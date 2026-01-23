@@ -63,6 +63,7 @@ python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 POST /evaluate
 
 ### Example request
+```json
 {
   "renter": {
     "monthly_income": 18000,
@@ -77,8 +78,10 @@ POST /evaluate
     "area_demand": "HIGH"
   }
 }
+```
 
 ### Example response
+```json
 {
   "score": 48,
   "verdict": "NOT_WORTH_IT",
@@ -96,7 +99,7 @@ POST /evaluate
     "upper_limit": 6300
   }
 }
-
+```
 ## Design Notes
 	•	The system is rules-based to ensure deterministic and explainable outputs.
 	•	Listings are represented as structured user inputs instead of external integrations or scraping.
