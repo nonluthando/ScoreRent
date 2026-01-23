@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html>
 <head>
   <title>RentCheck</title>
@@ -8,7 +8,9 @@
 
   <header>
     <h1>RentCheck</h1>
-    <p class="subtitle">Check if a rental listing is worth applying for — based on affordability & requirements.</p>
+    <p class="subtitle">
+      Check if a rental listing is worth applying for — based on affordability & requirements.
+    </p>
   </header>
 
   <div class="grid">
@@ -20,42 +22,48 @@
       <form method="post" action="/evaluate-ui">
 
         <h3>Your Profile</h3>
+
         <label>Monthly income</label>
-        <input type="number" name="monthly_income" placeholder="e.g. 18000" required>
+        <input type="number" name="monthly_income" min="1" placeholder="e.g. 18000" required>
 
         <label>Monthly rent budget</label>
-        <input type="number" name="budget" placeholder="e.g. 7000" required>
+        <input type="number" name="budget" min="1" placeholder="e.g. 7000" required>
 
         <h4>Documents you have</h4>
         <div class="checkboxes">
-          <label><input type="checkbox" name="documents" value="payslip"> Payslip</label>
           <label><input type="checkbox" name="documents" value="bank_statement"> Bank statement</label>
-          <label><input type="checkbox" name="documents" value="employment_letter"> Employment letter</label>
-          <label><input type="checkbox" name="documents" value="id_document"> ID document</label>
-          <label><input type="checkbox" name="documents" value="student_letter"> Student letter</label>
+          <label><input type="checkbox" name="documents" value="payslip"> Payslip</label>
+
+          <label><input type="checkbox" name="documents" value="employment_contract"> Employment contract</label>
           <label><input type="checkbox" name="documents" value="guarantor_letter"> Guarantor letter</label>
+
+          <label><input type="checkbox" name="documents" value="proof_of_registration"> Proof of registration</label>
+          <label><input type="checkbox" name="documents" value="proof_of_bursary"> Proof of bursary</label>
         </div>
 
         <hr>
 
         <h3>Listing Details</h3>
+
         <label>Rent</label>
-        <input type="number" name="rent" placeholder="e.g. 7500" required>
+        <input type="number" name="rent" min="1" placeholder="e.g. 7500" required>
 
         <label>Deposit</label>
-        <input type="number" name="deposit" placeholder="e.g. 7500" required>
+        <input type="number" name="deposit" min="0" placeholder="e.g. 7500" required>
 
         <label>Application fee</label>
-        <input type="number" name="application_fee" placeholder="e.g. 850" required>
+        <input type="number" name="application_fee" min="0" placeholder="e.g. 850" required>
 
         <h4>Required documents (from listing)</h4>
         <div class="checkboxes">
-          <label><input type="checkbox" name="required_documents" value="payslip"> Payslip</label>
           <label><input type="checkbox" name="required_documents" value="bank_statement"> Bank statement</label>
-          <label><input type="checkbox" name="required_documents" value="employment_letter"> Employment letter</label>
-          <label><input type="checkbox" name="required_documents" value="id_document"> ID document</label>
-          <label><input type="checkbox" name="required_documents" value="student_letter"> Student letter</label>
+          <label><input type="checkbox" name="required_documents" value="payslip"> Payslip</label>
+
+          <label><input type="checkbox" name="required_documents" value="employment_contract"> Employment contract</label>
           <label><input type="checkbox" name="required_documents" value="guarantor_letter"> Guarantor letter</label>
+
+          <label><input type="checkbox" name="required_documents" value="proof_of_registration"> Proof of registration</label>
+          <label><input type="checkbox" name="required_documents" value="proof_of_bursary"> Proof of bursary</label>
         </div>
 
         <label>Area demand</label>
