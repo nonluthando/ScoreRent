@@ -31,6 +31,7 @@ ScoreRent is an informational decision-support tool that helps renters assess wh
 - Uvicorn
 
 ## Project Structure
+```text
 rentcheck/
 ├── main.py
 ├── evaluator.py
@@ -39,8 +40,8 @@ rentcheck/
 ├── templates/
 │   └── index.html
 └── static/
-└── styles.css
-
+    └── styles.css
+```
 ## Setup
 ### Install dependencies
 
@@ -50,19 +51,18 @@ pip install -r requirements.txt
 Run application
 
 python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
 
-Access
+### Access
 	•	Web UI: http://127.0.0.1:8000/
 	•	API Docs (Swagger): http://127.0.0.1:8000/docs
 
-API
+## API
 
-Endpoint
-
+### Endpoint
 POST /evaluate
 
-Example request
-
+### Example request
 {
   "renter": {
     "monthly_income": 18000,
@@ -78,8 +78,7 @@ Example request
   }
 }
 
-Example response
-
+### Example response
 {
   "score": 48,
   "verdict": "NOT_WORTH_IT",
@@ -110,5 +109,6 @@ Example response
 	•	Add tests for evaluator rules
 
 ## Author
-Built as a backend-focused portfolio project.
+Luthando Mbuyane.
+#### Built as a backend-focused portfolio project.
 
