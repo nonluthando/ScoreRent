@@ -1,0 +1,38 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 40px;
+    max-width: 700px;
+}
+
+form input, form select {
+    display: block;
+    margin-bottom: 10px;
+    padding: 8px;
+    width: 100%;
+}
+
+button {
+    padding: 10px;
+    margin-top: 10px;
+}
+
+.card {
+    margin-top: 30px;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.score {
+    font-size: 2.5em;
+    font-weight: bold;
+}
+
+.verdict {
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.verdict.NOT_WORTH_IT { color: #c62828; }
+.verdict.BORDERLINE { color: #f9a825; }
+.verdict.WORTH_APPLYING { color: #2e7d32; }
