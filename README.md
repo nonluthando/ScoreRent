@@ -1,3 +1,4 @@
+![CI Tests](https://github.com/nonluthando/ScoreRent/actions/workflows/tests.yml/badge.svg)
 # ScoreRent
 Decision-support system that evaluates rental listings against renter profiles to reduce wasted application effort and costs.
 
