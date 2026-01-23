@@ -1,55 +1,61 @@
 from fastapi import FastAPI, Request, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from typing import List
 
-from schemas import EvaluationRequest
+from schemas import EvaluationRequest, EvaluationResponse
 from evaluator import evaluate
 
 app = FastAPI(
     title="RentCheck",
     description="Informational decision-support tool for rental applications",
-    version="1.0.0"
+    version="1.1.0"
 )
 
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+# -------------------------
+# UI ROUTES
+# -------------------------
+
 @app.get("/")
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.post("/evaluate")
+@app.post("/evaluate-ui")
 def evaluate_ui(
     request: Request,
+
+    # renter
     monthly_income: int = Form(...),
     budget: int = Form(...),
-    documents: str = Form(...),
+    documents: List[str] = Form([]),
+
+    # listing
     rent: int = Form(...),
     deposit: int = Form(...),
     application_fee: int = Form(...),
-    required_documents: str = Form(...),
+    required_documents: List[str] = Form([]),
     area_demand: str = Form(...)
 ):
-    renter = {
+    renter = type("Obj", (), {
         "monthly_income": monthly_income,
         "budget": budget,
-        "documents": [d.strip() for d in documents.split(",")]
-    }
+        "documents": documents
+    })
 
-    listing = {
+    listing = type("Obj", (), {
         "rent": rent,
         "deposit": deposit,
         "application_fee": application_fee,
-        "required_documents": [d.strip() for d in required_documents.split(",")],
+        "required_documents": required_documents,
         "area_demand": area_demand
-    }
+    })
 
-    score, verdict, reasons = evaluate(
-        renter=type("Obj", (), renter),
-        listing=type("Obj", (), listing)
-    )
+    score, verdict, reasons, suggested = evaluate(renter, listing)
 
     return templates.TemplateResponse(
         "index.html",
@@ -58,7 +64,24 @@ def evaluate_ui(
             "result": {
                 "score": score,
                 "verdict": verdict,
-                "reasons": reasons
+                "reasons": reasons,
+                "suggested_budget": suggested
             }
         }
     )
+
+
+# -------------------------
+# API ROUTE (JSON)
+# -------------------------
+
+@app.post("/evaluate", response_model=EvaluationResponse)
+def evaluate_api(payload: EvaluationRequest):
+    score, verdict, reasons, suggested = evaluate(payload.renter, payload.listing)
+
+    return {
+        "score": score,
+        "verdict": verdict,
+        "reasons": reasons,
+        "suggested_budget": suggested
+    }
