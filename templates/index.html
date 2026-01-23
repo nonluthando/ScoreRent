@@ -1,48 +1,106 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>RentCheck</title>
-    <link rel="stylesheet" href="/static/styles.css">
+  <title>RentCheck</title>
+  <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
 
-<h1>RentCheck</h1>
-<p>Decide if a rental listing is worth applying for.</p>
+  <header>
+    <h1>RentCheck</h1>
+    <p class="subtitle">Check if a rental listing is worth applying for — based on affordability & requirements.</p>
+  </header>
 
-<form method="post" action="/evaluate">
-    <h3>Your Profile</h3>
-    <input name="monthly_income" placeholder="Monthly income" required>
-    <input name="budget" placeholder="Monthly rent budget" required>
-    <input name="documents" placeholder="Documents (comma-separated)" required>
+  <div class="grid">
 
-    <h3>Listing Details</h3>
-    <input name="rent" placeholder="Rent" required>
-    <input name="deposit" placeholder="Deposit" required>
-    <input name="application_fee" placeholder="Application fee" required>
-    <input name="required_documents" placeholder="Required documents" required>
+    <!-- FORM -->
+    <section class="card">
+      <h2>Evaluate Listing</h2>
 
-    <select name="area_demand">
-        <option value="LOW">Low demand</option>
-        <option value="MEDIUM">Medium demand</option>
-        <option value="HIGH">High demand</option>
-    </select>
+      <form method="post" action="/evaluate-ui">
 
-    <button type="submit">Evaluate</button>
-</form>
+        <h3>Your Profile</h3>
+        <label>Monthly income</label>
+        <input type="number" name="monthly_income" placeholder="e.g. 18000" required>
 
-{% if result %}
-<div class="card">
-    <h2>Result</h2>
-    <div class="score">{{ result.score }}</div>
-    <div class="verdict {{ result.verdict }}">{{ result.verdict }}</div>
+        <label>Monthly rent budget</label>
+        <input type="number" name="budget" placeholder="e.g. 7000" required>
 
-    <ul>
-        {% for reason in result.reasons %}
-        <li>{{ reason }}</li>
-        {% endfor %}
-    </ul>
-</div>
-{% endif %}
+        <h4>Documents you have</h4>
+        <div class="checkboxes">
+          <label><input type="checkbox" name="documents" value="payslip"> Payslip</label>
+          <label><input type="checkbox" name="documents" value="bank_statement"> Bank statement</label>
+          <label><input type="checkbox" name="documents" value="employment_letter"> Employment letter</label>
+          <label><input type="checkbox" name="documents" value="id_document"> ID document</label>
+          <label><input type="checkbox" name="documents" value="student_letter"> Student letter</label>
+          <label><input type="checkbox" name="documents" value="guarantor_letter"> Guarantor letter</label>
+        </div>
+
+        <hr>
+
+        <h3>Listing Details</h3>
+        <label>Rent</label>
+        <input type="number" name="rent" placeholder="e.g. 7500" required>
+
+        <label>Deposit</label>
+        <input type="number" name="deposit" placeholder="e.g. 7500" required>
+
+        <label>Application fee</label>
+        <input type="number" name="application_fee" placeholder="e.g. 850" required>
+
+        <h4>Required documents (from listing)</h4>
+        <div class="checkboxes">
+          <label><input type="checkbox" name="required_documents" value="payslip"> Payslip</label>
+          <label><input type="checkbox" name="required_documents" value="bank_statement"> Bank statement</label>
+          <label><input type="checkbox" name="required_documents" value="employment_letter"> Employment letter</label>
+          <label><input type="checkbox" name="required_documents" value="id_document"> ID document</label>
+          <label><input type="checkbox" name="required_documents" value="student_letter"> Student letter</label>
+          <label><input type="checkbox" name="required_documents" value="guarantor_letter"> Guarantor letter</label>
+        </div>
+
+        <label>Area demand</label>
+        <select name="area_demand" required>
+          <option value="LOW">Low demand</option>
+          <option value="MEDIUM">Medium demand</option>
+          <option value="HIGH">High demand</option>
+        </select>
+
+        <button type="submit">Evaluate</button>
+
+      </form>
+    </section>
+
+    <!-- RESULT -->
+    <section class="card">
+      <h2>Result</h2>
+
+      {% if result %}
+        <div class="score">{{ result.score }}/100</div>
+
+        <div class="verdict {{ result.verdict }}">
+          {{ result.verdict.replace("_", " ") }}
+        </div>
+
+        <h3>Suggested monthly rent budget</h3>
+        <ul>
+          <li><b>Conservative (25%):</b> R{{ result.suggested_budget.conservative }}</li>
+          <li><b>Recommended (30%):</b> R{{ result.suggested_budget.recommended }}</li>
+          <li><b>Upper limit (35%):</b> R{{ result.suggested_budget.upper_limit }}</li>
+        </ul>
+
+        <h3>Reasons</h3>
+        <ul>
+          {% for reason in result.reasons %}
+            <li>{{ reason }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">Fill in the form to see the evaluation output here.</p>
+      {% endif %}
+
+    </section>
+
+  </div>
 
 </body>
 </html>
