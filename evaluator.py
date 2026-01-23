@@ -1,56 +1,70 @@
+def suggested_budget(monthly_income: int):
+    return {
+        "conservative": int(monthly_income * 0.25),
+        "recommended": int(monthly_income * 0.30),
+        "upper_limit": int(monthly_income * 0.35)
+    }
+
+
 def evaluate(renter, listing):
     score = 100
     reasons = []
 
-    # Rent vs income
-    if listing.rent / renter.monthly_income > 0.35:
+    # --- Suggested rent budget info ---
+    budget = suggested_budget(renter.monthly_income)
+
+    # --- Rent vs income ---
+    rent_ratio = listing.rent / renter.monthly_income
+    if rent_ratio > 0.35:
         score -= 30
         reasons.append("Rent exceeds recommended affordability threshold")
 
-    # Budget
+    # --- Budget check ---
     if listing.rent > renter.budget:
         score -= 20
         reasons.append("Rent exceeds stated budget")
 
-    # Deposit
+    # --- Deposit check ---
     if listing.deposit > renter.budget:
         score -= 10
         reasons.append("Deposit may be difficult to afford")
 
-    # Documents
+    # --- Document matching ---
     renter_docs = set(renter.documents)
     required_docs = set(listing.required_documents)
-    missing = required_docs - renter_docs
+    missing_docs = required_docs - renter_docs
 
-    if not missing:
+    if not missing_docs:
         score += 10
         reasons.append("All required documents are available")
-    elif len(missing) == 1:
+    elif len(missing_docs) == 1:
         score -= 10
-        reasons.append(f"Missing required document: {missing.pop()}")
+        reasons.append(f"Missing required document: {missing_docs.pop()}")
     else:
         score -= 30
         reasons.append("Multiple required documents are missing")
 
-    # Area demand
+    # --- Area demand ---
     if listing.area_demand == "HIGH":
         score -= 10
         reasons.append("High demand area increases competition")
 
-    # Application fee (risk)
+    # --- Application fee (risk factor) ---
     if listing.application_fee > 0:
-        fee_ratio = listing.application_fee / renter.budget
+        fee_ratio = listing.application_fee / max(renter.budget, 1)
+
         if fee_ratio > 0.05:
             score -= 15
             reasons.append("High application fee relative to budget")
+
         if score < 60:
             score -= 10
-            reasons.append(
-                "Application fee increases cost of a low-confidence application"
-            )
+            reasons.append("Application fee increases cost of a low-confidence application")
 
+    # --- Clamp score ---
     score = max(0, min(score, 100))
 
+    # --- Verdict ---
     if score >= 70:
         verdict = "WORTH_APPLYING"
     elif score >= 40:
@@ -58,4 +72,4 @@ def evaluate(renter, listing):
     else:
         verdict = "NOT_WORTH_IT"
 
-    return score, verdict, reasons
+    return score, verdict, reasons, budget
