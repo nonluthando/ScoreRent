@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RentCheck</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<h1>RentCheck</h1>
+<p>Decide if a rental listing is worth applying for.</p>
+
+<form method="post" action="/evaluate">
+    <h3>Your Profile</h3>
+    <input name="monthly_income" placeholder="Monthly income" required>
+    <input name="budget" placeholder="Monthly rent budget" required>
+    <input name="documents" placeholder="Documents (comma-separated)" required>
+
+    <h3>Listing Details</h3>
+    <input name="rent" placeholder="Rent" required>
+    <input name="deposit" placeholder="Deposit" required>
+    <input name="application_fee" placeholder="Application fee" required>
+    <input name="required_documents" placeholder="Required documents" required>
+
+    <select name="area_demand">
+        <option value="LOW">Low demand</option>
+        <option value="MEDIUM">Medium demand</option>
+        <option value="HIGH">High demand</option>
+    </select>
+
+    <button type="submit">Evaluate</button>
+</form>
+
+{% if result %}
+<div class="card">
+    <h2>Result</h2>
+    <div class="score">{{ result.score }}</div>
+    <div class="verdict {{ result.verdict }}">{{ result.verdict }}</div>
+
+    <ul>
+        {% for reason in result.reasons %}
+        <li>{{ reason }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+</body>
+</html>
