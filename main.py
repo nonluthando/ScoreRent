@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from database import init_db
 
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import RedirectResponse
