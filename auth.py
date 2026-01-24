@@ -18,14 +18,22 @@ def verify_password(password: str, password_hash: str) -> bool:
     return pwd_context.verify(password, password_hash)
 
 
-def create_user(email: str, password: str):
+def create_user(email: str, password: str) -> int:
     conn = get_conn()
-    conn.execute(
-        "INSERT INTO users (email, password_hash, created_at) VALUES (?, ?, ?)",
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO users (email, password_hash, created_at)
+        VALUES (%s, %s, %s)
+        RETURNING id
+        """,
         (email.lower().strip(), hash_password(password), datetime.utcnow().isoformat()),
     )
+    user_id = cur.fetchone()["id"]
     conn.commit()
+    cur.close()
     conn.close()
+    return user_id
 
 
 def get_user_by_email(email: str):
