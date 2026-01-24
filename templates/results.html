@@ -1,46 +1,84 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Evaluation result</h2>
 
-<div class="result">
-  <div class="scoreBox">
-    <div class="score">{{ evaluation.score }}</div>
-    <div class="verdict">{{ evaluation.verdict }}</div>
-    <div class="muted small">Confidence: {{ evaluation.confidence }}</div>
+<section class="stack" style="padding-top: 26px;">
+  <div class="stack" style="gap:10px;">
+    <h2>Evaluation result</h2>
+    <p>Your listing has been assessed against your renter profile.</p>
   </div>
 
-  <div class="card">
-    <h3>Listing summary</h3>
-    <ul class="list">
-      <li><strong>Name:</strong> {{ evaluation.listing_name or "Unnamed listing" }}</li>
-      <li><strong>Rent:</strong> R{{ listing.rent }}</li>
-      <li><strong>Deposit:</strong> R{{ listing.deposit }}</li>
-      <li><strong>Application fee:</strong> R{{ listing.application_fee }}</li>
-      <li><strong>Demand:</strong> {{ listing.area_demand }}</li>
-    </ul>
+  <div class="grid-2">
+    <div class="card stack">
+      <div class="badge">
+        Score: {{ evaluation["score"] }}/100
+      </div>
+
+      <h3 style="margin-top: 6px;">
+        {{ evaluation["listing_name"] or "Listing" }}
+      </h3>
+
+      <p style="margin-top:-4px;">
+        Verdict: <strong>{{ evaluation["verdict"] }}</strong><br />
+        Confidence: <strong>{{ evaluation["confidence"] }}</strong>
+      </p>
+
+      <div class="actions">
+        <a class="btn" href="/evaluate">New evaluation</a>
+        <a class="btn secondary" href="/history">View history</a>
+      </div>
+    </div>
+
+    <div class="card stack">
+      <h3>Listing details</h3>
+      <p>
+        Rent: <strong>R{{ listing["rent"] }}</strong><br />
+        Deposit: <strong>R{{ listing["deposit"] }}</strong><br />
+        Application fee: <strong>R{{ listing["application_fee"] }}</strong><br />
+        Demand: <strong>{{ listing["area_demand"] }}</strong>
+      </p>
+
+      <hr />
+
+      <h3>Required documents</h3>
+      {% if listing["required_documents"] %}
+        <div class="stack" style="gap:8px;">
+          {% for doc in listing["required_documents"] %}
+            <div class="badge">{{ doc.replace("_"," ").title() }}</div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p>No specific docs selected.</p>
+      {% endif %}
+    </div>
   </div>
 
-  <div class="card">
-    <h3>Reasons</h3>
-    <ul class="list">
-      {% for r in reasons %}
-        <li>{{ r }}</li>
-      {% endfor %}
-    </ul>
-  </div>
+  <div class="grid-2">
+    <div class="card stack">
+      <h3>Reasons</h3>
+      {% if reasons %}
+        <div class="stack" style="gap:10px;">
+          {% for r in reasons %}
+            <div class="badge">{{ r }}</div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p>No reasons logged.</p>
+      {% endif %}
+    </div>
 
-  <div class="card">
-    <h3>Suggested actions</h3>
-    <ul class="list">
-      {% for a in actions %}
-        <li>{{ a }}</li>
-      {% endfor %}
-    </ul>
+    <div class="card stack">
+      <h3>Recommended actions</h3>
+      {% if actions %}
+        <div class="stack" style="gap:10px;">
+          {% for a in actions %}
+            <div class="badge good">{{ a }}</div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p>No suggested actions.</p>
+      {% endif %}
+    </div>
   </div>
+</section>
 
-  <div class="actionsRow">
-    <a class="btn ghost" href="/history">View history</a>
-    <a class="btn" href="/evaluate">Evaluate another</a>
-  </div>
-</div>
 {% endblock %}
