@@ -1,56 +1,106 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Evaluate listing</h2>
 
-{% if user %}
-  <p class="muted">
-    Using your saved profile ({{ renter_type }}, income: R{{ monthly_income }}).
-  </p>
-{% else %}
-  <p class="muted">
-    You are evaluating as a guest. Sign up to save your profile and evaluation history.
-  </p>
-{% endif %}
+<h2>Evaluate a Listing</h2>
+<p class="muted">
+  Compare a rental listing against your profile and get a score, verdict, and explainable reasons.
+</p>
 
-<form method="post" class="card stack">
+<form method="post" class="card stack" action="/evaluate">
 
-  <label>Listing name (optional)</label>
-  <input name="listing_name" placeholder="e.g. Gardens Studio" />
+  <label>Listing Name (optional)</label>
+  <input name="listing_name" placeholder="e.g. Gardens Studio, Sea Point 1BR" />
 
-  <label>Rent (monthly)</label>
-  <input type="number" name="rent" min="0" required />
+  <div class="grid2">
+    <div>
+      <label>Rent (R)</label>
+      <input name="rent" type="number" min="0" required />
+    </div>
 
-  <label>Deposit</label>
-  <input type="number" name="deposit" min="0" required />
+    <div>
+      <label>Deposit (R)</label>
+      <input name="deposit" type="number" min="0" required />
+    </div>
+  </div>
 
-  <label>Application fee</label>
-  <input type="number" name="application_fee" min="0" required />
+  <div class="grid2">
+    <div>
+      <label>Application Fee (R)</label>
+      <input name="application_fee" type="number" min="0" required />
+    </div>
 
-  <label>Area demand</label>
-  <select name="area_demand">
-    {% for d in demand_levels %}
-      <option value="{{ d }}">{{ d }}</option>
-    {% endfor %}
-  </select>
+    <div>
+      <label>Area Demand</label>
+      <select name="area_demand" required>
+        {% for d in demand_levels %}
+          <option value="{{ d }}">{{ d }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
 
-  <div class="divider"></div>
+  <hr />
 
-  <h3 class="sectionTitle">Required documents (tick what the listing requires)</h3>
+  <h3>Required Documents (Listing)</h3>
+  <p class="muted">Tick the documents required by the listing/agent.</p>
+
   <div class="checkboxGrid">
     <label><input type="checkbox" name="required_documents" value="bank_statement" /> Bank statement</label>
     <label><input type="checkbox" name="required_documents" value="payslip" /> Payslip</label>
     <label><input type="checkbox" name="required_documents" value="employment_contract" /> Employment contract</label>
-    <label><input type="checkbox" name="required_documents" value="guarantor_letter" /> Guarantor letter</label>
+
     <label><input type="checkbox" name="required_documents" value="proof_of_registration" /> Proof of registration</label>
-    <label><input type="checkbox" name="required_documents" value="bursary_letter" /> Proof of bursary</label>
+    <label><input type="checkbox" name="required_documents" value="bursary_letter" /> Bursary confirmation</label>
+    <label><input type="checkbox" name="required_documents" value="guarantor_letter" /> Guarantor letter</label>
+
+    <label><input type="checkbox" name="required_documents" value="guarantor_payslip" /> Guarantor payslip</label>
+    <label><input type="checkbox" name="required_documents" value="guarantor_bank_statement" /> Guarantor bank statement</label>
   </div>
 
-  <button class="btn" type="submit">Evaluate</button>
+  <hr />
 
-  {% if not user %}
-    <p class="muted small">
-      Want to save results? <a href="/signup" class="inlineLink">Create an account</a>.
+  <h3>Student Support (only if relevant)</h3>
+  <p class="muted">
+    If you are a student without a bursary that covers rent, ScoreRent can evaluate affordability using your guarantor income.
+  </p>
+
+  <div id="guarantorIncomeBlock" style="display:none;">
+    <label>Guarantor Monthly Income (R)</label>
+    <input name="guarantor_monthly_income" type="number" min="0" value="0" />
+    <p class="muted">
+      Used only for <strong>non-bursary students</strong> to assess affordability.
     </p>
-  {% endif %}
+  </div>
+
+  <button class="btn" type="submit">Start Evaluation</button>
+
 </form>
+
+<script>
+  // We infer student/bursary from your saved profile docs (loaded into renter_docs),
+  // but the evaluator uses it only when renter_type == student and bursary_letter missing.
+
+  const renterType = "{{ renter_type }}";
+  const renterDocs = {{ renter_docs | tojson }};
+
+  function hasDoc(docName) {
+    return renterDocs && renterDocs.includes(docName);
+  }
+
+  function toggleGuarantorIncome() {
+    const block = document.getElementById("guarantorIncomeBlock");
+
+    const isStudent = renterType === "student";
+    const hasBursary = hasDoc("bursary_letter");
+
+    if (isStudent && !hasBursary) {
+      block.style.display = "block";
+    } else {
+      block.style.display = "none";
+    }
+  }
+
+  toggleGuarantorIncome();
+</script>
+
 {% endblock %}
