@@ -6,3 +6,4 @@ itsdangerous==2.2.0
 passlib[bcrypt]==1.7.4
 pytest
 pytest-cov
+psycopg[binary]==3.2.3
