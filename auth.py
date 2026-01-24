@@ -31,7 +31,7 @@ def create_user(email: str, password: str):
 def get_user_by_email(email: str):
     conn = get_conn()
     user = conn.execute(
-        "SELECT * FROM users WHERE email = ?",
+        "SELECT * FROM users WHERE email = %s",
         (email.lower().strip(),),
     ).fetchone()
     conn.close()
@@ -41,7 +41,7 @@ def get_user_by_email(email: str):
 def get_user_by_id(user_id: int):
     conn = get_conn()
     user = conn.execute(
-        "SELECT * FROM users WHERE id = ?",
+        "SELECT * FROM users WHERE id = %s",
         (user_id,),
     ).fetchone()
     conn.close()
