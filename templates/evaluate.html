@@ -1,11 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>Evaluate listing</h2>
-<p class="muted">
-  Using your saved profile ({{ profile.renter_type }}, income: R{{ profile.monthly_income }}).
-</p>
 
-<form method="post" class="card">
+{% if user %}
+  <p class="muted">
+    Using your saved profile ({{ renter_type }}, income: R{{ monthly_income }}).
+  </p>
+{% else %}
+  <p class="muted">
+    You are evaluating as a guest. Sign up to save your profile and evaluation history.
+  </p>
+{% endif %}
+
+<form method="post" class="card stack">
+
+  <label>Listing name (optional)</label>
+  <input name="listing_name" placeholder="e.g. Gardens Studio" />
+
   <label>Rent (monthly)</label>
   <input type="number" name="rent" min="0" required />
 
@@ -22,9 +33,24 @@
     {% endfor %}
   </select>
 
-  <label>Required documents (comma-separated)</label>
-  <input name="required_documents" placeholder="bank_statement, payslip" />
+  <div class="divider"></div>
+
+  <h3 class="sectionTitle">Required documents (tick what the listing requires)</h3>
+  <div class="checkboxGrid">
+    <label><input type="checkbox" name="required_documents" value="bank_statement" /> Bank statement</label>
+    <label><input type="checkbox" name="required_documents" value="payslip" /> Payslip</label>
+    <label><input type="checkbox" name="required_documents" value="employment_contract" /> Employment contract</label>
+    <label><input type="checkbox" name="required_documents" value="guarantor_letter" /> Guarantor letter</label>
+    <label><input type="checkbox" name="required_documents" value="proof_of_registration" /> Proof of registration</label>
+    <label><input type="checkbox" name="required_documents" value="bursary_letter" /> Proof of bursary</label>
+  </div>
 
   <button class="btn" type="submit">Evaluate</button>
+
+  {% if not user %}
+    <p class="muted small">
+      Want to save results? <a href="/signup" class="inlineLink">Create an account</a>.
+    </p>
+  {% endif %}
 </form>
 {% endblock %}
