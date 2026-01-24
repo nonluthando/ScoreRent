@@ -10,6 +10,27 @@ def get_conn():
     return conn
 
 
+def _col_exists(conn, table: str, col: str) -> bool:
+    cols = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    return any(c["name"] == col for c in cols)
+
+
+def migrate_db(conn):
+    """
+    Applies migrations safely for existing DBs.
+    """
+    # ---- profiles migrations ----
+    if not _col_exists(conn, "profiles", "documents_json"):
+        conn.execute("ALTER TABLE profiles ADD COLUMN documents_json TEXT")
+        conn.execute("UPDATE profiles SET documents_json = '[]' WHERE documents_json IS NULL")
+        conn.commit()
+
+    # ---- evaluations migrations ----
+    if not _col_exists(conn, "evaluations", "listing_name"):
+        conn.execute("ALTER TABLE evaluations ADD COLUMN listing_name TEXT")
+        conn.commit()
+
+
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
@@ -32,7 +53,7 @@ def init_db():
             user_id INTEGER NOT NULL,
             renter_type TEXT NOT NULL,
             monthly_income INTEGER NOT NULL,
-            documents_json TEXT NOT NULL,
+            documents_json TEXT NOT NULL DEFAULT '[]',
             created_at TEXT NOT NULL,
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
@@ -71,12 +92,9 @@ def init_db():
         """
     )
 
-    # ✅ migration: add listing_name if missing (for existing DB)
-    cols = conn.execute("PRAGMA table_info(evaluations)").fetchall()
-    col_names = {c["name"] for c in cols}
-    if "listing_name" not in col_names:
-        conn.execute("ALTER TABLE evaluations ADD COLUMN listing_name TEXT")
-        conn.commit()
-
     conn.commit()
+
+    #  apply migrations AFTER base tables exist
+    migrate_db(conn)
+
     conn.close()
