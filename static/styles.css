@@ -1,20 +1,13 @@
-:/* ===========================
-   ScoreRent Minimal UI Theme
-   =========================== */
-
-/* ---- Base ---- */
 :root {
   --bg: #ffffff;
-  --muted-bg: #f8fafc;
-  --card: #ffffff;
   --text: #0f172a;
-  --muted: #64748b;
+  --muted: #475569;
   --border: #e2e8f0;
+  --card: #f8fafc;
   --primary: #2563eb;
-  --primary-hover: #1d4ed8;
+  --primary-dark: #1d4ed8;
   --danger: #dc2626;
-  --success: #16a34a;
-  --shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
+  --shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
   --radius: 16px;
 }
 
@@ -22,93 +15,72 @@
   box-sizing: border-box;
 }
 
-body {
+html, body {
   margin: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  padding: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
   background: var(--bg);
   color: var(--text);
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
-/* ---- Layout ---- */
+a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
 .container {
-  max-width: 920px;
+  width: min(900px, 92vw);
   margin: 0 auto;
-  padding: 28px 18px 70px;
+  padding: 24px 0 80px;
 }
 
-.stack {
+nav {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* ---- Typography ---- */
-h1, h2, h3, h4 {
-  margin: 0 0 10px;
-  letter-spacing: -0.02em;
-}
-
-h1 { font-size: 2rem; }
-h2 { font-size: 1.4rem; margin-top: 6px; }
-h3 { font-size: 1.15rem; margin-top: 10px; }
-h4 { font-size: 1rem; margin-top: 8px; }
-
-p {
-  margin: 0 0 10px;
-}
-
-.muted {
-  color: var(--muted);
-  font-size: 0.95rem;
-}
-
-/* ---- Nav ---- */
-.navbar {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(10px);
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 0;
   border-bottom: 1px solid var(--border);
 }
 
-.navbar-inner {
-  max-width: 920px;
-  margin: 0 auto;
-  padding: 14px 18px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.brand {
-  font-weight: 700;
+nav .brand {
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -0.3px;
   color: var(--text);
-  text-decoration: none;
-  letter-spacing: -0.02em;
 }
 
-.nav-links {
+nav .links {
   display: flex;
   gap: 14px;
-  align-items: center;
+  flex-wrap: wrap;
 }
 
-.nav-links a {
-  text-decoration: none;
+h1, h2, h3 {
+  margin: 0 0 12px;
+  letter-spacing: -0.6px;
+}
+
+h1 {
+  font-size: clamp(32px, 4vw, 44px);
+  line-height: 1.1;
+}
+
+h2 {
+  font-size: 26px;
+}
+
+p {
+  margin: 0 0 14px;
   color: var(--muted);
-  font-weight: 500;
-  padding: 8px 10px;
-  border-radius: 10px;
 }
 
-.nav-links a:hover {
-  background: var(--muted-bg);
-  color: var(--text);
-}
-
-/* ---- Cards ---- */
 .card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -117,192 +89,139 @@ p {
   box-shadow: var(--shadow);
 }
 
-.card.subtle {
-  background: var(--muted-bg);
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 700px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 10px;
+  display: block;
+}
+
+input, select, textarea {
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px 12px;
   border: 1px solid var(--border);
-  box-shadow: none;
+  border-radius: 12px;
+  background: white;
+  color: var(--text);
+  font-size: 14px;
 }
 
-hr {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 6px 0;
+input:focus, select:focus, textarea:focus {
+  outline: 3px solid rgba(37, 99, 235, 0.15);
+  border-color: rgba(37, 99, 235, 0.6);
 }
 
-/* ---- Buttons ---- */
+.checkbox-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+  margin-top: 12px;
+}
+
+.checkbox {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: white;
+}
+
+.checkbox input {
+  width: auto;
+  margin: 0;
+}
+
 .btn {
+  appearance: none;
+  border: 0;
+  background: var(--primary);
+  color: white;
+  font-weight: 800;
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: 0.15s;
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  border: none;
-  padding: 12px 16px;
-  border-radius: 14px;
-  font-weight: 600;
-  text-decoration: none;
-  background: var(--primary);
-  color: white;
-  transition: transform 0.06s ease, background 0.2s ease;
+  gap: 10px;
 }
 
 .btn:hover {
-  background: var(--primary-hover);
-}
-
-.btn:active {
-  transform: translateY(1px);
+  background: var(--primary-dark);
+  transform: translateY(-1px);
 }
 
 .btn.secondary {
-  background: var(--muted-bg);
+  background: white;
   color: var(--text);
   border: 1px solid var(--border);
 }
 
 .btn.secondary:hover {
   background: #f1f5f9;
+  transform: translateY(-1px);
 }
 
-/* ---- Form controls ---- */
-label {
-  font-weight: 600;
-  font-size: 0.95rem;
-  margin-top: 4px;
-}
-
-input, select, textarea {
-  width: 100%;
-  padding: 12px 12px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  outline: none;
-  font-size: 1rem;
-  background: white;
-}
-
-input:focus, select:focus, textarea:focus {
-  border-color: rgba(37, 99, 235, 0.65);
-  box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.12);
-}
-
-/* ---- Checkboxes grid ---- */
-.checkboxGrid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-  padding: 14px;
-  background: var(--muted-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-@media (min-width: 720px) {
-  .checkboxGrid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-.checkboxGrid label {
+.actions {
   display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: white;
-  border: 1px solid var(--border);
-  font-weight: 500;
-  margin: 0;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.checkboxGrid input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--primary);
-}
-
-/* ---- Lists ---- */
-.bullets {
-  padding-left: 20px;
-  margin: 8px 0 0;
-  color: var(--text);
-}
-
-.bullets li {
-  margin-bottom: 6px;
-}
-
-/* ---- Alerts / error messages ---- */
-.error {
-  margin-top: 10px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(220, 38, 38, 0.35);
-  background: rgba(220, 38, 38, 0.08);
-  color: var(--danger);
-  font-weight: 600;
-}
-
-.success {
-  margin-top: 10px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(22, 163, 74, 0.35);
-  background: rgba(22, 163, 74, 0.08);
-  color: var(--success);
-  font-weight: 600;
-}
-
-/* ---- Tables (History page) ---- */
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  overflow: hidden;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-}
-
-.table th, .table td {
-  padding: 12px;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.95rem;
-}
-
-.table th {
-  background: var(--muted-bg);
-  color: var(--muted);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-size: 0.8rem;
-}
-
-.table tr:hover td {
-  background: #f8fafc;
-}
-
-/* ---- Badges ---- */
 .badge {
   display: inline-flex;
   align-items: center;
+  border: 1px solid var(--border);
   padding: 6px 10px;
   border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  border: 1px solid var(--border);
-  background: var(--muted-bg);
+  font-size: 12px;
+  font-weight: 800;
+  background: white;
   color: var(--text);
 }
 
-.badge.good { color: var(--success); border-color: rgba(22,163,74,.25); }
-.badge.bad { color: var(--danger); border-color: rgba(220,38,38,.25); }
+.badge.good { border-color: rgba(34,197,94,.3); }
+.badge.warn { border-color: rgba(245,158,11,.3); }
+.badge.bad { border-color: rgba(239,68,68,.3); }
 
-/* ---- Footer spacing ---- */
-.footer {
-  margin-top: 42px;
-  padding-top: 20px;
+hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+
+footer {
+  margin-top: 30px;
+  padding-top: 18px;
   border-top: 1px solid var(--border);
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: 13px;
+}
+
+.error {
+  color: var(--danger);
+  font-weight: 700;
 }
