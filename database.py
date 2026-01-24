@@ -32,8 +32,19 @@ def init_db():
             user_id INTEGER NOT NULL,
             renter_type TEXT NOT NULL,
             monthly_income INTEGER NOT NULL,
-            docs_json TEXT NOT NULL,
-            is_default INTEGER NOT NULL DEFAULT 1,
+            documents_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+        """
+    )
+
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token TEXT UNIQUE NOT NULL,
             created_at TEXT NOT NULL,
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
@@ -44,8 +55,9 @@ def init_db():
         """
         CREATE TABLE IF NOT EXISTS evaluations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            profile_id INTEGER NOT NULL,
+            user_id INTEGER,
+            profile_id INTEGER,
+            listing_name TEXT,
             listing_json TEXT NOT NULL,
             score INTEGER NOT NULL,
             verdict TEXT NOT NULL,
@@ -58,6 +70,13 @@ def init_db():
         )
         """
     )
+
+    # ✅ migration: add listing_name if missing (for existing DB)
+    cols = conn.execute("PRAGMA table_info(evaluations)").fetchall()
+    col_names = {c["name"] for c in cols}
+    if "listing_name" not in col_names:
+        conn.execute("ALTER TABLE evaluations ADD COLUMN listing_name TEXT")
+        conn.commit()
 
     conn.commit()
     conn.close()
