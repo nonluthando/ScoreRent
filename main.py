@@ -80,7 +80,6 @@ def signup_post(
     password: str = Form(...),
 ):
     if len(password.encode("utf-8")) > 72:
-        # avoid bcrypt crash
         return templates.TemplateResponse(
             "signup.html",
             {"request": request, "error": "Password too long (max 72 bytes)."},
@@ -99,9 +98,8 @@ def signup_post(
     token = make_session_token(user_id)
 
     resp = RedirectResponse("/dashboard", status_code=303)
-    resp.set_cookie("session_token", token, httponly=True)
+    resp.set_cookie("session", token, httponly=True, samesite="lax")
     return resp
-
 
 @app.get("/login")
 def login_page(request: Request):
@@ -128,14 +126,14 @@ def login_post(
 
     token = make_session_token(user["id"])
     resp = RedirectResponse("/dashboard", status_code=303)
-    resp.set_cookie("session_token", token, httponly=True)
+    resp.set_cookie("session", token, httponly=True, samesite="lax")
     return resp
 
 
 @app.get("/logout")
 def logout(request: Request):
     resp = RedirectResponse("/", status_code=303)
-    resp.delete_cookie("session_token")
+    resp.delete_cookie("session")
     return resp
 
 
