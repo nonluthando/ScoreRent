@@ -7,34 +7,21 @@ DB_PATH = Path("scorerent.db")
 def get_conn():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+
+    # ✅ Helps reduce "database is locked" issues
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+
     return conn
-
-
-def _col_exists(conn, table: str, col: str) -> bool:
-    cols = conn.execute(f"PRAGMA table_info({table})").fetchall()
-    return any(c["name"] == col for c in cols)
-
-
-def migrate_db(conn):
-    """
-    Applies migrations safely for existing DBs.
-    """
-    # ---- profiles migrations ----
-    if not _col_exists(conn, "profiles", "documents_json"):
-        conn.execute("ALTER TABLE profiles ADD COLUMN documents_json TEXT")
-        conn.execute("UPDATE profiles SET documents_json = '[]' WHERE documents_json IS NULL")
-        conn.commit()
-
-    # ---- evaluations migrations ----
-    if not _col_exists(conn, "evaluations", "listing_name"):
-        conn.execute("ALTER TABLE evaluations ADD COLUMN listing_name TEXT")
-        conn.commit()
 
 
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
 
+    # ----------------------------
+    # USERS
+    # ----------------------------
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -46,6 +33,9 @@ def init_db():
         """
     )
 
+    # ----------------------------
+    # PROFILES
+    # ----------------------------
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS profiles (
@@ -53,13 +43,25 @@ def init_db():
             user_id INTEGER NOT NULL,
             renter_type TEXT NOT NULL,
             monthly_income INTEGER NOT NULL,
-            documents_json TEXT NOT NULL DEFAULT '[]',
+            documents_json TEXT NOT NULL,
             created_at TEXT NOT NULL,
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
         """
     )
 
+    # ✅ migration: add documents_json to profiles if missing (older DBs)
+    cols = conn.execute("PRAGMA table_info(profiles)").fetchall()
+    profile_col_names = {c["name"] for c in cols}
+    if "documents_json" not in profile_col_names:
+        conn.execute(
+            "ALTER TABLE profiles ADD COLUMN documents_json TEXT DEFAULT '[]'"
+        )
+        conn.commit()
+
+    # ----------------------------
+    # SESSIONS
+    # ----------------------------
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS sessions (
@@ -72,6 +74,9 @@ def init_db():
         """
     )
 
+    # ----------------------------
+    # EVALUATIONS
+    # ----------------------------
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS evaluations (
@@ -92,9 +97,12 @@ def init_db():
         """
     )
 
+    # ✅ migration: add listing_name if missing (for existing DB)
+    cols = conn.execute("PRAGMA table_info(evaluations)").fetchall()
+    eval_col_names = {c["name"] for c in cols}
+    if "listing_name" not in eval_col_names:
+        conn.execute("ALTER TABLE evaluations ADD COLUMN listing_name TEXT")
+        conn.commit()
+
     conn.commit()
-
-    #  apply migrations AFTER base tables exist
-    migrate_db(conn)
-
     conn.close()
