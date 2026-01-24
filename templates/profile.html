@@ -1,110 +1,94 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2>Your Profile</h2>
-<p class="muted">
-  Save your renter profile so ScoreRent can evaluate listings against your situation automatically.
-</p>
-
-<form method="post" class="card stack" action="/profile">
-
-  <label>Renter Type</label>
-  <select id="renter_type" name="renter_type" required>
-    <option value="worker" {% if renter_type == "worker" %}selected{% endif %}>Worker</option>
-    <option value="new_professional" {% if renter_type == "new_professional" %}selected{% endif %}>New Professional</option>
-    <option value="student" {% if renter_type == "student" %}selected{% endif %}>Student</option>
-  </select>
-
-  <label>Monthly Income (R)</label>
-  <input name="monthly_income" type="number" min="0" value="{{ monthly_income }}" required />
-
-  <hr />
-
-  <h3>Your Documents</h3>
-  <p class="muted">Select the documents you can provide.</p>
-
-  <div class="checkboxGrid">
-
-    <!-- Worker docs -->
-    <label>
-      <input type="checkbox" name="renter_docs" value="bank_statement"
-      {% if "bank_statement" in docs_selected %}checked{% endif %}/>
-      Bank statement
-    </label>
-
-    <label>
-      <input type="checkbox" name="renter_docs" value="payslip"
-      {% if "payslip" in docs_selected %}checked{% endif %}/>
-      Payslip
-    </label>
-
-    <!-- New professional docs -->
-    <label>
-      <input type="checkbox" name="renter_docs" value="employment_contract"
-      {% if "employment_contract" in docs_selected %}checked{% endif %}/>
-      Employment contract
-    </label>
-
-    <label>
-      <input type="checkbox" name="renter_docs" value="guarantor_letter"
-      {% if "guarantor_letter" in docs_selected %}checked{% endif %}/>
-      Guarantor letter
-    </label>
-
-    <!-- Student docs -->
-    <label>
-      <input type="checkbox" name="renter_docs" value="proof_of_registration"
-      {% if "proof_of_registration" in docs_selected %}checked{% endif %}/>
-      Proof of registration
-    </label>
-
-    <label>
-      <input type="checkbox" name="renter_docs" value="bursary_letter"
-      {% if "bursary_letter" in docs_selected %}checked{% endif %}/>
-      Bursary confirmation
-    </label>
-
-    <!-- Guarantor doc set (for non-bursary students) -->
-    <label>
-      <input type="checkbox" name="renter_docs" value="guarantor_payslip"
-      {% if "guarantor_payslip" in docs_selected %}checked{% endif %}/>
-      Guarantor payslip
-    </label>
-
-    <label>
-      <input type="checkbox" name="renter_docs" value="guarantor_bank_statement"
-      {% if "guarantor_bank_statement" in docs_selected %}checked{% endif %}/>
-      Guarantor bank statement
-    </label>
-
-  </div>
-
-  <div class="card subtle">
-    <h4 style="margin:0 0 8px 0;">Recommended docs for your renter type</h4>
-    <ul id="recommended_docs" class="bullets"></ul>
-    <p class="muted" style="margin-top:10px;">
-      These strengthen your application. ScoreRent will still evaluate if you are missing some.
+<section class="stack" style="padding-top: 26px;">
+  <div class="stack" style="gap:10px;">
+    <h2>Your renter profile</h2>
+    <p>
+      This profile is used when evaluating listings. You can update it anytime.
     </p>
   </div>
 
-  <button class="btn" type="submit">Save Profile</button>
-</form>
+  <form method="post" class="card stack">
+    <div class="grid-2">
+      <div class="stack">
+        <label>Renter type</label>
+        <select id="renter_type" name="renter_type" required>
+          <option value="worker" {% if renter_type=="worker" %}selected{% endif %}>Worker</option>
+          <option value="new_professional" {% if renter_type=="new_professional" %}selected{% endif %}>New Professional</option>
+          <option value="student" {% if renter_type=="student" %}selected{% endif %}>Student</option>
+        </select>
+      </div>
+
+      <div class="stack">
+        <label>Monthly income (R)</label>
+        <input name="monthly_income" type="number" min="0" required value="{{ monthly_income }}" />
+      </div>
+    </div>
+
+    <hr />
+
+    <div class="stack">
+      <div class="stack" style="gap:4px;">
+        <label>Documents you have</label>
+        <p style="margin-top:-4px;">
+          Tick what you can provide — this will impact confidence & recommendations.
+        </p>
+      </div>
+
+      <div id="docs_box" class="checkbox-group"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" type="submit">Save profile</button>
+      <a class="btn secondary" href="/evaluate">Evaluate listing</a>
+    </div>
+  </form>
+
+  <div class="card stack" style="margin-top: 18px;">
+    <h3>Recommended docs (based on renter type)</h3>
+    <ul id="recommended_docs" style="margin: 0; padding-left: 18px;"></ul>
+  </div>
+</section>
 
 <script>
   const DOC_CLUSTERS = {{ doc_clusters | tojson }};
-  const renterTypeEl = document.getElementById("renter_type");
-  const recommendedEl = document.getElementById("recommended_docs");
+  const docsSelected = {{ docs_selected | tojson }};
 
-  function renderRecommendedDocs(renterType) {
-    const docs = DOC_CLUSTERS[renterType] || [];
-    recommendedEl.innerHTML = docs.map(d => `<li>${d.replaceAll("_", " ")}</li>`).join("");
+  function titleize(s) {
+    return s.replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase());
   }
 
-  renterTypeEl.addEventListener("change", (e) => {
-    renderRecommendedDocs(e.target.value);
-  });
+  function renderDocs(renterType) {
+    const docs = DOC_CLUSTERS[renterType] || [];
+    const box = document.getElementById("docs_box");
 
-  renderRecommendedDocs(renterTypeEl.value);
+    box.innerHTML = docs.map(doc => {
+      const checked = docsSelected.includes(doc) ? "checked" : "";
+      return `
+        <label class="checkbox">
+          <input type="checkbox" name="renter_docs" value="${doc}" ${checked}/>
+          <span>${titleize(doc)}</span>
+        </label>
+      `;
+    }).join("");
+  }
+
+  function renderRecommended(renterType) {
+    const docs = DOC_CLUSTERS[renterType] || [];
+    const list = document.getElementById("recommended_docs");
+
+    list.innerHTML = docs.map(d => `<li>${titleize(d)}</li>`).join("");
+  }
+
+  const select = document.getElementById("renter_type");
+  renderDocs(select.value);
+  renderRecommended(select.value);
+
+  select.addEventListener("change", (e) => {
+    renderDocs(e.target.value);
+    renderRecommended(e.target.value);
+  });
 </script>
 
 {% endblock %}
