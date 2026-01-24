@@ -10,8 +10,8 @@ serializer = URLSafeTimedSerializer(SECRET_KEY)
 
 def hash_password(password: str) -> str:
     print("PASSWORD:", password)
-print("TYPE:", type(password))
-print("BYTES:", len(password.encode("utf-8")))
+    print("TYPE:", type(password))
+    print("BYTES:", len(password.encode("utf-8")))
     return bcrypt.hash(password)
 
 
