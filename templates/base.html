@@ -1,38 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>{{ title or "ScoreRent" }}</title>
-  <link rel="stylesheet" href="/static/styles.css" />
-</head>
-<body>
-  <nav class="nav">
-    <div class="nav-inner">
-      <a class="brand" href="/">ScoreRent</a>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ScoreRent</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
 
-      <div class="links">
-        {% if user %}
-          <a href="/dashboard">Dashboard</a>
-          <a href="/profile">Profile</a>
+  <body>
+    <!-- Navbar -->
+    <header class="navbar">
+      <div class="navbar-inner">
+        <a class="brand" href="/">ScoreRent</a>
+
+        <nav class="nav-links">
           <a href="/evaluate">Evaluate</a>
-          <a href="/history">History</a>
-          <a href="/logout">Logout</a>
-        {% else %}
-          <a href="/evaluate">Guest evaluate</a>
-          <a href="/login">Login</a>
-          <a class="cta" href="/signup">Sign up</a>
-        {% endif %}
+
+          {% if user %}
+            <a href="/dashboard">Dashboard</a>
+            <a href="/profile">Profile</a>
+            <a href="/history">History</a>
+            <a href="/logout">Logout</a>
+          {% else %}
+            <a href="/login">Login</a>
+            <a class="btn secondary" href="/signup">Sign up</a>
+          {% endif %}
+        </nav>
       </div>
-    </div>
-  </nav>
+    </header>
 
-  <main class="container">
-    {% block content %}{% endblock %}
-  </main>
-
-  <footer class="footer">
-    <span class="muted">ScoreRent · explainable rental scoring</span>
-  </footer>
-</body>
+    <!-- Page content -->
+    <main class="container">
+      {% block content %}{% endblock %}
+      <div class="footer">
+        <p>ScoreRent © {{ 2026 }}</p>
+      </div>
+    </main>
+  </body>
 </html>
