@@ -1,87 +1,110 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Your renter profile</h2>
-<p class="muted">Save a default profile to speed up evaluations.</p>
 
-<form method="post" class="card stack">
+<h2>Your Profile</h2>
+<p class="muted">
+  Save your renter profile so ScoreRent can evaluate listings against your situation automatically.
+</p>
 
-  <label>Renter type</label>
-  <select id="renter_type" name="renter_type">
+<form method="post" class="card stack" action="/profile">
+
+  <label>Renter Type</label>
+  <select id="renter_type" name="renter_type" required>
     <option value="worker" {% if renter_type == "worker" %}selected{% endif %}>Worker</option>
-    <option value="new_professional" {% if renter_type == "new_professional" %}selected{% endif %}>New professional / recent graduate</option>
+    <option value="new_professional" {% if renter_type == "new_professional" %}selected{% endif %}>New Professional</option>
     <option value="student" {% if renter_type == "student" %}selected{% endif %}>Student</option>
   </select>
 
-  <label>Monthly income (ZAR)</label>
-  <input type="number" min="0" name="monthly_income" value="{{ monthly_income }}" required />
+  <label>Monthly Income (R)</label>
+  <input name="monthly_income" type="number" min="0" value="{{ monthly_income }}" required />
 
-  <div class="divider"></div>
+  <hr />
 
-  <h3 class="sectionTitle">Documents you have (tick all that apply)</h3>
+  <h3>Your Documents</h3>
+  <p class="muted">Select the documents you can provide.</p>
 
   <div class="checkboxGrid">
+
+    <!-- Worker docs -->
     <label>
       <input type="checkbox" name="renter_docs" value="bank_statement"
-        {% if "bank_statement" in docs_selected %}checked{% endif %} />
+      {% if "bank_statement" in docs_selected %}checked{% endif %}/>
       Bank statement
     </label>
 
     <label>
       <input type="checkbox" name="renter_docs" value="payslip"
-        {% if "payslip" in docs_selected %}checked{% endif %} />
+      {% if "payslip" in docs_selected %}checked{% endif %}/>
       Payslip
     </label>
 
+    <!-- New professional docs -->
     <label>
       <input type="checkbox" name="renter_docs" value="employment_contract"
-        {% if "employment_contract" in docs_selected %}checked{% endif %} />
+      {% if "employment_contract" in docs_selected %}checked{% endif %}/>
       Employment contract
     </label>
 
     <label>
       <input type="checkbox" name="renter_docs" value="guarantor_letter"
-        {% if "guarantor_letter" in docs_selected %}checked{% endif %} />
+      {% if "guarantor_letter" in docs_selected %}checked{% endif %}/>
       Guarantor letter
     </label>
 
+    <!-- Student docs -->
     <label>
       <input type="checkbox" name="renter_docs" value="proof_of_registration"
-        {% if "proof_of_registration" in docs_selected %}checked{% endif %} />
+      {% if "proof_of_registration" in docs_selected %}checked{% endif %}/>
       Proof of registration
     </label>
 
     <label>
       <input type="checkbox" name="renter_docs" value="bursary_letter"
-        {% if "bursary_letter" in docs_selected %}checked{% endif %} />
-      Proof of bursary
+      {% if "bursary_letter" in docs_selected %}checked{% endif %}/>
+      Bursary confirmation
     </label>
+
+    <!-- Guarantor doc set (for non-bursary students) -->
+    <label>
+      <input type="checkbox" name="renter_docs" value="guarantor_payslip"
+      {% if "guarantor_payslip" in docs_selected %}checked{% endif %}/>
+      Guarantor payslip
+    </label>
+
+    <label>
+      <input type="checkbox" name="renter_docs" value="guarantor_bank_statement"
+      {% if "guarantor_bank_statement" in docs_selected %}checked{% endif %}/>
+      Guarantor bank statement
+    </label>
+
   </div>
 
-  <p class="muted small">
-    Suggested docs for this renter type:
-    <span id="recommended_docs"></span>
-  </p>
+  <div class="card subtle">
+    <h4 style="margin:0 0 8px 0;">Recommended docs for your renter type</h4>
+    <ul id="recommended_docs" class="bullets"></ul>
+    <p class="muted" style="margin-top:10px;">
+      These strengthen your application. ScoreRent will still evaluate if you are missing some.
+    </p>
+  </div>
 
-  <button class="btn" type="submit">Save profile</button>
+  <button class="btn" type="submit">Save Profile</button>
 </form>
 
 <script>
-  // Provided by main.py: doc_clusters = { renterType: [docs...] }
   const DOC_CLUSTERS = {{ doc_clusters | tojson }};
-  const renterTypeSelect = document.getElementById("renter_type");
-  const recDocsEl = document.getElementById("recommended_docs");
+  const renterTypeEl = document.getElementById("renter_type");
+  const recommendedEl = document.getElementById("recommended_docs");
 
-  function formatDoc(doc) {
-    return doc.replaceAll("_", " ");
-  }
-
-  function updateRecommended() {
-    const renterType = renterTypeSelect.value;
+  function renderRecommendedDocs(renterType) {
     const docs = DOC_CLUSTERS[renterType] || [];
-    recDocsEl.textContent = docs.map(formatDoc).join(", ");
+    recommendedEl.innerHTML = docs.map(d => `<li>${d.replaceAll("_", " ")}</li>`).join("");
   }
 
-  renterTypeSelect.addEventListener("change", updateRecommended);
-  updateRecommended();
+  renterTypeEl.addEventListener("change", (e) => {
+    renderRecommendedDocs(e.target.value);
+  });
+
+  renderRecommendedDocs(renterTypeEl.value);
 </script>
+
 {% endblock %}
