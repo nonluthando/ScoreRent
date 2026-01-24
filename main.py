@@ -14,8 +14,7 @@ from auth import (
     make_session_token,
     get_current_user,
 )
-
-from evaluator import evaluate, DOC_CLUSTERS, RENTER_TYPES, DEMAND_LEVELS
+from evaluator import evaluate, DOC_CLUSTERS, DEMAND_LEVELS
 
 app = FastAPI(title="ScoreRent")
 templates = Jinja2Templates(directory="templates")
@@ -50,7 +49,7 @@ def dashboard(request: Request):
     last_eval = conn.execute(
         """
         SELECT * FROM evaluations
-        WHERE user_id = ?
+        WHERE user_id = %s
         ORDER BY created_at DESC
         LIMIT 1
         """,
@@ -79,13 +78,6 @@ def signup_post(
     email: str = Form(...),
     password: str = Form(...),
 ):
-    if len(password.encode("utf-8")) > 72:
-        return templates.TemplateResponse(
-            "signup.html",
-            {"request": request, "error": "Password too long (max 72 bytes)."},
-            status_code=400,
-        )
-
     existing = get_user_by_email(email)
     if existing:
         return templates.TemplateResponse(
@@ -100,6 +92,7 @@ def signup_post(
     resp = RedirectResponse("/dashboard", status_code=303)
     resp.set_cookie("session", token, httponly=True, samesite="lax")
     return resp
+
 
 @app.get("/login")
 def login_page(request: Request):
@@ -145,7 +138,12 @@ def profile_page(request: Request):
 
     conn = get_conn()
     profile = conn.execute(
-        "SELECT * FROM profiles WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+        """
+        SELECT * FROM profiles
+        WHERE user_id = %s
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
         (user["id"],),
     ).fetchone()
     conn.close()
@@ -178,7 +176,7 @@ def profile_post(
     request: Request,
     renter_type: str = Form(...),
     monthly_income: int = Form(...),
-    renter_docs: list[str] = Form([]),  # ✅ checkbox support
+    renter_docs: list[str] = Form([]),
 ):
     user = require_user(request)
     if not user:
@@ -190,14 +188,14 @@ def profile_post(
     conn.execute(
         """
         INSERT INTO profiles (user_id, renter_type, monthly_income, documents_json, created_at)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
         """,
         (
             user["id"],
             renter_type,
             int(monthly_income),
             json.dumps(renter_docs),
-            datetime.utcnow().isoformat(),
+            datetime.utcnow(),
         ),
     )
     conn.commit()
@@ -208,10 +206,6 @@ def profile_post(
 
 @app.get("/evaluate")
 def evaluate_page(request: Request):
-    """
-    ✅ Guest mode: allow everyone to evaluate.
-    If logged in, profile is loaded automatically.
-    """
     user = get_current_user(request)
 
     renter_type = "worker"
@@ -221,7 +215,12 @@ def evaluate_page(request: Request):
     if user:
         conn = get_conn()
         profile = conn.execute(
-            "SELECT * FROM profiles WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+            """
+            SELECT * FROM profiles
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
             (user["id"],),
         ).fetchone()
         conn.close()
@@ -253,11 +252,10 @@ def evaluate_post(
     deposit: int = Form(...),
     application_fee: int = Form(...),
     area_demand: str = Form("MEDIUM"),
-    required_documents: list[str] = Form([]),  # ✅ checkbox support
+    required_documents: list[str] = Form([]),
 ):
     user = get_current_user(request)
 
-    # Load profile if logged in (else guest must supply defaults)
     renter_type = "worker"
     monthly_income = 0
     renter_docs: list[str] = []
@@ -267,20 +265,23 @@ def evaluate_post(
 
     if user:
         user_id = user["id"]
-
         conn = get_conn()
         profile = conn.execute(
-            "SELECT * FROM profiles WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
-            (user["id"],),
+            """
+            SELECT * FROM profiles
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (user_id,),
         ).fetchone()
+        conn.close()
 
         if profile:
             profile_id = profile["id"]
             renter_type = profile["renter_type"]
             monthly_income = int(profile["monthly_income"])
             renter_docs = json.loads(profile["documents_json"])
-
-        conn.close()
 
     required_docs = [d.strip().lower() for d in required_documents if d.strip()]
 
@@ -304,7 +305,7 @@ def evaluate_post(
         "area_demand": area_demand,
     }
 
-    # ✅ Guest mode: show result immediately, don't store DB
+    # Guest mode
     if not user:
         return templates.TemplateResponse(
             "guest_results.html",
@@ -323,12 +324,14 @@ def evaluate_post(
         listing_name = f"Listing (R{rent})"
 
     conn = get_conn()
-    conn.execute(
+    cur = conn.cursor()
+    cur.execute(
         """
         INSERT INTO evaluations (
             user_id, profile_id, listing_name, listing_json, score, verdict, confidence,
             reasons_json, actions_json, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
         """,
         (
             user_id,
@@ -340,12 +343,12 @@ def evaluate_post(
             result.confidence,
             json.dumps(result.reasons),
             json.dumps(result.actions),
-            datetime.utcnow().isoformat(),
+            datetime.utcnow(),
         ),
     )
+    eval_id = cur.fetchone()["id"]
     conn.commit()
-
-    eval_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
+    cur.close()
     conn.close()
 
     return RedirectResponse(f"/results/{eval_id}", status_code=303)
@@ -359,7 +362,7 @@ def results_page(request: Request, evaluation_id: int):
 
     conn = get_conn()
     ev = conn.execute(
-        "SELECT * FROM evaluations WHERE id = ? AND user_id = ?",
+        "SELECT * FROM evaluations WHERE id = %s AND user_id = %s",
         (evaluation_id, user["id"]),
     ).fetchone()
     conn.close()
@@ -395,7 +398,7 @@ def history(request: Request):
         """
         SELECT id, listing_name, score, verdict, confidence, created_at
         FROM evaluations
-        WHERE user_id = ?
+        WHERE user_id = %s
         ORDER BY created_at DESC
         """,
         (user["id"],),
