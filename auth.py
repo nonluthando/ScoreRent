@@ -1,22 +1,21 @@
 from datetime import datetime
 from itsdangerous import URLSafeTimedSerializer, BadSignature
-from passlib.hash import bcrypt
+from passlib.context import CryptContext
 from fastapi import Request
 from database import get_conn
 
 SECRET_KEY = "CHANGE_ME__SCORERENT_SECRET"
 serializer = URLSafeTimedSerializer(SECRET_KEY)
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 def hash_password(password: str) -> str:
-    print("PASSWORD:", password)
-    print("TYPE:", type(password))
-    print("BYTES:", len(password.encode("utf-8")))
-    return bcrypt.hash(password)
+    return pwd_context.hash(password)
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    return bcrypt.verify(password, password_hash)
+    return pwd_context.verify(password, password_hash)
 
 
 def create_user(email: str, password: str):
@@ -62,6 +61,7 @@ def read_session_token(token: str, max_age_seconds: int = 60 * 60 * 24 * 7):
 
 
 def get_current_user(request: Request):
+    # ✅ MUST match what you set in main.py
     token = request.cookies.get("session")
     if not token:
         return None
