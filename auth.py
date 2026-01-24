@@ -61,7 +61,10 @@ def read_session_token(token: str, max_age_seconds: int = 60 * 60 * 24 * 7):
 
 
 def get_current_user(request: Request):
-    # ✅ MUST match what you set in main.py
+    print("DEBUG COOKIES:", request.cookies)
+    token = request.cookies.get("session")
+    print("DEBUG SESSION TOKEN:", token)
+    ...
     token = request.cookies.get("session")
     if not token:
         return None
