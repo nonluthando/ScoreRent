@@ -3,27 +3,85 @@
 <h2>Your renter profile</h2>
 <p class="muted">Save a default profile to speed up evaluations.</p>
 
-<form method="post" class="card">
+<form method="post" class="card stack">
+
   <label>Renter type</label>
-  <select name="renter_type">
-    {% for t in renter_types %}
-      <option value="{{ t }}" {% if t == renter_type %}selected{% endif %}>{{ t }}</option>
-    {% endfor %}
+  <select id="renter_type" name="renter_type">
+    <option value="worker" {% if renter_type == "worker" %}selected{% endif %}>Worker</option>
+    <option value="new_professional" {% if renter_type == "new_professional" %}selected{% endif %}>New professional / recent graduate</option>
+    <option value="student" {% if renter_type == "student" %}selected{% endif %}>Student</option>
   </select>
 
   <label>Monthly income (ZAR)</label>
   <input type="number" min="0" name="monthly_income" value="{{ monthly_income }}" required />
 
-  <label>Documents (comma-separated)</label>
-  <input
-    name="documents"
-    placeholder="bank_statement, payslip, employment_contract"
-    value="{{ docs | join(', ') }}"
-  />
+  <div class="divider"></div>
+
+  <h3 class="sectionTitle">Documents you have (tick all that apply)</h3>
+
+  <div class="checkboxGrid">
+    <label>
+      <input type="checkbox" name="renter_docs" value="bank_statement"
+        {% if "bank_statement" in docs_selected %}checked{% endif %} />
+      Bank statement
+    </label>
+
+    <label>
+      <input type="checkbox" name="renter_docs" value="payslip"
+        {% if "payslip" in docs_selected %}checked{% endif %} />
+      Payslip
+    </label>
+
+    <label>
+      <input type="checkbox" name="renter_docs" value="employment_contract"
+        {% if "employment_contract" in docs_selected %}checked{% endif %} />
+      Employment contract
+    </label>
+
+    <label>
+      <input type="checkbox" name="renter_docs" value="guarantor_letter"
+        {% if "guarantor_letter" in docs_selected %}checked{% endif %} />
+      Guarantor letter
+    </label>
+
+    <label>
+      <input type="checkbox" name="renter_docs" value="proof_of_registration"
+        {% if "proof_of_registration" in docs_selected %}checked{% endif %} />
+      Proof of registration
+    </label>
+
+    <label>
+      <input type="checkbox" name="renter_docs" value="bursary_letter"
+        {% if "bursary_letter" in docs_selected %}checked{% endif %} />
+      Proof of bursary
+    </label>
+  </div>
+
   <p class="muted small">
-    Suggested docs for your category: {{ docs_for_type | join(', ') }}
+    Suggested docs for this renter type:
+    <span id="recommended_docs"></span>
   </p>
 
   <button class="btn" type="submit">Save profile</button>
 </form>
+
+<script>
+  // Provided by main.py: doc_clusters = { renterType: [docs...] }
+  const DOC_CLUSTERS = {{ doc_clusters | tojson }};
+  const renterTypeSelect = document.getElementById("renter_type");
+  const recDocsEl = document.getElementById("recommended_docs");
+
+  function formatDoc(doc) {
+    return doc.replaceAll("_", " ");
+  }
+
+  function updateRecommended() {
+    const renterType = renterTypeSelect.value;
+    const docs = DOC_CLUSTERS[renterType] || [];
+    recDocsEl.textContent = docs.map(formatDoc).join(", ");
+  }
+
+  renterTypeSelect.addEventListener("change", updateRecommended);
+  updateRecommended();
+</script>
 {% endblock %}
