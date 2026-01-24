@@ -10,14 +10,16 @@
   <nav class="nav">
     <div class="nav-inner">
       <a class="brand" href="/">ScoreRent</a>
+
       <div class="links">
         {% if user %}
+          <a href="/dashboard">Dashboard</a>
           <a href="/profile">Profile</a>
           <a href="/evaluate">Evaluate</a>
           <a href="/history">History</a>
-          <a href="/compare">Compare</a>
           <a href="/logout">Logout</a>
         {% else %}
+          <a href="/evaluate">Guest evaluate</a>
           <a href="/login">Login</a>
           <a class="cta" href="/signup">Sign up</a>
         {% endif %}
