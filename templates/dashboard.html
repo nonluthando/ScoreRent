@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Dashboard</h2>
+
+<p class="muted">Hi {{ user.email }}, good to see you again.</p>
+
+{% if last_eval %}
+  <div class="card">
+    <h3>Your last evaluation</h3>
+    <ul class="list">
+      <li><strong>Listing:</strong> {{ last_eval.listing_name or "Unnamed listing" }}</li>
+      <li><strong>Score:</strong> {{ last_eval.score }}</li>
+      <li><strong>Verdict:</strong> {{ last_eval.verdict }}</li>
+      <li><strong>Confidence:</strong> {{ last_eval.confidence }}</li>
+      <li><strong>Date:</strong> {{ last_eval.created_at }}</li>
+    </ul>
+
+    <div class="actionsRow">
+      <a class="btn" href="/results/{{ last_eval.id }}">View details</a>
+      <a class="btn ghost" href="/evaluate">New evaluation</a>
+    </div>
+  </div>
+{% else %}
+  <div class="card">
+    <h3>No evaluations yet</h3>
+    <p class="muted">Run your first evaluation to start building history.</p>
+    <a class="btn" href="/evaluate">Start evaluation</a>
+  </div>
+{% endif %}
+{% endblock %}
