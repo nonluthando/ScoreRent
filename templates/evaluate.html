@@ -1,106 +1,86 @@
-{% extends "base.html" %}
+{{% extends "base.html" %}
 {% block content %}
 
-<h2>Evaluate a Listing</h2>
-<p class="muted">
-  Compare a rental listing against your profile and get a score, verdict, and explainable reasons.
-</p>
-
-<form method="post" class="card stack" action="/evaluate">
-
-  <label>Listing Name (optional)</label>
-  <input name="listing_name" placeholder="e.g. Gardens Studio, Sea Point 1BR" />
-
-  <div class="grid2">
-    <div>
-      <label>Rent (R)</label>
-      <input name="rent" type="number" min="0" required />
-    </div>
-
-    <div>
-      <label>Deposit (R)</label>
-      <input name="deposit" type="number" min="0" required />
-    </div>
-  </div>
-
-  <div class="grid2">
-    <div>
-      <label>Application Fee (R)</label>
-      <input name="application_fee" type="number" min="0" required />
-    </div>
-
-    <div>
-      <label>Area Demand</label>
-      <select name="area_demand" required>
-        {% for d in demand_levels %}
-          <option value="{{ d }}">{{ d }}</option>
-        {% endfor %}
-      </select>
-    </div>
-  </div>
-
-  <hr />
-
-  <h3>Required Documents (Listing)</h3>
-  <p class="muted">Tick the documents required by the listing/agent.</p>
-
-  <div class="checkboxGrid">
-    <label><input type="checkbox" name="required_documents" value="bank_statement" /> Bank statement</label>
-    <label><input type="checkbox" name="required_documents" value="payslip" /> Payslip</label>
-    <label><input type="checkbox" name="required_documents" value="employment_contract" /> Employment contract</label>
-
-    <label><input type="checkbox" name="required_documents" value="proof_of_registration" /> Proof of registration</label>
-    <label><input type="checkbox" name="required_documents" value="bursary_letter" /> Bursary confirmation</label>
-    <label><input type="checkbox" name="required_documents" value="guarantor_letter" /> Guarantor letter</label>
-
-    <label><input type="checkbox" name="required_documents" value="guarantor_payslip" /> Guarantor payslip</label>
-    <label><input type="checkbox" name="required_documents" value="guarantor_bank_statement" /> Guarantor bank statement</label>
-  </div>
-
-  <hr />
-
-  <h3>Student Support (only if relevant)</h3>
-  <p class="muted">
-    If you are a student without a bursary that covers rent, ScoreRent can evaluate affordability using your guarantor income.
-  </p>
-
-  <div id="guarantorIncomeBlock" style="display:none;">
-    <label>Guarantor Monthly Income (R)</label>
-    <input name="guarantor_monthly_income" type="number" min="0" value="0" />
-    <p class="muted">
-      Used only for <strong>non-bursary students</strong> to assess affordability.
+<section class="stack" style="padding-top: 26px;">
+  <div class="stack" style="gap:10px;">
+    <h2>Evaluate listing</h2>
+    <p>
+      Enter listing details below. We’ll calculate confidence + recommend what to do next.
     </p>
   </div>
 
-  <button class="btn" type="submit">Start Evaluation</button>
+  <form method="post" class="card stack">
+    <div class="grid-2">
+      <div class="stack">
+        <label>Listing name (optional)</label>
+        <input name="listing_name" placeholder="e.g. Gardens Studio" />
+      </div>
 
-</form>
+      <div class="stack">
+        <label>Area demand</label>
+        <select name="area_demand">
+          {% for d in demand_levels %}
+            <option value="{{ d }}">{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
 
-<script>
-  // We infer student/bursary from your saved profile docs (loaded into renter_docs),
-  // but the evaluator uses it only when renter_type == student and bursary_letter missing.
+    <hr />
 
-  const renterType = "{{ renter_type }}";
-  const renterDocs = {{ renter_docs | tojson }};
+    <div class="grid-2">
+      <div class="stack">
+        <label>Monthly rent (R)</label>
+        <input name="rent" type="number" required min="0" placeholder="e.g. 7500" />
+      </div>
 
-  function hasDoc(docName) {
-    return renterDocs && renterDocs.includes(docName);
-  }
+      <div class="stack">
+        <label>Deposit (R)</label>
+        <input name="deposit" type="number" required min="0" placeholder="e.g. 7500" />
+      </div>
+    </div>
 
-  function toggleGuarantorIncome() {
-    const block = document.getElementById("guarantorIncomeBlock");
+    <div class="grid-2">
+      <div class="stack">
+        <label>Application fee (R)</label>
+        <input name="application_fee" type="number" required min="0" placeholder="e.g. 250" />
+      </div>
 
-    const isStudent = renterType === "student";
-    const hasBursary = hasDoc("bursary_letter");
+      <div class="stack">
+        <label> </label>
+        <div class="badge warn" style="margin-top: 6px;">
+          Tip: medium confidence → fee is informational only
+        </div>
+      </div>
+    </div>
 
-    if (isStudent && !hasBursary) {
-      block.style.display = "block";
-    } else {
-      block.style.display = "none";
-    }
-  }
+    <hr />
 
-  toggleGuarantorIncome();
-</script>
+    <div class="stack">
+      <label>Required documents (listing)</label>
+      <p style="margin-top:-6px;">
+        Tick what the listing requires. ScoreRent will check if your profile matches.
+      </p>
+
+      <div class="checkbox-group">
+        {% for doc in doc_clusters["worker"] | sort %}
+          <label class="checkbox">
+            <input type="checkbox" name="required_documents" value="{{ doc }}" />
+            <span>{{ doc.replace("_", " ").title() }}</span>
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <hr />
+
+    <div class="actions">
+      <button class="btn" type="submit">Evaluate</button>
+      {% if not user %}
+        <a class="btn secondary" href="/signup">Sign up to save results</a>
+      {% endif %}
+    </div>
+  </form>
+</section>
 
 {% endblock %}
