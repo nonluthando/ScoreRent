@@ -1,6 +1,5 @@
 import json
 from datetime import datetime
-from database import init_db
 
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import RedirectResponse
@@ -24,20 +23,44 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.on_event("startup")
-def on_startup():
+def startup():
     init_db()
 
 
 def require_user(request: Request):
-    user = get_current_user(request)
-    return user
+    return get_current_user(request)
 
 
 @app.get("/")
 def home(request: Request):
     user = get_current_user(request)
     return templates.TemplateResponse(
-        "index.html", {"request": request, "user": user}
+        "index.html",
+        {"request": request, "user": user},
+    )
+
+
+@app.get("/dashboard")
+def dashboard(request: Request):
+    user = require_user(request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+
+    conn = get_conn()
+    last_eval = conn.execute(
+        """
+        SELECT * FROM evaluations
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (user["id"],),
+    ).fetchone()
+    conn.close()
+
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {"request": request, "user": user, "last_eval": last_eval},
     )
 
 
@@ -45,8 +68,9 @@ def home(request: Request):
 def signup_page(request: Request):
     user = get_current_user(request)
     if user:
-        return RedirectResponse("/profile", status_code=303)
-    return templates.TemplateResponse("signup.html", {"request": request, "user": None, "error": None})
+        return RedirectResponse("/dashboard", status_code=303)
+
+    return templates.TemplateResponse("signup.html", {"request": request})
 
 
 @app.post("/signup")
@@ -55,18 +79,27 @@ def signup_post(
     email: str = Form(...),
     password: str = Form(...),
 ):
+    if len(password.encode("utf-8")) > 72:
+        # avoid bcrypt crash
+        return templates.TemplateResponse(
+            "signup.html",
+            {"request": request, "error": "Password too long (max 72 bytes)."},
+            status_code=400,
+        )
+
     existing = get_user_by_email(email)
     if existing:
         return templates.TemplateResponse(
             "signup.html",
-            {"request": request, "user": None, "error": "Email already registered."},
+            {"request": request, "error": "Email already registered."},
+            status_code=400,
         )
 
-    create_user(email, password)
-    user = get_user_by_email(email)
-    token = make_session_token(user["id"])
-    resp = RedirectResponse("/profile", status_code=303)
-    resp.set_cookie("session", token, httponly=True, samesite="lax")
+    user_id = create_user(email, password)
+    token = make_session_token(user_id)
+
+    resp = RedirectResponse("/dashboard", status_code=303)
+    resp.set_cookie("session_token", token, httponly=True)
     return resp
 
 
@@ -74,8 +107,9 @@ def signup_post(
 def login_page(request: Request):
     user = get_current_user(request)
     if user:
-        return RedirectResponse("/profile", status_code=303)
-    return templates.TemplateResponse("login.html", {"request": request, "user": None, "error": None})
+        return RedirectResponse("/dashboard", status_code=303)
+
+    return templates.TemplateResponse("login.html", {"request": request})
 
 
 @app.post("/login")
@@ -88,19 +122,20 @@ def login_post(
     if not user or not verify_password(password, user["password_hash"]):
         return templates.TemplateResponse(
             "login.html",
-            {"request": request, "user": None, "error": "Invalid email or password."},
+            {"request": request, "error": "Invalid email or password."},
+            status_code=400,
         )
 
     token = make_session_token(user["id"])
-    resp = RedirectResponse("/profile", status_code=303)
-    resp.set_cookie("session", token, httponly=True, samesite="lax")
+    resp = RedirectResponse("/dashboard", status_code=303)
+    resp.set_cookie("session_token", token, httponly=True)
     return resp
 
 
 @app.get("/logout")
-def logout():
+def logout(request: Request):
     resp = RedirectResponse("/", status_code=303)
-    resp.delete_cookie("session")
+    resp.delete_cookie("session_token")
     return resp
 
 
@@ -117,27 +152,25 @@ def profile_page(request: Request):
     ).fetchone()
     conn.close()
 
-    profile_docs = []
+    docs_selected = []
     renter_type = "worker"
     monthly_income = 0
 
     if profile:
+        docs_selected = json.loads(profile["documents_json"])
         renter_type = profile["renter_type"]
-        monthly_income = int(profile["monthly_income"])
-        profile_docs = json.loads(profile["docs_json"])
-
-    docs_for_type = sorted(list(DOC_CLUSTERS.get(renter_type, set())))
+        monthly_income = profile["monthly_income"]
 
     return templates.TemplateResponse(
         "profile.html",
         {
             "request": request,
             "user": user,
-            "renter_types": RENTER_TYPES,
+            "profile": profile,
             "renter_type": renter_type,
             "monthly_income": monthly_income,
-            "docs": profile_docs,
-            "docs_for_type": docs_for_type,
+            "docs_selected": docs_selected,
+            "doc_clusters": {k: sorted(list(v)) for k, v in DOC_CLUSTERS.items()},
         },
     )
 
@@ -147,25 +180,27 @@ def profile_post(
     request: Request,
     renter_type: str = Form(...),
     monthly_income: int = Form(...),
-    documents: str = Form(""),
+    renter_docs: list[str] = Form([]),  # ✅ checkbox support
 ):
     user = require_user(request)
     if not user:
         return RedirectResponse("/login", status_code=303)
 
-    renter_type = renter_type.strip()
-    if renter_type not in RENTER_TYPES:
-        renter_type = "worker"
-
-    docs = [d.strip().lower() for d in documents.split(",") if d.strip()]
+    renter_docs = [d.strip().lower() for d in renter_docs if d.strip()]
 
     conn = get_conn()
     conn.execute(
         """
-        INSERT INTO profiles (user_id, renter_type, monthly_income, docs_json, is_default, created_at)
-        VALUES (?, ?, ?, ?, 1, ?)
+        INSERT INTO profiles (user_id, renter_type, monthly_income, documents_json, created_at)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (user["id"], renter_type, int(monthly_income), json.dumps(docs), datetime.utcnow().isoformat()),
+        (
+            user["id"],
+            renter_type,
+            int(monthly_income),
+            json.dumps(renter_docs),
+            datetime.utcnow().isoformat(),
+        ),
     )
     conn.commit()
     conn.close()
@@ -175,26 +210,38 @@ def profile_post(
 
 @app.get("/evaluate")
 def evaluate_page(request: Request):
-    user = require_user(request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
+    """
+    ✅ Guest mode: allow everyone to evaluate.
+    If logged in, profile is loaded automatically.
+    """
+    user = get_current_user(request)
 
-    conn = get_conn()
-    profile = conn.execute(
-        "SELECT * FROM profiles WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
-        (user["id"],),
-    ).fetchone()
-    conn.close()
+    renter_type = "worker"
+    monthly_income = 0
+    renter_docs = []
 
-    if not profile:
-        return RedirectResponse("/profile", status_code=303)
+    if user:
+        conn = get_conn()
+        profile = conn.execute(
+            "SELECT * FROM profiles WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+            (user["id"],),
+        ).fetchone()
+        conn.close()
+
+        if profile:
+            renter_type = profile["renter_type"]
+            monthly_income = profile["monthly_income"]
+            renter_docs = json.loads(profile["documents_json"])
 
     return templates.TemplateResponse(
         "evaluate.html",
         {
             "request": request,
             "user": user,
-            "profile": profile,
+            "renter_type": renter_type,
+            "monthly_income": monthly_income,
+            "renter_docs": renter_docs,
+            "doc_clusters": {k: sorted(list(v)) for k, v in DOC_CLUSTERS.items()},
             "demand_levels": DEMAND_LEVELS,
         },
     )
@@ -203,35 +250,45 @@ def evaluate_page(request: Request):
 @app.post("/evaluate")
 def evaluate_post(
     request: Request,
+    listing_name: str = Form(""),
     rent: int = Form(...),
     deposit: int = Form(...),
     application_fee: int = Form(...),
     area_demand: str = Form("MEDIUM"),
-    required_documents: str = Form(""),
+    required_documents: list[str] = Form([]),  # ✅ checkbox support
 ):
-    user = require_user(request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
+    user = get_current_user(request)
 
-    conn = get_conn()
-    profile = conn.execute(
-        "SELECT * FROM profiles WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
-        (user["id"],),
-    ).fetchone()
+    # Load profile if logged in (else guest must supply defaults)
+    renter_type = "worker"
+    monthly_income = 0
+    renter_docs: list[str] = []
 
-    if not profile:
+    profile_id = None
+    user_id = None
+
+    if user:
+        user_id = user["id"]
+
+        conn = get_conn()
+        profile = conn.execute(
+            "SELECT * FROM profiles WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+            (user["id"],),
+        ).fetchone()
+
+        if profile:
+            profile_id = profile["id"]
+            renter_type = profile["renter_type"]
+            monthly_income = int(profile["monthly_income"])
+            renter_docs = json.loads(profile["documents_json"])
+
         conn.close()
-        return RedirectResponse("/profile", status_code=303)
 
-    renter_type = profile["renter_type"]
-    monthly_income = int(profile["monthly_income"])
-    renter_docs = json.loads(profile["docs_json"])
-
-    required_docs = [d.strip().lower() for d in required_documents.split(",") if d.strip()]
+    required_docs = [d.strip().lower() for d in required_documents if d.strip()]
 
     result, bands = evaluate(
         renter_type=renter_type,
-        monthly_income=monthly_income,
+        monthly_income=int(monthly_income),
         renter_docs=renter_docs,
         rent=int(rent),
         deposit=int(deposit),
@@ -241,6 +298,7 @@ def evaluate_post(
     )
 
     listing = {
+        "listing_name": listing_name.strip(),
         "rent": int(rent),
         "deposit": int(deposit),
         "application_fee": int(application_fee),
@@ -248,18 +306,38 @@ def evaluate_post(
         "area_demand": area_demand,
     }
 
+    # ✅ Guest mode: show result immediately, don't store DB
+    if not user:
+        return templates.TemplateResponse(
+            "guest_results.html",
+            {
+                "request": request,
+                "user": None,
+                "listing": listing,
+                "result": result,
+                "bands": bands,
+                "guest": True,
+            },
+        )
+
+    # Logged in: save evaluation
+    if not listing_name.strip():
+        listing_name = f"Listing (R{rent})"
+
+    conn = get_conn()
     conn.execute(
         """
         INSERT INTO evaluations (
-            user_id, profile_id, listing_json, score, verdict, confidence,
+            user_id, profile_id, listing_name, listing_json, score, verdict, confidence,
             reasons_json, actions_json, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            user["id"],
-            profile["id"],
+            user_id,
+            profile_id,
+            listing_name.strip(),
             json.dumps(listing),
-            result.score,
+            int(result.score),
             result.verdict,
             result.confidence,
             json.dumps(result.reasons),
@@ -300,7 +378,7 @@ def results_page(request: Request, evaluation_id: int):
         {
             "request": request,
             "user": user,
-            "ev": ev,
+            "evaluation": ev,
             "listing": listing,
             "reasons": reasons,
             "actions": actions,
@@ -309,56 +387,24 @@ def results_page(request: Request, evaluation_id: int):
 
 
 @app.get("/history")
-def history_page(request: Request):
+def history(request: Request):
     user = require_user(request)
     if not user:
         return RedirectResponse("/login", status_code=303)
 
     conn = get_conn()
-    evals = conn.execute(
-        "SELECT * FROM evaluations WHERE user_id = ? ORDER BY created_at DESC LIMIT 50",
+    rows = conn.execute(
+        """
+        SELECT id, listing_name, score, verdict, confidence, created_at
+        FROM evaluations
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        """,
         (user["id"],),
     ).fetchall()
     conn.close()
 
     return templates.TemplateResponse(
         "history.html",
-        {"request": request, "user": user, "evals": evals},
-    )
-
-
-@app.get("/compare")
-def compare_page(request: Request):
-    user = require_user(request)
-    if not user:
-        return RedirectResponse("/login", status_code=303)
-
-    conn = get_conn()
-    evals = conn.execute(
-        "SELECT * FROM evaluations WHERE user_id = ? ORDER BY created_at DESC LIMIT 3",
-        (user["id"],),
-    ).fetchall()
-    conn.close()
-
-    items = []
-    for ev in evals:
-        listing = json.loads(ev["listing_json"])
-        reasons = json.loads(ev["reasons_json"])
-        items.append(
-            {
-                "id": ev["id"],
-                "score": ev["score"],
-                "verdict": ev["verdict"],
-                "confidence": ev["confidence"],
-                "rent": listing.get("rent"),
-                "deposit": listing.get("deposit"),
-                "application_fee": listing.get("application_fee"),
-                "demand": listing.get("area_demand"),
-                "top_reason": reasons[0] if reasons else "",
-            }
-        )
-
-    return templates.TemplateResponse(
-        "compare.html",
-        {"request": request, "user": user, "items": items},
+        {"request": request, "user": user, "evaluations": rows},
     )
