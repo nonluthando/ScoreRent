@@ -142,13 +142,14 @@ def test_medium_confidence_suggests_guarantor():
     result, bands = evaluate(
         renter_type="new_professional",
         monthly_income=20000,
-        renter_docs=["employment_contract"],  # missing guarantor_letter
-        rent=6800,  # slightly above recommended
+        renter_docs=["employment_contract", "bank_statement"],  # bank statement avoids -14
+        rent=6800,  # above recommended (30%), below upper limit (35%)
         deposit=6800,
         application_fee=0,
         required_documents=["employment_contract"],
-        area_demand="MEDIUM",
+        area_demand="LOW",  # adds +4 so we land in MEDIUM
     )
 
     assert result.confidence == "MEDIUM"
+    assert result.verdict == "BORDERLINE"
     assert any("guarantor" in a.lower() for a in result.actions)
