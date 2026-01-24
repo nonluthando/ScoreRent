@@ -41,18 +41,21 @@ def evaluate(
     required_documents: List[str],
     area_demand: str,
 ) -> Tuple[EvaluationResult, Dict[str, int]]:
-    reasons = []
-    actions = []
+    reasons: List[str] = []
+    actions: List[str] = []
     score = 70
 
-    renter_docs = set([d.strip().lower() for d in renter_docs if d.strip()])
-    required_documents = set([d.strip().lower() for d in required_documents if d.strip()])
+    renter_docs_set = set([d.strip().lower() for d in renter_docs if d and d.strip()])
+    required_docs_set = set([d.strip().lower() for d in required_documents if d and d.strip()])
     area_demand = area_demand.upper().strip() if area_demand else "MEDIUM"
 
     bands = suggested_budget_bands(monthly_income)
     upper_limit = bands["upper_limit"]
     recommended = bands["recommended"]
 
+    # --------------------
+    # Affordability logic
+    # --------------------
     if rent > upper_limit:
         score -= 30
         reasons.append("Rent exceeds the recommended affordability limit (35% of income).")
@@ -71,32 +74,31 @@ def evaluate(
         reasons.append("Upfront cost (rent + deposit + application fee) is high relative to monthly income.")
         actions.append("Ensure deposit/fees are affordable before applying.")
 
-    missing_required = required_documents - renter_docs
+    # --------------------
+    # Document logic
+    # --------------------
+    missing_required = required_docs_set - renter_docs_set
     if missing_required:
         score -= 18
         reasons.append("Some required documents are missing.")
         actions.append("Gather the missing required documents before applying.")
 
     cluster_docs = DOC_CLUSTERS.get(renter_type, set())
-    missing_cluster = cluster_docs - renter_docs
+    missing_cluster = cluster_docs - renter_docs_set
     if missing_cluster and len(missing_cluster) < len(cluster_docs):
         score -= 6
         reasons.append("Some recommended documents for your renter category are missing.")
         actions.append("Add the recommended documents to strengthen your application.")
 
-    if "bank_statement" not in renter_docs:
+    # universal penalty for bank statements
+    if "bank_statement" not in renter_docs_set:
         score -= 14
         reasons.append("No bank statement provided (may reduce application strength).")
         actions.append("Prepare 3 months bank statements if available.")
 
-    if application_fee >= 800:
-        score -= 8
-        reasons.append("High application fee increases cost of a low-confidence application.")
-        actions.append("Avoid high-fee applications unless score is strong.")
-    elif application_fee >= 500:
-        score -= 4
-        reasons.append("Moderate application fee increases risk if application is weak.")
-
+    # --------------------
+    # Demand logic
+    # --------------------
     if area_demand == "HIGH":
         score -= 10
         reasons.append("High demand area increases competition.")
@@ -105,19 +107,52 @@ def evaluate(
         score += 4
         reasons.append("Lower demand area may reduce competition.")
 
-    score = max(0, min(100, score))
+    # clamp score BEFORE verdict
+    base_score = max(0, min(100, score))
 
-    if score >= 75:
+    # --------------------
+    # Determine verdict + confidence
+    # --------------------
+    if base_score >= 75:
         verdict = "WORTH_APPLYING"
         confidence = "HIGH"
-    elif score >= 55:
+    elif base_score >= 55:
         verdict = "BORDERLINE"
         confidence = "MEDIUM"
     else:
         verdict = "NOT_WORTH_IT"
         confidence = "LOW"
 
+    # --------------------
+    # Application fee: informational note for MEDIUM confidence
+    # --------------------
+    fee_note = None
+    fee_penalty = 0
+
+    if application_fee >= 800:
+        fee_note = "High application fee — consider the risk if the match is uncertain."
+        fee_penalty = 8
+    elif application_fee >= 500:
+        fee_note = "Moderate application fee — consider the cost if you are unsure."
+        fee_penalty = 4
+
+    if fee_note:
+        reasons.append(fee_note)
+
+    # Only penalise fee if confidence LOW (NOT for MEDIUM)
+    final_score = base_score
+    if confidence == "LOW":
+        final_score = max(0, min(100, base_score - fee_penalty))
+
+    # --------------------
+    # Action improvements
+    # --------------------
+    if confidence == "HIGH":
+        actions.insert(0, "Apply — this listing looks like a strong match.")
+    if confidence == "MEDIUM":
+        actions.append("Consider adding a guarantor to strengthen your application.")
+
     actions = list(dict.fromkeys(actions))[:5]
     reasons = list(dict.fromkeys(reasons))[:8]
 
-    return EvaluationResult(score, verdict, confidence, reasons, actions), bands
+    return EvaluationResult(final_score, verdict, confidence, reasons, actions), bands
