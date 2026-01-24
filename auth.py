@@ -62,17 +62,12 @@ def make_session_token(user_id: int) -> str:
 
 def read_session_token(token: str, max_age_seconds: int = 60 * 60 * 24 * 7):
     try:
-        data = serializer.loads(token, max_age=max_age_seconds)
-        return data
+        return serializer.loads(token, max_age=max_age_seconds)
     except BadSignature:
         return None
 
 
 def get_current_user(request: Request):
-    print("DEBUG COOKIES:", request.cookies)
-    token = request.cookies.get("session")
-    print("DEBUG SESSION TOKEN:", token)
-    ...
     token = request.cookies.get("session")
     if not token:
         return None
