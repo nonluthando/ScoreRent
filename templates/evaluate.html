@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Evaluate listing</h2>
+<p class="muted">
+  Using your saved profile ({{ profile.renter_type }}, income: R{{ profile.monthly_income }}).
+</p>
+
+<form method="post" class="card">
+  <label>Rent (monthly)</label>
+  <input type="number" name="rent" min="0" required />
+
+  <label>Deposit</label>
+  <input type="number" name="deposit" min="0" required />
+
+  <label>Application fee</label>
+  <input type="number" name="application_fee" min="0" required />
+
+  <label>Area demand</label>
+  <select name="area_demand">
+    {% for d in demand_levels %}
+      <option value="{{ d }}">{{ d }}</option>
+    {% endfor %}
+  </select>
+
+  <label>Required documents (comma-separated)</label>
+  <input name="required_documents" placeholder="bank_statement, payslip" />
+
+  <button class="btn" type="submit">Evaluate</button>
+</form>
+{% endblock %}

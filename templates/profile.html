@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Your renter profile</h2>
+<p class="muted">Save a default profile to speed up evaluations.</p>
+
+<form method="post" class="card">
+  <label>Renter type</label>
+  <select name="renter_type">
+    {% for t in renter_types %}
+      <option value="{{ t }}" {% if t == renter_type %}selected{% endif %}>{{ t }}</option>
+    {% endfor %}
+  </select>
+
+  <label>Monthly income (ZAR)</label>
+  <input type="number" min="0" name="monthly_income" value="{{ monthly_income }}" required />
+
+  <label>Documents (comma-separated)</label>
+  <input
+    name="documents"
+    placeholder="bank_statement, payslip, employment_contract"
+    value="{{ docs | join(', ') }}"
+  />
+  <p class="muted small">
+    Suggested docs for your category: {{ docs_for_type | join(', ') }}
+  </p>
+
+  <button class="btn" type="submit">Save profile</button>
+</form>
+{% endblock %}

@@ -1,114 +1,19 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>RentCheck</title>
-  <link rel="stylesheet" href="/static/styles.css">
-</head>
-<body>
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Decide if a rental listing is worth applying for.</h1>
+  <p class="muted">
+    ScoreRent compares renter profiles against listing requirements and explains the decision.
+  </p>
 
-  <header>
-    <h1>RentCheck</h1>
-    <p class="subtitle">
-      Check if a rental listing is worth applying for — based on affordability & requirements.
-    </p>
-  </header>
-
-  <div class="grid">
-
-    <!-- FORM -->
-    <section class="card">
-      <h2>Evaluate Listing</h2>
-
-      <form method="post" action="/evaluate-ui">
-
-        <h3>Your Profile</h3>
-
-        <label>Monthly income</label>
-        <input type="number" name="monthly_income" min="1" placeholder="e.g. 18000" required>
-
-        <label>Monthly rent budget</label>
-        <input type="number" name="budget" min="1" placeholder="e.g. 7000" required>
-
-        <h4>Documents you have</h4>
-        <div class="checkboxes">
-          <label><input type="checkbox" name="documents" value="bank_statement"> Bank statement</label>
-          <label><input type="checkbox" name="documents" value="payslip"> Payslip</label>
-
-          <label><input type="checkbox" name="documents" value="employment_contract"> Employment contract</label>
-          <label><input type="checkbox" name="documents" value="guarantor_letter"> Guarantor letter</label>
-
-          <label><input type="checkbox" name="documents" value="proof_of_registration"> Proof of registration</label>
-          <label><input type="checkbox" name="documents" value="proof_of_bursary"> Proof of bursary</label>
-        </div>
-
-        <hr>
-
-        <h3>Listing Details</h3>
-
-        <label>Rent</label>
-        <input type="number" name="rent" min="1" placeholder="e.g. 7500" required>
-
-        <label>Deposit</label>
-        <input type="number" name="deposit" min="0" placeholder="e.g. 7500" required>
-
-        <label>Application fee</label>
-        <input type="number" name="application_fee" min="0" placeholder="e.g. 850" required>
-
-        <h4>Required documents (from listing)</h4>
-        <div class="checkboxes">
-          <label><input type="checkbox" name="required_documents" value="bank_statement"> Bank statement</label>
-          <label><input type="checkbox" name="required_documents" value="payslip"> Payslip</label>
-
-          <label><input type="checkbox" name="required_documents" value="employment_contract"> Employment contract</label>
-          <label><input type="checkbox" name="required_documents" value="guarantor_letter"> Guarantor letter</label>
-
-          <label><input type="checkbox" name="required_documents" value="proof_of_registration"> Proof of registration</label>
-          <label><input type="checkbox" name="required_documents" value="proof_of_bursary"> Proof of bursary</label>
-        </div>
-
-        <label>Area demand</label>
-        <select name="area_demand" required>
-          <option value="LOW">Low demand</option>
-          <option value="MEDIUM">Medium demand</option>
-          <option value="HIGH">High demand</option>
-        </select>
-
-        <button type="submit">Evaluate</button>
-
-      </form>
-    </section>
-
-    <!-- RESULT -->
-    <section class="card">
-      <h2>Result</h2>
-
-      {% if result %}
-        <div class="score">{{ result.score }}/100</div>
-
-        <div class="verdict {{ result.verdict }}">
-          {{ result.verdict.replace("_", " ") }}
-        </div>
-
-        <h3>Suggested monthly rent budget</h3>
-        <ul>
-          <li><b>Conservative (25%):</b> R{{ result.suggested_budget.conservative }}</li>
-          <li><b>Recommended (30%):</b> R{{ result.suggested_budget.recommended }}</li>
-          <li><b>Upper limit (35%):</b> R{{ result.suggested_budget.upper_limit }}</li>
-        </ul>
-
-        <h3>Reasons</h3>
-        <ul>
-          {% for reason in result.reasons %}
-            <li>{{ reason }}</li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p class="muted">Fill in the form to see the evaluation output here.</p>
-      {% endif %}
-
-    </section>
-
+  <div class="hero-actions">
+    {% if user %}
+      <a class="btn" href="/evaluate">Start evaluation</a>
+      <a class="btn ghost" href="/history">View history</a>
+    {% else %}
+      <a class="btn" href="/signup">Create account</a>
+      <a class="btn ghost" href="/login">Sign in</a>
+    {% endif %}
   </div>
-
-</body>
-</html>
+</section>
+{% endblock %}

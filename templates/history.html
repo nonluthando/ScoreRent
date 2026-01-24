@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Evaluation history</h2>
+<p class="muted">Your last 50 evaluations.</p>
+
+<div class="grid">
+  {% for ev in evals %}
+    <a class="card linkCard" href="/results/{{ ev.id }}">
+      <div class="row">
+        <div>
+          <div class="big">{{ ev.score }} · {{ ev.verdict }}</div>
+          <div class="muted small">{{ ev.created_at }}</div>
+        </div>
+        <span class="pill">{{ ev.confidence }}</span>
+      </div>
+    </a>
+  {% else %}
+    <p class="muted">No evaluations yet. Run your first evaluation.</p>
+  {% endfor %}
+</div>
+{% endblock %}

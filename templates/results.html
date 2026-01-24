@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Evaluation result</h2>
+
+<div class="result">
+  <div class="scoreBox">
+    <div class="score">{{ ev.score }}</div>
+    <div class="verdict">{{ ev.verdict }}</div>
+    <div class="muted small">Confidence: {{ ev.confidence }}</div>
+  </div>
+
+  <div class="card">
+    <h3>Listing summary</h3>
+    <ul class="list">
+      <li><strong>Rent:</strong> R{{ listing.rent }}</li>
+      <li><strong>Deposit:</strong> R{{ listing.deposit }}</li>
+      <li><strong>Application fee:</strong> R{{ listing.application_fee }}</li>
+      <li><strong>Demand:</strong> {{ listing.area_demand }}</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Reasons</h3>
+    <ul class="list">
+      {% for r in reasons %}
+        <li>{{ r }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Suggested actions</h3>
+    <ul class="list">
+      {% for a in actions %}
+        <li>{{ a }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="actionsRow">
+    <a class="btn ghost" href="/history">View history</a>
+    <a class="btn" href="/evaluate">Evaluate another</a>
+  </div>
+</div>
+{% endblock %}
