@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 from typing import List, Dict, Tuple
 
@@ -31,6 +32,10 @@ def suggested_budget_bands(monthly_income: int) -> Dict[str, int]:
     }
 
 
+def _dedupe_keep_order(items: List[str]) -> List[str]:
+    return list(dict.fromkeys(items))
+
+
 def evaluate(
     renter_type: str,
     monthly_income: int,
@@ -40,22 +45,79 @@ def evaluate(
     application_fee: int,
     required_documents: List[str],
     area_demand: str,
+    guarantor_monthly_income: int = 0,
 ) -> Tuple[EvaluationResult, Dict[str, int]]:
     reasons: List[str] = []
     actions: List[str] = []
     score = 70
 
-    renter_docs_set = set([d.strip().lower() for d in renter_docs if d and d.strip()])
-    required_docs_set = set([d.strip().lower() for d in required_documents if d and d.strip()])
+    # ---- Normalise input ----
+    renter_type = (renter_type or "").strip().lower()
+    renter_docs = set([d.strip().lower() for d in (renter_docs or []) if d.strip()])
+    required_documents = set([d.strip().lower() for d in (required_documents or []) if d.strip()])
     area_demand = area_demand.upper().strip() if area_demand else "MEDIUM"
 
-    bands = suggested_budget_bands(monthly_income)
+    if renter_type not in RENTER_TYPES:
+        renter_type = "worker"
+
+    if area_demand not in DEMAND_LEVELS:
+        area_demand = "MEDIUM"
+
+    is_student = renter_type == "student"
+    has_bursary = is_student and ("bursary_letter" in renter_docs)
+    non_bursary_student = is_student and not has_bursary
+
+    # ---- Suggested budgets ----
+    # For non-bursary students, affordability should be evaluated using GUARANTOR income
+    effective_income_for_affordability = monthly_income
+    if non_bursary_student and guarantor_monthly_income > 0:
+        effective_income_for_affordability = guarantor_monthly_income
+
+    bands = suggested_budget_bands(effective_income_for_affordability)
     upper_limit = bands["upper_limit"]
     recommended = bands["recommended"]
 
-    # --------------------
-    # Affordability logic
-    # --------------------
+    # ==========================================================
+    # Student-specific document requirements
+    # ==========================================================
+    if is_student:
+        # proof of registration required for ALL students
+        if "proof_of_registration" not in renter_docs:
+            score -= 25
+            reasons.append("Student applicants must provide proof of registration.")
+            actions.append("Upload proof of registration.")
+
+        if has_bursary:
+            # bursary confirmation required
+            reasons.append("Bursary confirmation provided (strong financial support).")
+        else:
+            # Non-bursary students require guarantor support
+            required_guarantor_docs = {
+                "guarantor_letter",
+                "guarantor_payslip",
+                "guarantor_bank_statement"
+            }
+            missing = required_guarantor_docs - renter_docs
+            if missing:
+                score -= 25
+                reasons.append("Non-bursary student applications rely on guarantor documentation.")
+                actions.append("Provide guarantor letter, guarantor payslip, and guarantor bank statement.")
+
+            if guarantor_monthly_income <= 0:
+                score -= 15
+                reasons.append("Guarantor income not provided.")
+                actions.append("Insert guarantor monthly income to assess affordability.")
+
+    # ==========================================================
+    # Affordability rules
+    # ==========================================================
+    # If non-bursary student and no guarantor income, treat as weak signal
+    if non_bursary_student and guarantor_monthly_income <= 0:
+        score -= 10
+        reasons.append("Affordability cannot be verified without guarantor income for a non-bursary student.")
+        actions.append("Add guarantor income and re-evaluate affordability.")
+
+    # Standard affordability logic (but based on effective income for affordability)
     if rent > upper_limit:
         score -= 30
         reasons.append("Rent exceeds the recommended affordability limit (35% of income).")
@@ -68,37 +130,67 @@ def evaluate(
         score += 5
         reasons.append("Rent falls within recommended affordability range.")
 
+    # Bursary student: if bursary/monthly support covers rent, strong positive
+    if is_student and has_bursary and monthly_income >= rent:
+        score += 12
+        reasons.append("Bursary/financial support covers rent (strong affordability signal).")
+        actions.append("Apply — affordability looks strong for your situation.")
+
+    # Bursary shortfall: recommend guarantor income that keeps deficit <= 30% of guarantor income
+    if is_student and has_bursary and monthly_income < rent:
+        shortfall = rent - monthly_income
+        required_guarantor_income = math.ceil(shortfall / 0.30)
+
+        reasons.append(f"Bursary does not fully cover rent (shortfall: R{shortfall}).")
+        actions.append(
+            f"Consider adding a guarantor: target guarantor income >= R{required_guarantor_income}/month "
+            f"(so the shortfall stays within 30% affordability)."
+        )
+
+    # Upfront cost risk
     upfront = rent + deposit + application_fee
-    if upfront > monthly_income:
+    if upfront > effective_income_for_affordability and effective_income_for_affordability > 0:
         score -= 10
         reasons.append("Upfront cost (rent + deposit + application fee) is high relative to monthly income.")
         actions.append("Ensure deposit/fees are affordable before applying.")
 
-    # --------------------
-    # Document logic
-    # --------------------
-    missing_required = required_docs_set - renter_docs_set
+    # ==========================================================
+    # Required documents from listing
+    # ==========================================================
+    missing_required = required_documents - renter_docs
     if missing_required:
         score -= 18
         reasons.append("Some required documents are missing.")
         actions.append("Gather the missing required documents before applying.")
 
+    # Cluster docs (recommended docs for category)
     cluster_docs = DOC_CLUSTERS.get(renter_type, set())
-    missing_cluster = cluster_docs - renter_docs_set
+    missing_cluster = cluster_docs - renter_docs
     if missing_cluster and len(missing_cluster) < len(cluster_docs):
         score -= 6
         reasons.append("Some recommended documents for your renter category are missing.")
         actions.append("Add the recommended documents to strengthen your application.")
 
-    # universal penalty for bank statements
-    if "bank_statement" not in renter_docs_set:
-        score -= 14
-        reasons.append("No bank statement provided (may reduce application strength).")
-        actions.append("Prepare 3 months bank statements if available.")
+    # ==========================================================
+    # Bank statement logic
+    # ==========================================================
+    if not is_student:
+        # workers/new professionals
+        if "bank_statement" not in renter_docs:
+            score -= 14
+            reasons.append("No bank statement provided (may reduce application strength).")
+            actions.append("Prepare 3 months bank statements if available.")
+    else:
+        # students:
+        # bursary students do NOT need bank statement
+        if non_bursary_student and ("guarantor_bank_statement" not in renter_docs):
+            score -= 8
+            reasons.append("No guarantor bank statement provided (may weaken application).")
+            actions.append("Ask guarantor for 3 months bank statements.")
 
-    # --------------------
-    # Demand logic
-    # --------------------
+    # ==========================================================
+    # Demand weighting
+    # ==========================================================
     if area_demand == "HIGH":
         score -= 10
         reasons.append("High demand area increases competition.")
@@ -107,52 +199,70 @@ def evaluate(
         score += 4
         reasons.append("Lower demand area may reduce competition.")
 
-    # clamp score BEFORE verdict
-    base_score = max(0, min(100, score))
+    # Clamp score
+    score = max(0, min(100, score))
 
-    # --------------------
-    # Determine verdict + confidence
-    # --------------------
-    if base_score >= 75:
+    # ==========================================================
+    # Verdict & Confidence
+    # ==========================================================
+    if score >= 75:
         verdict = "WORTH_APPLYING"
         confidence = "HIGH"
-    elif base_score >= 55:
+    elif score >= 55:
         verdict = "BORDERLINE"
         confidence = "MEDIUM"
     else:
         verdict = "NOT_WORTH_IT"
         confidence = "LOW"
 
-    # --------------------
-    # Application fee: informational note for MEDIUM confidence
-    # --------------------
-    fee_note = None
-    fee_penalty = 0
-
-    if application_fee >= 800:
-        fee_note = "High application fee — consider the risk if the match is uncertain."
-        fee_penalty = 8
-    elif application_fee >= 500:
-        fee_note = "Moderate application fee — consider the cost if you are unsure."
-        fee_penalty = 4
-
-    if fee_note:
-        reasons.append(fee_note)
-
-    # Only penalise fee if confidence LOW (NOT for MEDIUM)
-    final_score = base_score
-    if confidence == "LOW":
-        final_score = max(0, min(100, base_score - fee_penalty))
-
-    # --------------------
-    # Action improvements
-    # --------------------
-    if confidence == "HIGH":
-        actions.insert(0, "Apply — this listing looks like a strong match.")
+    # ==========================================================
+    # Application fee logic (your rule)
+    # - If confidence MEDIUM: informational note, no penalty
+    # ==========================================================
     if confidence == "MEDIUM":
-        actions.append("Consider adding a guarantor to strengthen your application.")
+        if application_fee >= 800:
+            reasons.append("Application fee is high — consider the risk before applying.")
+        elif application_fee >= 500:
+            reasons.append("Application fee is moderate — consider the risk if unsure.")
+    else:
+        if application_fee >= 800:
+            score -= 8
+            reasons.append("High application fee increases cost of a low-confidence application.")
+            actions.append("Avoid high-fee applications unless score is strong.")
+        elif application_fee >= 500:
+            score -= 4
+            reasons.append("Moderate application fee increases risk if application is weak.")
 
-    actions = list(dict.fromkeys(actions))[:5]
-    reasons = list(dict.fromkeys(reasons))[:8]
+        score = max(0, min(100, score))
+        # re-evaluate confidence in case fee changed the score
+        if score >= 75:
+            verdict = "WORTH_APPLYING"
+            confidence = "HIGH"
+        elif score >= 55:
+            verdict = "BORDERLINE"
+            confidence = "MEDIUM"
+        else:
+            verdict = "NOT_WORTH_IT"
+            confidence = "LOW"
 
-    return EvaluationResult(final_score, verdict, confidence, reasons, actions), bands
+    # ==========================================================
+    # Suggested actions polish
+    # ==========================================================
+    if confidence == "HIGH":
+        actions.insert(0, "Apply — this looks like a strong match.")
+    elif confidence == "MEDIUM":
+        # Suggest guarantor for borderline/medium confidence
+        actions.append("If possible, add a guarantor to strengthen your application.")
+
+    actions = _dedupe_keep_order(actions)[:5]
+    reasons = _dedupe_keep_order(reasons)[:8]
+
+    result = EvaluationResult(
+        score=score,
+        verdict=verdict,
+        confidence=confidence,
+        reasons=reasons,
+        actions=actions,
+    )
+
+    return result, bands
