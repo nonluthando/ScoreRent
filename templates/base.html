@@ -1,36 +1,39 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ScoreRent</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=3">
-</head>
-<body>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ScoreRent</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
 
-  <div class="container">
-    <nav>
-      <a class="brand" href="/">ScoreRent</a>
+  <body>
+    <div class="container">
+      <nav>
+        <a class="brand" href="/">ScoreRent</a>
 
-      <div class="links">
-        <a href="/evaluate">Evaluate</a>
-        <a href="/dashboard">Dashboard</a>
+        <div class="links">
+          <a href="/evaluate">Evaluate</a>
 
-        {% if user %}
-          <a href="/profile">Profile</a>
-          <a href="/history">History</a>
-          <a href="/logout">Logout</a>
-        {% else %}
-          <a href="/login">Login</a>
-          <a href="/signup">Sign up</a>
-        {% endif %}
-      </div>
-    </nav>
+          {% if user %}
+            <a href="/dashboard">Dashboard</a>
+            <a href="/profile">Profile</a>
+            <a href="/history">History</a>
+            <a href="/logout">Logout</a>
+          {% else %}
+            <a href="/login">Login</a>
+            <a href="/signup">Sign up</a>
+          {% endif %}
+        </div>
+      </nav>
 
-    {% block content %}{% endblock %}
+      <main class="stack" style="margin-top: 28px;">
+        {% block content %}{% endblock %}
+      </main>
 
-    <footer>ScoreRent © 2026</footer>
-  </div>
-
-</body>
+      <footer>
+        <p>ScoreRent © 2026</p>
+      </footer>
+    </div>
+  </body>
 </html>
