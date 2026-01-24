@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    volumes:
+      - ..:/workspaces/ScoreRent:cached
+    command: sleep infinity
+    network_mode: service:db
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: scorerent
+      POSTGRES_PASSWORD: scorerent
+      POSTGRES_DB: scorerent
+    ports:
+      - "5432:5432"
