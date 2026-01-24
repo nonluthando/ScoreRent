@@ -1,25 +1,55 @@
-{% extends "base.html" %}
+{{% extends "base.html" %}
 {% block content %}
-<h2>Evaluation history</h2>
-<p class="muted">Your last 50 evaluations.</p>
 
-<div class="grid">
-  {% for ev in evaluations %}
-    <a class="card linkCard" href="/results/{{ ev.id }}">
-      <div class="row">
-        <div>
-          <div class="big">
-            {{ ev.listing_name or "Unnamed listing" }}
+<section class="stack" style="padding-top: 26px;">
+  <div class="stack" style="gap:10px;">
+    <h2>Saved evaluations</h2>
+    <p>
+      Review past listings you've evaluated.
+    </p>
+  </div>
+
+  <div class="actions">
+    <a class="btn" href="/evaluate">New evaluation</a>
+    <a class="btn secondary" href="/profile">Update profile</a>
+  </div>
+
+  {% if evaluations and evaluations|length > 0 %}
+    <div class="stack" style="margin-top: 18px;">
+      {% for e in evaluations %}
+        <a href="/results/{{ e['id'] }}" class="card stack" style="text-decoration:none;">
+          <div class="grid-2" style="align-items:center;">
+            <div class="stack" style="gap:4px;">
+              <h3 style="margin:0;">{{ e["listing_name"] or "Listing" }}</h3>
+              <p style="margin:0; opacity:.85;">
+                {{ e["created_at"] }}
+              </p>
+            </div>
+
+            <div class="stack" style="gap:8px; justify-self:end; text-align:right;">
+              <div class="badge">Score: {{ e["score"] }}/100</div>
+
+              {% if e["confidence"] == "HIGH" %}
+                <div class="badge good">{{ e["verdict"] }} • {{ e["confidence"] }}</div>
+              {% elif e["confidence"] == "MEDIUM" %}
+                <div class="badge warn">{{ e["verdict"] }} • {{ e["confidence"] }}</div>
+              {% else %}
+                <div class="badge bad">{{ e["verdict"] }} • {{ e["confidence"] }}</div>
+              {% endif %}
+            </div>
           </div>
-          <div class="muted small">
-            {{ ev.score }} · {{ ev.verdict }} · {{ ev.created_at }}
-          </div>
-        </div>
-        <span class="pill">{{ ev.confidence }}</span>
-      </div>
-    </a>
+        </a>
+      {% endfor %}
+    </div>
   {% else %}
-    <p class="muted">No evaluations yet. Run your first evaluation.</p>
-  {% endfor %}
-</div>
+    <div class="card stack" style="margin-top: 18px;">
+      <h3>No saved evaluations yet</h3>
+      <p>Run your first evaluation to start building history.</p>
+      <div class="actions">
+        <a class="btn" href="/evaluate">Start evaluation</a>
+      </div>
+    </div>
+  {% endif %}
+</section>
+
 {% endblock %}
