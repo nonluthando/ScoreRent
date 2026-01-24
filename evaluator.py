@@ -1,119 +1,123 @@
-# -------------------------
-# Document clusters
-# -------------------------
+from dataclasses import dataclass
+from typing import List, Dict, Tuple
+
+
+@dataclass
+class EvaluationResult:
+    score: int
+    verdict: str
+    confidence: str
+    reasons: List[str]
+    actions: List[str]
+
+
+VERDICTS = ["WORTH_APPLYING", "BORDERLINE", "NOT_WORTH_IT"]
+RENTER_TYPES = ["worker", "new_professional", "student"]
 
 DOC_CLUSTERS = {
-    # Workers: strong evidence
     "worker": {"bank_statement", "payslip"},
-
-    # New professional/recent grad: can apply with contract + guarantor
-    "recent_grad": {"employment_contract", "guarantor_letter"},
-
-    # Student
-    "student": {"proof_of_registration", "proof_of_bursary", "guarantor_letter"},
+    "new_professional": {"employment_contract", "guarantor_letter"},
+    "student": {"proof_of_registration", "bursary_letter", "guarantor_letter"},
 }
 
+DEMAND_LEVELS = ["LOW", "MEDIUM", "HIGH"]
 
-def suggested_budget(monthly_income: int):
+
+def suggested_budget_bands(monthly_income: int) -> Dict[str, int]:
     return {
         "conservative": int(monthly_income * 0.25),
         "recommended": int(monthly_income * 0.30),
-        "upper_limit": int(monthly_income * 0.35)
+        "upper_limit": int(monthly_income * 0.35),
     }
 
 
-def has_any_cluster_proof(docs: set[str]) -> bool:
-    """
-    Do they have any acceptable proof from any cluster?
-    (doesn't replace bank statement, just reduces doc mismatch penalty)
-    """
-    for cluster_docs in DOC_CLUSTERS.values():
-        if not docs.isdisjoint(cluster_docs):
-            return True
-    return False
-
-
-def evaluate(renter, listing):
-    score = 100
+def evaluate(
+    renter_type: str,
+    monthly_income: int,
+    renter_docs: List[str],
+    rent: int,
+    deposit: int,
+    application_fee: int,
+    required_documents: List[str],
+    area_demand: str,
+) -> Tuple[EvaluationResult, Dict[str, int]]:
     reasons = []
+    actions = []
+    score = 70
 
-    # --- Suggested rent budget info ---
-    budget = suggested_budget(renter.monthly_income)
+    renter_docs = set([d.strip().lower() for d in renter_docs if d.strip()])
+    required_documents = set([d.strip().lower() for d in required_documents if d.strip()])
+    area_demand = area_demand.upper().strip() if area_demand else "MEDIUM"
 
-    # --- Rent vs income ---
-    rent_ratio = listing.rent / renter.monthly_income
-    if rent_ratio > 0.35:
+    bands = suggested_budget_bands(monthly_income)
+    upper_limit = bands["upper_limit"]
+    recommended = bands["recommended"]
+
+    if rent > upper_limit:
         score -= 30
-        reasons.append("Rent exceeds recommended affordability threshold")
-
-    # --- Budget check ---
-    if listing.rent > renter.budget:
-        score -= 20
-        reasons.append("Rent exceeds stated budget")
-
-    # --- Deposit check ---
-    if listing.deposit > renter.budget:
-        score -= 10
-        reasons.append("Deposit may be difficult to afford")
-
-    # -------------------------
-    # Document logic (clusters + universal bank statement penalty)
-    # -------------------------
-    renter_docs = set(renter.documents)
-    required_docs = set(listing.required_documents)
-
-    missing_required = required_docs - renter_docs
-    has_proof = has_any_cluster_proof(renter_docs)
-    has_bank_statement = "bank_statement" in renter_docs
-
-    # 1) Required documents match / mismatch
-    if not missing_required:
-        score += 10
-        reasons.append("All required documents are available")
+        reasons.append("Rent exceeds the recommended affordability limit (35% of income).")
+        actions.append("Target listings with rent <= 35% of monthly income.")
+    elif rent > recommended:
+        score -= 12
+        reasons.append("Rent is above the recommended band (30% of income).")
+        actions.append("If possible, reduce rent target closer to 30% of income.")
     else:
-        # Missing some required docs, but still has alternative proof
-        if has_proof:
-            score -= 10
-            reasons.append("Some required documents are missing, but alternative proof is available")
-        else:
-            score -= 30
-            reasons.append("Multiple required documents are missing")
+        score += 5
+        reasons.append("Rent falls within recommended affordability range.")
 
-    # 2) Universal penalty if no bank statement (applies to everyone)
-    if not has_bank_statement:
-        if has_proof:
-            score -= 10
-            reasons.append("No bank statement provided (may reduce application strength)")
-        else:
-            score -= 20
-            reasons.append("No bank statement provided and limited alternative proof available")
-
-    # --- Area demand ---
-    if listing.area_demand == "HIGH":
+    upfront = rent + deposit + application_fee
+    if upfront > monthly_income:
         score -= 10
-        reasons.append("High demand area increases competition")
+        reasons.append("Upfront cost (rent + deposit + application fee) is high relative to monthly income.")
+        actions.append("Ensure deposit/fees are affordable before applying.")
 
-    # --- Application fee (risk factor) ---
-    if listing.application_fee > 0:
-        fee_ratio = listing.application_fee / max(renter.budget, 1)
+    missing_required = required_documents - renter_docs
+    if missing_required:
+        score -= 18
+        reasons.append("Some required documents are missing.")
+        actions.append("Gather the missing required documents before applying.")
 
-        if fee_ratio > 0.05:
-            score -= 15
-            reasons.append("High application fee relative to budget")
+    cluster_docs = DOC_CLUSTERS.get(renter_type, set())
+    missing_cluster = cluster_docs - renter_docs
+    if missing_cluster and len(missing_cluster) < len(cluster_docs):
+        score -= 6
+        reasons.append("Some recommended documents for your renter category are missing.")
+        actions.append("Add the recommended documents to strengthen your application.")
 
-        if score < 60:
-            score -= 10
-            reasons.append("Application fee increases cost of a low-confidence application")
+    if "bank_statement" not in renter_docs:
+        score -= 14
+        reasons.append("No bank statement provided (may reduce application strength).")
+        actions.append("Prepare 3 months bank statements if available.")
 
-    # --- Clamp score ---
-    score = max(0, min(score, 100))
+    if application_fee >= 800:
+        score -= 8
+        reasons.append("High application fee increases cost of a low-confidence application.")
+        actions.append("Avoid high-fee applications unless score is strong.")
+    elif application_fee >= 500:
+        score -= 4
+        reasons.append("Moderate application fee increases risk if application is weak.")
 
-    # --- Verdict ---
-    if score >= 70:
+    if area_demand == "HIGH":
+        score -= 10
+        reasons.append("High demand area increases competition.")
+        actions.append("Apply only if documents and affordability are strong.")
+    elif area_demand == "LOW":
+        score += 4
+        reasons.append("Lower demand area may reduce competition.")
+
+    score = max(0, min(100, score))
+
+    if score >= 75:
         verdict = "WORTH_APPLYING"
-    elif score >= 40:
+        confidence = "HIGH"
+    elif score >= 55:
         verdict = "BORDERLINE"
+        confidence = "MEDIUM"
     else:
         verdict = "NOT_WORTH_IT"
+        confidence = "LOW"
 
-    return score, verdict, reasons, budget
+    actions = list(dict.fromkeys(actions))[:5]
+    reasons = list(dict.fromkeys(reasons))[:8]
+
+    return EvaluationResult(score, verdict, confidence, reasons, actions), bands
