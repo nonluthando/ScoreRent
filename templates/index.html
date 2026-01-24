@@ -1,19 +1,41 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="hero">
-  <h1>Decide if a rental listing is worth applying for.</h1>
-  <p class="muted">
-    ScoreRent compares renter profiles against listing requirements and explains the decision.
-  </p>
 
-  <div class="hero-actions">
+<section class="stack" style="padding-top: 30px;">
+  <div class="stack" style="gap:10px;">
+    <h1>Decide if a rental listing is worth applying for.</h1>
+    <p>
+      ScoreRent compares your renter profile against listing requirements and gives a clear recommendation:
+      apply, proceed with caution, or avoid.
+    </p>
+  </div>
+
+  <div class="actions">
+    <a class="btn" href="/evaluate">Start evaluation</a>
     {% if user %}
-      <a class="btn" href="/evaluate">Start evaluation</a>
-      <a class="btn ghost" href="/history">View history</a>
+      <a class="btn secondary" href="/history">View saved evaluations</a>
     {% else %}
-      <a class="btn" href="/evaluate">Continue as guest</a>
-      <a class="btn ghost" href="/signup">Sign up to save history</a>
+      <a class="btn secondary" href="/login">Login to save history</a>
     {% endif %}
   </div>
+
+  <div class="grid-2" style="margin-top: 10px;">
+    <div class="card stack">
+      <div class="badge good">✅ Fast & simple</div>
+      <h3>Instant decision support</h3>
+      <p>
+        Quickly identify document gaps, affordability risks, and demand pressure.
+      </p>
+    </div>
+
+    <div class="card stack">
+      <div class="badge warn">📌 Product-style recommendations</div>
+      <h3>Actionable next steps</h3>
+      <p>
+        Get suggested actions like “apply”, “add guarantor”, or “request proof of income”.
+      </p>
+    </div>
+  </div>
 </section>
+
 {% endblock %}
