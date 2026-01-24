@@ -4,14 +4,15 @@
 
 <div class="result">
   <div class="scoreBox">
-    <div class="score">{{ ev.score }}</div>
-    <div class="verdict">{{ ev.verdict }}</div>
-    <div class="muted small">Confidence: {{ ev.confidence }}</div>
+    <div class="score">{{ evaluation.score }}</div>
+    <div class="verdict">{{ evaluation.verdict }}</div>
+    <div class="muted small">Confidence: {{ evaluation.confidence }}</div>
   </div>
 
   <div class="card">
     <h3>Listing summary</h3>
     <ul class="list">
+      <li><strong>Name:</strong> {{ evaluation.listing_name or "Unnamed listing" }}</li>
       <li><strong>Rent:</strong> R{{ listing.rent }}</li>
       <li><strong>Deposit:</strong> R{{ listing.deposit }}</li>
       <li><strong>Application fee:</strong> R{{ listing.application_fee }}</li>
