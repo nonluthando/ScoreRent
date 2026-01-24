@@ -1,15 +1,19 @@
-{% extends "base.html" %}
+{{% extends "base.html" %}
 {% block content %}
 <h2>Evaluation history</h2>
 <p class="muted">Your last 50 evaluations.</p>
 
 <div class="grid">
-  {% for ev in evals %}
+  {% for ev in evaluations %}
     <a class="card linkCard" href="/results/{{ ev.id }}">
       <div class="row">
         <div>
-          <div class="big">{{ ev.score }} · {{ ev.verdict }}</div>
-          <div class="muted small">{{ ev.created_at }}</div>
+          <div class="big">
+            {{ ev.listing_name or "Unnamed listing" }}
+          </div>
+          <div class="muted small">
+            {{ ev.score }} · {{ ev.verdict }} · {{ ev.created_at }}
+          </div>
         </div>
         <span class="pill">{{ ev.confidence }}</span>
       </div>
