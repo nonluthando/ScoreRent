@@ -29,7 +29,37 @@ def test_bank_statement_penalty_applies_for_workers():
         area_demand="LOW",
     )
 
+    # Worker-specific bank statement rule is now heavy
     assert any("bank statement" in r.lower() for r in result.reasons)
+
+
+def test_worker_missing_bank_statement_penalty_is_worse_without_payslip():
+    """
+    New test: worker missing bank statement is punished more if payslip also missing.
+    """
+    with_payslip, _ = evaluate(
+        renter_type="worker",
+        monthly_income=20000,
+        renter_docs=["payslip"],
+        rent=6000,
+        deposit=6000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="LOW",
+    )
+
+    without_payslip, _ = evaluate(
+        renter_type="worker",
+        monthly_income=20000,
+        renter_docs=[],  # missing bank_statement + payslip
+        rent=6000,
+        deposit=6000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="LOW",
+    )
+
+    assert without_payslip.score < with_payslip.score
 
 
 def test_bursary_student_no_bank_statement_penalty():
@@ -44,6 +74,7 @@ def test_bursary_student_no_bank_statement_penalty():
         area_demand="MEDIUM",
     )
 
+    # bursary students should NOT trigger non-student "no bank statement" penalty
     assert not any("no bank statement" in r.lower() for r in result.reasons)
 
 
@@ -98,11 +129,15 @@ def test_non_bursary_student_affordability_uses_guarantor_income():
 
 
 def test_application_fee_not_penalised_for_medium_confidence():
+    """
+    MEDIUM confidence: fee becomes informational only (no score penalty).
+    The reason should mention the fee.
+    """
     result, bands = evaluate(
         renter_type="worker",
         monthly_income=20000,
-        renter_docs=["bank_statement", "payslip"],  # strengthen docs
-        rent=6800,
+        renter_docs=["bank_statement", "payslip"],  # strong docs
+        rent=6800,  # above recommended (6000), below upper (7000) -> borderline zone
         deposit=6800,
         application_fee=800,
         required_documents=["bank_statement", "payslip"],
@@ -110,7 +145,26 @@ def test_application_fee_not_penalised_for_medium_confidence():
     )
 
     assert result.confidence == "MEDIUM"
-    assert "Application fee" in " ".join(result.reasons)
+    assert any("application fee" in r.lower() for r in result.reasons)
+
+
+def test_medium_confidence_suggests_roommates_if_rent_above_recommended():
+    """
+    New requirement: if MEDIUM confidence and rent is above recommended -> suggest roommates.
+    """
+    result, bands = evaluate(
+        renter_type="worker",
+        monthly_income=20000,
+        renter_docs=["bank_statement", "payslip"],
+        rent=6800,  # above recommended
+        deposit=6800,
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+    )
+
+    if result.confidence == "MEDIUM":
+        assert any("roommates" in a.lower() or "house-sharing" in a.lower() for a in result.actions)
 
 
 def test_high_confidence_includes_apply_action():
