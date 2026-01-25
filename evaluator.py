@@ -208,7 +208,7 @@ def evaluate(
                     score,
                     breakdown,
                     "Affordability: rent above recommended 30%",
-                    -20
+                    -20,
                     details=f"Recommended: {_format_currency(recommended)}",
                 )
                 reasons.append("Rent is above the recommended band (30% of income).")
