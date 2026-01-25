@@ -38,50 +38,53 @@
     </ul>
   </div>
 
-  <!-- ✅ NEW: Score breakdown -->
+  <!-- ✅ Breakdown (collapsible + bars) -->
   {% if result.breakdown %}
   <div class="card breakdownCard">
-    <details class="breakdown">
-      <summary>
-        <span class="caret">▼</span>
-        <span>Show how ScoreRent calculated this score</span>
-      </summary>
+    <details class="breakdownDetails">
+      <summary class="breakdownSummary">Show how ScoreRent calculated this score</summary>
 
-      <div class="breakdownBody">
-        {% for step in result.breakdown %}
-        <div class="breakdownRow">
-          <div class="breakdownLeft">
-            <div class="breakdownTitle">{{ step.title }}</div>
+      <div class="breakdownList">
+        {% for b in result.breakdown %}
+          {% set delta = b.delta %}
+          {% set before = b.before %}
+          {% set after = b.after %}
+          {% set title = b.title %}
+          {% set details = b.details %}
 
-            {% if step.details %}
-              <div class="breakdownDetails">{{ step.details }}</div>
-            {% endif %}
+          {% if delta > 0 %}
+            {% set badgeClass = "pos" %}
+          {% elif delta < 0 %}
+            {% set badgeClass = "neg" %}
+          {% else %}
+            {% set badgeClass = "zero" %}
+          {% endif %}
 
-            <!-- Mini progress bar -->
-            <div class="miniBar">
-              <div class="miniBarTrack">
-                <div
-                  class="miniBarFill"
-                  style="width: {{ step.after }}%;"
-                ></div>
+          <!-- bar = progress between before and after (clamped 0-100) -->
+          {% set progress = after %}
+          {% if progress < 0 %}{% set progress = 0 %}{% endif %}
+          {% if progress > 100 %}{% set progress = 100 %}{% endif %}
+
+          <div class="breakItem">
+            <div class="breakTop">
+              <div class="breakTitle">{{ title }}</div>
+
+              <div class="breakRight">
+                <span class="deltaBadge {{ badgeClass }}">
+                  {% if delta > 0 %}+{{ delta }}{% else %}{{ delta }}{% endif %}
+                </span>
+                <span class="arrowNums">{{ before }} → {{ after }}</span>
               </div>
             </div>
-          </div>
 
-          <div class="breakdownRight">
-            <div class="deltaPill
-              {% if step.delta < 0 %}neg{% elif step.delta > 0 %}pos{% else %}zero{% endif %}
-            ">
-              {% if step.delta > 0 %}+{% endif %}{{ step.delta }}
-            </div>
+            {% if details %}
+              <div class="breakDetailsText">{{ details }}</div>
+            {% endif %}
 
-            <div class="arrowScore">
-              <span class="before">{{ step.before }}</span>
-              <span class="arrow">→</span>
-              <span class="after">{{ step.after }}</span>
+            <div class="miniBar">
+              <div class="miniBarFill" style="width: {{ progress }}%"></div>
             </div>
           </div>
-        </div>
         {% endfor %}
       </div>
     </details>
