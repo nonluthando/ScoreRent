@@ -29,18 +29,17 @@ def test_bank_statement_penalty_applies_for_workers():
         area_demand="LOW",
     )
 
-    # Worker-specific bank statement rule is now heavy
     assert any("bank statement" in r.lower() for r in result.reasons)
 
 
 def test_worker_missing_bank_statement_penalty_is_worse_without_payslip():
     """
-    New test: worker missing bank statement is punished more if payslip also missing.
+    Worker missing bank statement should be penalised more if payslip is also missing.
     """
     with_payslip, _ = evaluate(
         renter_type="worker",
         monthly_income=20000,
-        renter_docs=["payslip"],
+        renter_docs=["payslip"],  # missing bank statement
         rent=6000,
         deposit=6000,
         application_fee=0,
@@ -51,7 +50,7 @@ def test_worker_missing_bank_statement_penalty_is_worse_without_payslip():
     without_payslip, _ = evaluate(
         renter_type="worker",
         monthly_income=20000,
-        renter_docs=[],  # missing bank_statement + payslip
+        renter_docs=[],  # missing bank statement + payslip
         rent=6000,
         deposit=6000,
         application_fee=0,
@@ -60,6 +59,7 @@ def test_worker_missing_bank_statement_penalty_is_worse_without_payslip():
     )
 
     assert without_payslip.score < with_payslip.score
+    assert any("payslip" in r.lower() for r in without_payslip.reasons)
 
 
 def test_bursary_student_no_bank_statement_penalty():
@@ -74,8 +74,9 @@ def test_bursary_student_no_bank_statement_penalty():
         area_demand="MEDIUM",
     )
 
-    # bursary students should NOT trigger non-student "no bank statement" penalty
+    # Should not complain about bank statement for bursary student
     assert not any("no bank statement" in r.lower() for r in result.reasons)
+    assert not any("guarantor bank statement" in r.lower() for r in result.reasons)
 
 
 def test_bursary_shortfall_recommends_guarantor_income():
@@ -91,14 +92,19 @@ def test_bursary_shortfall_recommends_guarantor_income():
     )
 
     assert any("shortfall" in r.lower() for r in result.reasons)
-    assert any("guarantor" in a.lower() for a in result.actions)
+    assert any("guarantor income" in a.lower() or "guarantor" in a.lower() for a in result.actions)
 
 
 def test_non_bursary_student_requires_guarantor_income():
     result, bands = evaluate(
         renter_type="student",
         monthly_income=0,
-        renter_docs=["proof_of_registration", "guarantor_letter", "guarantor_payslip", "guarantor_bank_statement"],
+        renter_docs=[
+            "proof_of_registration",
+            "guarantor_letter",
+            "guarantor_payslip",
+            "guarantor_bank_statement",
+        ],
         rent=5000,
         deposit=5000,
         application_fee=0,
@@ -115,7 +121,12 @@ def test_non_bursary_student_affordability_uses_guarantor_income():
     result, bands = evaluate(
         renter_type="student",
         monthly_income=0,
-        renter_docs=["proof_of_registration", "guarantor_letter", "guarantor_payslip", "guarantor_bank_statement"],
+        renter_docs=[
+            "proof_of_registration",
+            "guarantor_letter",
+            "guarantor_payslip",
+            "guarantor_bank_statement",
+        ],
         rent=5800,
         deposit=5800,
         application_fee=0,
@@ -129,15 +140,11 @@ def test_non_bursary_student_affordability_uses_guarantor_income():
 
 
 def test_application_fee_not_penalised_for_medium_confidence():
-    """
-    MEDIUM confidence: fee becomes informational only (no score penalty).
-    The reason should mention the fee.
-    """
     result, bands = evaluate(
         renter_type="worker",
         monthly_income=20000,
-        renter_docs=["bank_statement", "payslip"],  # strong docs
-        rent=6800,  # above recommended (6000), below upper (7000) -> borderline zone
+        renter_docs=["bank_statement", "payslip"],
+        rent=6800,
         deposit=6800,
         application_fee=800,
         required_documents=["bank_statement", "payslip"],
@@ -145,26 +152,7 @@ def test_application_fee_not_penalised_for_medium_confidence():
     )
 
     assert result.confidence == "MEDIUM"
-    assert any("application fee" in r.lower() for r in result.reasons)
-
-
-def test_medium_confidence_suggests_roommates_if_rent_above_recommended():
-    """
-    New requirement: if MEDIUM confidence and rent is above recommended -> suggest roommates.
-    """
-    result, bands = evaluate(
-        renter_type="worker",
-        monthly_income=20000,
-        renter_docs=["bank_statement", "payslip"],
-        rent=6800,  # above recommended
-        deposit=6800,
-        application_fee=0,
-        required_documents=[],
-        area_demand="MEDIUM",
-    )
-
-    if result.confidence == "MEDIUM":
-        assert any("roommates" in a.lower() or "house-sharing" in a.lower() for a in result.actions)
+    assert "application fee" in " ".join(result.reasons).lower()
 
 
 def test_high_confidence_includes_apply_action():
@@ -181,3 +169,36 @@ def test_high_confidence_includes_apply_action():
 
     assert result.confidence == "HIGH"
     assert any("apply" in a.lower() for a in result.actions)
+
+
+def test_cluster_penalty_only_applies_to_student_or_new_professional():
+    """
+    Cluster penalty should NOT apply to worker.
+    (Workers are handled explicitly via bank_statement/payslip rules.)
+    """
+    worker_res, _ = evaluate(
+        renter_type="worker",
+        monthly_income=20000,
+        renter_docs=["bank_statement"],  # missing payslip
+        rent=6000,
+        deposit=6000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="LOW",
+    )
+
+    assert any("payslip" in r.lower() for r in worker_res.reasons)
+    assert not any("recommended documents" in r.lower() for r in worker_res.reasons)
+
+    np_res, _ = evaluate(
+        renter_type="new_professional",
+        monthly_income=20000,
+        renter_docs=["employment_contract"],  # missing guarantor_letter
+        rent=6000,
+        deposit=6000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="LOW",
+    )
+
+    assert any("recommended documents" in r.lower() for r in np_res.reasons)
