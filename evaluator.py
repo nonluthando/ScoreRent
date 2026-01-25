@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 
 
 @dataclass
@@ -10,6 +10,7 @@ class EvaluationResult:
     confidence: str
     reasons: List[str]
     actions: List[str]
+    breakdown: List[Dict[str, Any]]  # ✅ NEW
 
 
 VERDICTS = ["WORTH_APPLYING", "BORDERLINE", "NOT_WORTH_IT"]
@@ -36,6 +37,16 @@ def _dedupe_keep_order(items: List[str]) -> List[str]:
     return list(dict.fromkeys(items))
 
 
+def _add_step(breakdown: List[Dict[str, Any]], rule: str, delta: int, score_after: int):
+    breakdown.append(
+        {
+            "rule": rule,
+            "delta": delta,
+            "score": score_after,
+        }
+    )
+
+
 def evaluate(
     renter_type: str,
     monthly_income: int,
@@ -49,7 +60,10 @@ def evaluate(
 ) -> Tuple[EvaluationResult, Dict[str, int]]:
     reasons: List[str] = []
     actions: List[str] = []
+    breakdown: List[Dict[str, Any]] = []
+
     score = 70
+    _add_step(breakdown, "Base score", 0, score)
 
     # ----------------------------
     # Normalise input
@@ -87,6 +101,7 @@ def evaluate(
     if is_student:
         if "proof_of_registration" not in renter_docs:
             score -= 25
+            _add_step(breakdown, "Missing proof of registration (student requirement)", -25, score)
             reasons.append("Student applicants must provide proof of registration.")
             actions.append("Upload proof of registration.")
 
@@ -101,11 +116,13 @@ def evaluate(
             missing = required_guarantor_docs - renter_docs
             if missing:
                 score -= 25
+                _add_step(breakdown, "Missing guarantor documentation (non-bursary student)", -25, score)
                 reasons.append("Non-bursary student applications rely on guarantor documentation.")
                 actions.append("Provide guarantor letter, guarantor payslip, and guarantor bank statement.")
 
             if guarantor_monthly_income <= 0:
                 score -= 15
+                _add_step(breakdown, "Guarantor income not provided (non-bursary student)", -15, score)
                 reasons.append("Guarantor income not provided.")
                 actions.append("Insert guarantor monthly income to assess affordability.")
 
@@ -114,24 +131,29 @@ def evaluate(
     # ==========================================================
     if non_bursary_student and guarantor_monthly_income <= 0:
         score -= 10
+        _add_step(breakdown, "Affordability cannot be verified (no guarantor income)", -10, score)
         reasons.append("Affordability cannot be verified without guarantor income for a non-bursary student.")
         actions.append("Add guarantor income and re-evaluate affordability.")
 
     if rent > upper_limit:
         score -= 30
+        _add_step(breakdown, "Rent exceeds affordability upper limit (35%)", -30, score)
         reasons.append("Rent exceeds the recommended affordability limit (35% of income).")
         actions.append("Target listings with rent <= 35% of monthly income.")
     elif rent > recommended:
         score -= 12
+        _add_step(breakdown, "Rent above recommended band (30%)", -12, score)
         reasons.append("Rent is above the recommended band (30% of income).")
         actions.append("If possible, reduce rent target closer to 30% of income.")
     else:
         score += 5
+        _add_step(breakdown, "Rent within recommended affordability range", +5, score)
         reasons.append("Rent falls within recommended affordability range.")
 
     # bursary: strong positive if covered
     if is_student and has_bursary and monthly_income >= rent:
         score += 12
+        _add_step(breakdown, "Bursary/financial support covers rent", +12, score)
         reasons.append("Bursary/financial support covers rent (strong affordability signal).")
         actions.append("Apply — affordability looks strong for your situation.")
 
@@ -160,6 +182,7 @@ def evaluate(
     missing_required = required_documents - renter_docs
     if missing_required:
         score -= 18
+        _add_step(breakdown, "Missing required listing documents", -18, score)
         reasons.append("Some required documents are missing.")
         actions.append("Gather the missing required documents before applying.")
 
@@ -173,6 +196,7 @@ def evaluate(
     if renter_type in {"new_professional", "student"}:
         if missing_cluster and len(missing_cluster) < len(cluster_docs):
             score -= 6
+            _add_step(breakdown, "Missing recommended documents (cluster penalty)", -6, score)
             reasons.append("Some recommended documents for your renter category are missing.")
             actions.append("Add the recommended documents to strengthen your application.")
 
@@ -182,16 +206,19 @@ def evaluate(
     if renter_type == "worker":
         if "payslip" not in renter_docs:
             score -= 10
+            _add_step(breakdown, "Worker missing payslip", -10, score)
             reasons.append("No payslip provided (income verification is weak).")
             actions.append("Upload your latest payslip(s) to strengthen your application.")
 
         if "bank_statement" not in renter_docs:
             if "payslip" in renter_docs:
                 score -= 12
+                _add_step(breakdown, "Worker missing bank statement (payslip present)", -12, score)
                 reasons.append("No bank statement provided (worker applications usually require it).")
                 actions.append("Prepare 3 months bank statements before applying.")
             else:
                 score -= 18
+                _add_step(breakdown, "Worker missing bank statement + payslip", -18, score)
                 reasons.append("No bank statement provided and payslip missing (very weak worker documentation).")
                 actions.append("Prepare bank statements and payslips before applying.")
 
@@ -200,16 +227,19 @@ def evaluate(
             has_strong_np_docs = ("employment_contract" in renter_docs) and ("guarantor_letter" in renter_docs)
             if has_strong_np_docs:
                 score -= 6
+                _add_step(breakdown, "New professional missing bank statement (strong alternative docs)", -6, score)
                 reasons.append("No bank statement provided (supporting documents are strong).")
                 actions.append("If possible, provide bank statements or alternative proof of income.")
             else:
                 score -= 10
+                _add_step(breakdown, "New professional missing bank statement", -10, score)
                 reasons.append("No bank statement provided (may reduce application strength).")
                 actions.append("Provide bank statements or supporting proof of income if possible.")
 
     elif renter_type == "student":
         if non_bursary_student and ("guarantor_bank_statement" not in renter_docs):
             score -= 8
+            _add_step(breakdown, "Student missing guarantor bank statement", -8, score)
             reasons.append("No guarantor bank statement provided (may weaken application).")
             actions.append("Ask guarantor for 3 months bank statements.")
 
@@ -218,10 +248,12 @@ def evaluate(
     # ==========================================================
     if area_demand == "HIGH":
         score -= 10
+        _add_step(breakdown, "High demand area", -10, score)
         reasons.append("High demand area increases competition.")
         actions.append("Apply only if documents and affordability are strong.")
     elif area_demand == "LOW":
         score += 4
+        _add_step(breakdown, "Low demand area", +4, score)
         reasons.append("Lower demand area may reduce competition.")
 
     # Clamp score
@@ -267,6 +299,7 @@ def evaluate(
         confidence=confidence,
         reasons=reasons,
         actions=actions,
+        breakdown=breakdown,
     )
 
     return result, bands
