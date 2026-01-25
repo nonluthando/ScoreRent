@@ -2,8 +2,8 @@
 {% block content %}
 <h2>Guest evaluation result</h2>
 
-<div class="result">
-  <div class="scoreBox">
+<div class="result stack">
+  <div class="scoreBox card">
     <div class="score">{{ result.score }}</div>
     <div class="verdict">{{ result.verdict }}</div>
     <div class="muted small">Confidence: {{ result.confidence }}</div>
@@ -38,49 +38,47 @@
     </ul>
   </div>
 
-  {% if result.breakdown and result.breakdown|length > 0 %}
+  {# --------------------------
+     Breakdown (Prosple-style)
+     -------------------------- #}
+  {% if result.breakdown %}
   <div class="card breakdownCard">
     <details class="breakdownDetails">
       <summary class="breakdownSummary">Show how ScoreRent calculated this score</summary>
 
       <div class="breakdownList">
-        {% for step in result.breakdown %}
-          {% set delta = step.delta %}
-          {% set before = step.before %}
-          {% set after = step.after %}
+        {% for b in result.breakdown %}
+          {% set delta = b.delta %}
+          {% set before = b.before %}
+          {% set after = b.after %}
 
-          {% if delta > 0 %}
-            {% set badgeClass = "pos" %}
-          {% elif delta < 0 %}
-            {% set badgeClass = "neg" %}
-          {% else %}
-            {% set badgeClass = "zero" %}
-          {% endif %}
+          {% set badge_class = "zero" %}
+          {% if delta > 0 %}{% set badge_class = "pos" %}{% endif %}
+          {% if delta < 0 %}{% set badge_class = "neg" %}{% endif %}
+
+          {# bar percent: clamp 0..100 #}
+          {% set pct = after %}
+          {% if pct < 0 %}{% set pct = 0 %}{% endif %}
+          {% if pct > 100 %}{% set pct = 100 %}{% endif %}
 
           <div class="breakItem">
             <div class="breakTop">
-              <div>
-                <div class="breakTitle">{{ step.title }}</div>
-                {% if step.details %}
-                  <div class="breakDetailsText">{{ step.details }}</div>
-                {% endif %}
-              </div>
+              <div class="breakTitle">{{ b.title }}</div>
 
               <div class="breakRight">
-                <div class="deltaBadge {{ badgeClass }}">
+                <div class="deltaBadge {{ badge_class }}">
                   {% if delta > 0 %}+{{ delta }}{% else %}{{ delta }}{% endif %}
                 </div>
-
                 <div class="arrowNums">{{ before }} → {{ after }}</div>
               </div>
             </div>
 
-            <!-- Mini progress bar -->
+            {% if b.details %}
+              <div class="breakDetailsText">{{ b.details }}</div>
+            {% endif %}
+
             <div class="miniBar">
-              <div
-                class="miniBarFill"
-                style="width: {{ after }}%;"
-              ></div>
+              <div class="miniBarFill" style="width: {{ pct }}%;"></div>
             </div>
           </div>
         {% endfor %}
