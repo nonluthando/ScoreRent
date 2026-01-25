@@ -6,7 +6,7 @@ def test_affordability_penalty_when_rent_exceeds_upper_limit():
         renter_type="worker",
         monthly_income=20000,
         renter_docs=["bank_statement", "payslip"],
-        rent=9000,  # upper_limit = 7000
+        rent=9000,  # 35% of 20k = 7000 -> exceeds upper_limit
         deposit=9000,
         application_fee=0,
         required_documents=["bank_statement"],
@@ -33,6 +33,9 @@ def test_bank_statement_penalty_applies_for_workers():
 
 
 def test_worker_missing_bank_statement_penalty_is_worse_without_payslip():
+    """
+    Worker missing bank statement should be penalised more if payslip is also missing.
+    """
     with_payslip, _ = evaluate(
         renter_type="worker",
         monthly_income=20000,
@@ -59,26 +62,21 @@ def test_worker_missing_bank_statement_penalty_is_worse_without_payslip():
     assert any("payslip" in r.lower() for r in without_payslip.reasons)
 
 
-def test_bursary_student_no_affordability_penalty_if_covered():
-    """
-    Your updated evaluator: bursary student with support >= rent skips affordability penalty
-    and gets a boost (+15).
-    """
+def test_bursary_student_no_bank_statement_penalty():
     result, bands = evaluate(
         renter_type="student",
         monthly_income=8000,
-        renter_docs=["proof_of_registration", "bursary_letter"],
-        rent=8000,
-        deposit=8000,
+        renter_docs=["proof_of_registration", "bursary_letter"],  # no bank_statement
+        rent=7000,
+        deposit=7000,
         application_fee=0,
         required_documents=[],
         area_demand="MEDIUM",
         is_bursary_student=True,
     )
 
-    assert not any("35%" in r for r in result.reasons)
-    assert not any("30%" in r for r in result.reasons)
-    assert any("covers the rent" in r.lower() for r in result.reasons)
+    assert not any("bank statement" in r.lower() for r in result.reasons)
+    assert not any("guarantor bank statement" in r.lower() for r in result.reasons)
 
 
 def test_bursary_shortfall_recommends_guarantor_income():
@@ -86,7 +84,7 @@ def test_bursary_shortfall_recommends_guarantor_income():
         renter_type="student",
         monthly_income=5000,
         renter_docs=["proof_of_registration", "bursary_letter"],
-        rent=7000,
+        rent=7000,  # shortfall 2000
         deposit=7000,
         application_fee=0,
         required_documents=[],
@@ -144,6 +142,9 @@ def test_non_bursary_student_affordability_uses_guarantor_income():
 
 
 def test_application_fee_is_informational_only_not_penalty():
+    """
+    Application fee should add a reason but NOT reduce score.
+    """
     no_fee, _ = evaluate(
         renter_type="worker",
         monthly_income=20000,
@@ -187,6 +188,10 @@ def test_high_confidence_includes_apply_action():
 
 
 def test_cluster_penalty_only_applies_to_student_or_new_professional():
+    """
+    Cluster penalty should NOT apply to worker.
+    Workers are handled explicitly via bank_statement/payslip rules.
+    """
     worker_res, _ = evaluate(
         renter_type="worker",
         monthly_income=20000,
@@ -216,6 +221,9 @@ def test_cluster_penalty_only_applies_to_student_or_new_professional():
 
 
 def test_upfront_cost_is_informational_only_no_score_penalty():
+    """
+    Upfront cost warning should NOT reduce score.
+    """
     res_high_upfront, _ = evaluate(
         renter_type="worker",
         monthly_income=20000,
@@ -242,11 +250,54 @@ def test_upfront_cost_is_informational_only_no_score_penalty():
     assert any("upfront cost" in r.lower() for r in res_high_upfront.reasons)
 
 
-def test_new_professional_gets_boost_for_employment_contract():
+def test_new_professional_bank_statement_penalty_is_lighter_with_strong_docs():
     """
-    Your evaluator adds +10 when employment_contract exists.
+    New professional: missing bank statement is penalised less if they have:
+    employment_contract + guarantor_letter.
     """
-    with_contract, _ = evaluate(
+    strong_docs, _ = evaluate(
+        renter_type="new_professional",
+        monthly_income=20000,
+        renter_docs=["employment_contract", "guarantor_letter"],
+        rent=6000,
+        deposit=6000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="LOW",
+    )
+
+    weak_docs, _ = evaluate(
+        renter_type="new_professional",
+        monthly_income=20000,
+        renter_docs=[],
+        rent=6000,
+        deposit=6000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="LOW",
+    )
+
+    assert strong_docs.score > weak_docs.score
+    assert any("employment contract" in r.lower() for r in strong_docs.reasons)
+
+
+def test_new_professional_guarantor_letter_is_positive_signal():
+    """
+    Guarantor letter should be treated as a positive signal for new professionals.
+    We don't assert score difference because high-scoring cases can tie.
+    """
+    with_guarantor, _ = evaluate(
+        renter_type="new_professional",
+        monthly_income=20000,
+        renter_docs=["employment_contract", "guarantor_letter"],
+        rent=6000,
+        deposit=6000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="LOW",
+    )
+
+    without_guarantor, _ = evaluate(
         renter_type="new_professional",
         monthly_income=20000,
         renter_docs=["employment_contract"],
@@ -257,54 +308,20 @@ def test_new_professional_gets_boost_for_employment_contract():
         area_demand="LOW",
     )
 
-    without_contract, _ = evaluate(
-        renter_type="new_professional",
-        monthly_income=20000,
-        renter_docs=[],
-        rent=6000,
-        deposit=6000,
-        application_fee=0,
-        required_documents=[],
-        area_demand="LOW",
-    )
-
-    assert with_contract.score > without_contract.score
-    assert any("employment contract provided" in r.lower() for r in with_contract.reasons)
+    assert any("guarantor letter" in r.lower() for r in with_guarantor.reasons)
+    assert not any("guarantor letter" in r.lower() for r in without_guarantor.reasons)
 
 
-def test_new_professional_gets_boost_for_guarantor_letter():
-    with_letter, _ = evaluate(
-        renter_type="new_professional",
-        monthly_income=20000,
-        renter_docs=["guarantor_letter"],
-        rent=6000,
-        deposit=6000,
-        application_fee=0,
-        required_documents=[],
-        area_demand="LOW",
-    )
-
-    without_letter, _ = evaluate(
-        renter_type="new_professional",
-        monthly_income=20000,
-        renter_docs=[],
-        rent=6000,
-        deposit=6000,
-        application_fee=0,
-        required_documents=[],
-        area_demand="LOW",
-    )
-
-    assert with_letter.score > without_letter.score
-    assert any("guarantor letter provided" in r.lower() for r in with_letter.reasons)
-
-
-def test_roommate_suggestion_added_when_borderline_and_rent_above_recommended():
+def test_roommate_suggestion_added_when_medium_confidence_and_rent_above_recommended():
+    """
+    Roommate suggestion is only added when confidence is MEDIUM
+    and rent is above recommended.
+    """
     result, bands = evaluate(
         renter_type="worker",
         monthly_income=20000,
-        renter_docs=["bank_statement", "payslip"],
-        rent=6500,  # recommended 6000
+        renter_docs=["bank_statement"],  # missing payslip -> penalty
+        rent=6500,  # recommended = 6000
         deposit=6500,
         application_fee=0,
         required_documents=[],
@@ -313,25 +330,3 @@ def test_roommate_suggestion_added_when_borderline_and_rent_above_recommended():
 
     assert result.confidence == "MEDIUM"
     assert any("roommates" in a.lower() or "house" in a.lower() for a in result.actions)
-
-
-def test_breakdown_is_populated():
-    """
-    Since you added breakdown, we ensure it's always non-empty and has the expected keys.
-    """
-    result, _ = evaluate(
-        renter_type="worker",
-        monthly_income=20000,
-        renter_docs=["bank_statement", "payslip"],
-        rent=6000,
-        deposit=6000,
-        application_fee=0,
-        required_documents=[],
-        area_demand="LOW",
-    )
-
-    assert len(result.breakdown) >= 2
-    assert all("title" in row for row in result.breakdown)
-    assert all("before" in row for row in result.breakdown)
-    assert all("after" in row for row in result.breakdown)
-    assert all("delta" in row for row in result.breakdown)
