@@ -195,10 +195,10 @@ def evaluate(
         else:
             if rent > upper_limit:
                 score = _apply(
-                    score,
+                score,
                     breakdown,
                     "Affordability: rent exceeds 35% upper limit",
-                    -30,
+                    -50,
                     details=f"Upper limit: {_format_currency(upper_limit)}",
                 )
                 reasons.append("Rent exceeds the recommended affordability limit (35% of income).")
@@ -208,7 +208,7 @@ def evaluate(
                     score,
                     breakdown,
                     "Affordability: rent above recommended 30%",
-                    -12,
+                    -20
                     details=f"Recommended: {_format_currency(recommended)}",
                 )
                 reasons.append("Rent is above the recommended band (30% of income).")
