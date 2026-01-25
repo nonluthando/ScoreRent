@@ -202,3 +202,84 @@ def test_cluster_penalty_only_applies_to_student_or_new_professional():
     )
 
     assert any("recommended documents" in r.lower() for r in np_res.reasons)
+    def test_upfront_cost_is_informational_only_no_score_penalty():
+    """
+    Upfront cost (rent + deposit + application_fee) should NOT reduce score anymore.
+    It should only add a reason/action.
+    """
+    res_high_upfront, _ = evaluate(
+        renter_type="worker",
+        monthly_income=20000,
+        renter_docs=["bank_statement", "payslip"],
+        rent=6000,
+        deposit=20000,        # huge deposit to force upfront warning
+        application_fee=1000, # big fee
+        required_documents=[],
+        area_demand="LOW",
+    )
+
+    res_low_upfront, _ = evaluate(
+        renter_type="worker",
+        monthly_income=20000,
+        renter_docs=["bank_statement", "payslip"],
+        rent=6000,
+        deposit=0,
+        application_fee=0,
+        required_documents=[],
+        area_demand="LOW",
+    )
+
+    # scores should be equal because upfront is informational only
+    assert res_high_upfront.score == res_low_upfront.score
+    assert any("upfront cost" in r.lower() for r in res_high_upfront.reasons)
+
+
+def test_new_professional_bank_statement_penalty_is_lighter_with_strong_docs():
+    """
+    New professional: missing bank statement is penalised less if they have strong docs:
+    employment_contract + guarantor_letter.
+    """
+    strong_docs, _ = evaluate(
+        renter_type="new_professional",
+        monthly_income=20000,
+        renter_docs=["employment_contract", "guarantor_letter"],  # strong docs, no bank statement
+        rent=6000,
+        deposit=6000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="LOW",
+    )
+
+    weak_docs, _ = evaluate(
+        renter_type="new_professional",
+        monthly_income=20000,
+        renter_docs=[],  # missing everything
+        rent=6000,
+        deposit=6000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="LOW",
+    )
+
+    assert strong_docs.score > weak_docs.score
+    assert any("bank statement" in r.lower() for r in strong_docs.reasons)
+
+
+def test_roommate_suggestion_added_when_borderline_and_rent_above_recommended():
+    """
+    When confidence is MEDIUM and rent > recommended band,
+    evaluator should suggest house-sharing/roommates.
+    """
+    result, bands = evaluate(
+        renter_type="worker",
+        monthly_income=20000,
+        renter_docs=["bank_statement", "payslip"],
+        rent=6500,  # recommended 30% = 6000, so above recommended but below 35%
+        deposit=6500,
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+    )
+
+    assert result.confidence == "MEDIUM"
+    assert any("roommates" in a.lower() or "house" in a.lower() for a in result.actions)
