@@ -38,19 +38,16 @@
     </ul>
   </div>
 
-  <!-- ✅ Breakdown (collapsible + bars) -->
-  {% if result.breakdown %}
+  {% if result.breakdown and result.breakdown|length > 0 %}
   <div class="card breakdownCard">
     <details class="breakdownDetails">
       <summary class="breakdownSummary">Show how ScoreRent calculated this score</summary>
 
       <div class="breakdownList">
-        {% for b in result.breakdown %}
-          {% set delta = b.delta %}
-          {% set before = b.before %}
-          {% set after = b.after %}
-          {% set title = b.title %}
-          {% set details = b.details %}
+        {% for step in result.breakdown %}
+          {% set delta = step.delta %}
+          {% set before = step.before %}
+          {% set after = step.after %}
 
           {% if delta > 0 %}
             {% set badgeClass = "pos" %}
@@ -60,29 +57,30 @@
             {% set badgeClass = "zero" %}
           {% endif %}
 
-          <!-- bar = progress between before and after (clamped 0-100) -->
-          {% set progress = after %}
-          {% if progress < 0 %}{% set progress = 0 %}{% endif %}
-          {% if progress > 100 %}{% set progress = 100 %}{% endif %}
-
           <div class="breakItem">
             <div class="breakTop">
-              <div class="breakTitle">{{ title }}</div>
+              <div>
+                <div class="breakTitle">{{ step.title }}</div>
+                {% if step.details %}
+                  <div class="breakDetailsText">{{ step.details }}</div>
+                {% endif %}
+              </div>
 
               <div class="breakRight">
-                <span class="deltaBadge {{ badgeClass }}">
+                <div class="deltaBadge {{ badgeClass }}">
                   {% if delta > 0 %}+{{ delta }}{% else %}{{ delta }}{% endif %}
-                </span>
-                <span class="arrowNums">{{ before }} → {{ after }}</span>
+                </div>
+
+                <div class="arrowNums">{{ before }} → {{ after }}</div>
               </div>
             </div>
 
-            {% if details %}
-              <div class="breakDetailsText">{{ details }}</div>
-            {% endif %}
-
+            <!-- Mini progress bar -->
             <div class="miniBar">
-              <div class="miniBarFill" style="width: {{ progress }}%"></div>
+              <div
+                class="miniBarFill"
+                style="width: {{ after }}%;"
+              ></div>
             </div>
           </div>
         {% endfor %}
