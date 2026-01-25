@@ -95,7 +95,7 @@ def evaluate(
             required_guarantor_docs = {
                 "guarantor_letter",
                 "guarantor_payslip",
-                "guarantor_bank_statement"
+                "guarantor_bank_statement",
             }
             missing = required_guarantor_docs - renter_docs
             if missing:
@@ -147,10 +147,11 @@ def evaluate(
             f"(so the shortfall stays within 30% affordability)."
         )
 
-    # Upfront cost risk
+    # ==========================================================
+    # Upfront cost risk (✅ informational only: no penalty)
+    # ==========================================================
     upfront = rent + deposit + application_fee
     if upfront > effective_income_for_affordability and effective_income_for_affordability > 0:
-        score -= 10
         reasons.append("Upfront cost (rent + deposit + application fee) is high relative to monthly income.")
         actions.append("Ensure deposit/fees are affordable before applying.")
 
@@ -172,14 +173,42 @@ def evaluate(
         actions.append("Add the recommended documents to strengthen your application.")
 
     # ==========================================================
-    # Bank statement logic
+    # Bank statement logic (UPDATED)
     # ==========================================================
     if not is_student:
-        # workers/new professionals
-        if "bank_statement" not in renter_docs:
-            score -= 14
-            reasons.append("No bank statement provided (may reduce application strength).")
-            actions.append("Prepare 3 months bank statements if available.")
+        if renter_type == "worker":
+            # ✅ Heavy penalty if worker missing bank statement
+            if "bank_statement" not in renter_docs:
+                # If they at least have payslip, reduce slightly
+                if "payslip" in renter_docs:
+                    score -= 12
+                    reasons.append("No bank statement provided (worker applications usually require it).")
+                    actions.append("Prepare 3 months bank statements before applying.")
+                else:
+                    score -= 18
+                    reasons.append("No bank statement provided and payslip missing (very weak worker documentation).")
+                    actions.append("Prepare bank statements and payslips before applying.")
+
+        elif renter_type == "new_professional":
+            # ✅ Lighter penalty if they have strong docs (employment contract + guarantor)
+            if "bank_statement" not in renter_docs:
+                has_strong_np_docs = ("employment_contract" in renter_docs) and ("guarantor_letter" in renter_docs)
+                if has_strong_np_docs:
+                    score -= 6
+                    reasons.append("No bank statement provided (may reduce strength, but supporting documents are strong).")
+                    actions.append("If possible, provide bank statements or alternative proof of income.")
+                else:
+                    score -= 10
+                    reasons.append("No bank statement provided (may reduce application strength).")
+                    actions.append("Provide bank statements or supporting proof of income if possible.")
+
+        else:
+            # fallback
+            if "bank_statement" not in renter_docs:
+                score -= 10
+                reasons.append("No bank statement provided (may reduce application strength).")
+                actions.append("Prepare 3 months bank statements if available.")
+
     else:
         # students:
         # bursary students do NOT need bank statement
@@ -216,7 +245,7 @@ def evaluate(
         confidence = "LOW"
 
     # ==========================================================
-    # Application fee logic (your rule)
+    # Application fee logic
     # - If confidence MEDIUM: informational note, no penalty
     # ==========================================================
     if confidence == "MEDIUM":
@@ -250,9 +279,14 @@ def evaluate(
     # ==========================================================
     if confidence == "HIGH":
         actions.insert(0, "Apply — this looks like a strong match.")
+
     elif confidence == "MEDIUM":
-        # Suggest guarantor for borderline/medium confidence
+        # suggest guarantor only if missing guarantor / borderline student gaps
         actions.append("If possible, add a guarantor to strengthen your application.")
+
+        # ✅ roommate suggestion if affordability is tight (rent above recommended)
+        if rent > recommended:
+            actions.append("Consider roommates/house-sharing to reduce rent burden.")
 
     actions = _dedupe_keep_order(actions)[:5]
     reasons = _dedupe_keep_order(reasons)[:8]
