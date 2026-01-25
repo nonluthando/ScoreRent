@@ -38,6 +38,33 @@
     </ul>
   </div>
 
+  <!-- ✅ NEW: Score breakdown (expand/collapse) -->
+  <div class="card">
+    <details>
+      <summary style="cursor:pointer; font-weight:800;">
+        Show how ScoreRent calculated this score
+      </summary>
+
+      <div style="margin-top:14px;">
+        {% for step in result.breakdown %}
+          <div style="display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid #e2e8f0;">
+            <div style="flex:1;">
+              <strong>{{ step.label }}</strong>
+              {% if step.note %}
+                <div class="muted small">{{ step.note }}</div>
+              {% endif %}
+            </div>
+
+            <div style="white-space:nowrap; font-weight:800;">
+              {% if step.delta > 0 %}+{{ step.delta }}{% else %}{{ step.delta }}{% endif %}
+              → {{ step.score_after }}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </details>
+  </div>
+
   <div class="actionsRow">
     <a class="btn" href="/evaluate">Evaluate another</a>
     <a class="btn ghost" href="/signup">Sign up to save history</a>
