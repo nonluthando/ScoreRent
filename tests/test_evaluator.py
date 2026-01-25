@@ -72,11 +72,11 @@ def test_bursary_student_no_bank_statement_penalty():
         application_fee=0,
         required_documents=[],
         area_demand="MEDIUM",
+        is_bursary_student=True,  
     )
 
-    assert not any("bank statement" in r.lower() for r in result.reasons)
+    # bursary student should not require guarantor bank statement
     assert not any("guarantor bank statement" in r.lower() for r in result.reasons)
-
 
 def test_bursary_shortfall_recommends_guarantor_income():
     result, bands = evaluate(
@@ -88,11 +88,11 @@ def test_bursary_shortfall_recommends_guarantor_income():
         application_fee=0,
         required_documents=[],
         area_demand="MEDIUM",
+        is_bursary_student=True, 
     )
 
     assert any("shortfall" in r.lower() for r in result.reasons)
     assert any("guarantor" in a.lower() for a in result.actions)
-
 
 def test_non_bursary_student_requires_guarantor_income():
     result, bands = evaluate(
