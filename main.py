@@ -268,19 +268,26 @@ def evaluate_post(
     application_fee: int = Form(...),
     area_demand: str = Form("MEDIUM"),
     required_documents: list[str] = Form([]),
-    guarantor_monthly_income: int = Form(0),  # ✅ NEW
+
+    # ✅ guest fields
+    guest_renter_type: str = Form("worker"),
+    guest_monthly_income: int = Form(0),
+    guest_renter_docs: list[str] = Form([]),
+    guest_guarantor_monthly_income: int = Form(0),
 ):
     user = get_current_user(request)
 
-    # Load profile if logged in
+    # defaults
     renter_type = "worker"
     monthly_income = 0
     renter_docs: list[str] = []
+    guarantor_monthly_income = 0
 
     profile_id = None
     user_id = None
 
     if user:
+        # Load profile if logged in
         user_id = user["id"]
         conn = get_conn()
         cur = conn.cursor()
@@ -298,6 +305,13 @@ def evaluate_post(
 
         cur.close()
         conn.close()
+
+    else:
+        # ✅ Guest mode: use guest profile inputs
+        renter_type = (guest_renter_type or "worker").strip().lower()
+        monthly_income = int(guest_monthly_income or 0)
+        renter_docs = [d.strip().lower() for d in guest_renter_docs if d.strip()]
+        guarantor_monthly_income = int(guest_guarantor_monthly_income or 0)
 
     required_docs = [d.strip().lower() for d in required_documents if d.strip()]
 
@@ -323,7 +337,7 @@ def evaluate_post(
         "guarantor_monthly_income": int(guarantor_monthly_income),
     }
 
-    # Guest mode: show result but do not store
+    # ✅ Guest mode: show result but do not store
     if not user:
         return templates.TemplateResponse(
             "guest_results.html",
@@ -371,7 +385,6 @@ def evaluate_post(
     conn.close()
 
     return RedirectResponse(f"/results/{eval_id}", status_code=303)
-
 
 @app.get("/results/{evaluation_id}")
 def results_page(request: Request, evaluation_id: int):
