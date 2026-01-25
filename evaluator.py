@@ -164,9 +164,13 @@ def evaluate(
         reasons.append("Some required documents are missing.")
         actions.append("Gather the missing required documents before applying.")
 
-    # Cluster docs (recommended docs for category)
-    cluster_docs = DOC_CLUSTERS.get(renter_type, set())
-    missing_cluster = cluster_docs - renter_docs
+ # Cluster docs (recommended docs for category)
+cluster_docs = DOC_CLUSTERS.get(renter_type, set())
+missing_cluster = cluster_docs - renter_docs
+
+# Only apply cluster penalty for renter types where these docs are "soft signals"
+# (for workers, docs are handled explicitly as hard requirements)
+if renter_type in {"new_professional", "student"}:
     if missing_cluster and len(missing_cluster) < len(cluster_docs):
         score -= 6
         reasons.append("Some recommended documents for your renter category are missing.")
@@ -177,7 +181,11 @@ def evaluate(
     # ==========================================================
     if not is_student:
         if renter_type == "worker":
-            # ✅ Heavy penalty if worker missing bank statement
+           if "payslip" not in renter_docs:
+        score -= 10
+        reasons.append("No payslip provided (income verification is weak).")
+        actions.append("Upload your latest payslip(s) to strengthen your application.")
+            # Heavy penalty if worker missing bank statement
             if "bank_statement" not in renter_docs:
                 # If they at least have payslip, reduce slightly
                 if "payslip" in renter_docs:
@@ -190,7 +198,7 @@ def evaluate(
                     actions.append("Prepare bank statements and payslips before applying.")
 
         elif renter_type == "new_professional":
-            # ✅ Lighter penalty if they have strong docs (employment contract + guarantor)
+            #Lighter penalty if they have strong docs (employment contract + guarantor)
             if "bank_statement" not in renter_docs:
                 has_strong_np_docs = ("employment_contract" in renter_docs) and ("guarantor_letter" in renter_docs)
                 if has_strong_np_docs:
