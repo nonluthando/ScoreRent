@@ -38,32 +38,48 @@
     </ul>
   </div>
 
-  <!-- ✅ NEW: Score breakdown (expand/collapse) -->
+  <!-- ✅ Score Breakdown (Collapsible) -->
+  {% if result.breakdown %}
   <div class="card">
-    <details>
-      <summary style="cursor:pointer; font-weight:800;">
+    <details class="breakdownWrap">
+      <summary class="breakdownSummary">
         Show how ScoreRent calculated this score
       </summary>
 
-      <div style="margin-top:14px;">
-        {% for step in result.breakdown %}
-          <div style="display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid #e2e8f0;">
-            <div style="flex:1;">
-              <strong>{{ step.label }}</strong>
-              {% if step.note %}
-                <div class="muted small">{{ step.note }}</div>
+      <div class="breakdownList">
+        {% for b in result.breakdown %}
+          <div class="breakdownRow">
+            <div class="breakdownLeft">
+              <div class="breakdownTitle">{{ b.title }}</div>
+
+              {% if b.details %}
+                <div class="breakdownDetails">{{ b.details }}</div>
               {% endif %}
+
+              <div class="breakdownBar">
+                <div class="breakdownBarFill" style="width: {{ b.after }}%;"></div>
+              </div>
             </div>
 
-            <div style="white-space:nowrap; font-weight:800;">
-              {% if step.delta > 0 %}+{{ step.delta }}{% else %}{{ step.delta }}{% endif %}
-              → {{ step.score_after }}
+            <div class="breakdownRight">
+              <div class="breakdownDelta
+                {% if b.delta > 0 %}pos{% elif b.delta < 0 %}neg{% else %}zero{% endif %}
+              ">
+                {% if b.delta > 0 %}+{{ b.delta }}{% else %}{{ b.delta }}{% endif %}
+                <span class="arrow">→</span>
+                {{ b.after }}
+              </div>
             </div>
           </div>
+
+          {% if not loop.last %}
+            <div class="breakdownDivider"></div>
+          {% endif %}
         {% endfor %}
       </div>
     </details>
   </div>
+  {% endif %}
 
   <div class="actionsRow">
     <a class="btn" href="/evaluate">Evaluate another</a>
