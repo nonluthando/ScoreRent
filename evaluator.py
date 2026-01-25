@@ -51,7 +51,9 @@ def evaluate(
     actions: List[str] = []
     score = 70
 
-    # ---- Normalise input ----
+    # ----------------------------
+    # Normalise input
+    # ----------------------------
     renter_type = (renter_type or "").strip().lower()
     renter_docs = set([d.strip().lower() for d in (renter_docs or []) if d.strip()])
     required_documents = set([d.strip().lower() for d in (required_documents or []) if d.strip()])
@@ -67,8 +69,10 @@ def evaluate(
     has_bursary = is_student and ("bursary_letter" in renter_docs)
     non_bursary_student = is_student and not has_bursary
 
-    # ---- Suggested budgets ----
-    # For non-bursary students, affordability should be evaluated using GUARANTOR income
+    # ----------------------------
+    # Suggested budgets
+    # For non-bursary students, affordability uses guarantor income
+    # ----------------------------
     effective_income_for_affordability = monthly_income
     if non_bursary_student and guarantor_monthly_income > 0:
         effective_income_for_affordability = guarantor_monthly_income
@@ -81,7 +85,6 @@ def evaluate(
     # Student-specific document requirements
     # ==========================================================
     if is_student:
-        # proof of registration required for ALL students
         if "proof_of_registration" not in renter_docs:
             score -= 25
             reasons.append("Student applicants must provide proof of registration.")
@@ -90,7 +93,6 @@ def evaluate(
         if has_bursary:
             reasons.append("Bursary confirmation provided (strong financial support).")
         else:
-            # Non-bursary students require guarantor support
             required_guarantor_docs = {
                 "guarantor_letter",
                 "guarantor_payslip",
@@ -127,13 +129,13 @@ def evaluate(
         score += 5
         reasons.append("Rent falls within recommended affordability range.")
 
-    # Bursary student: if bursary/monthly support covers rent
+    # bursary: strong positive if covered
     if is_student and has_bursary and monthly_income >= rent:
         score += 12
         reasons.append("Bursary/financial support covers rent (strong affordability signal).")
         actions.append("Apply — affordability looks strong for your situation.")
 
-    # Bursary shortfall: recommend guarantor income that keeps deficit <= 30% of guarantor income
+    # bursary shortfall
     if is_student and has_bursary and monthly_income < rent:
         shortfall = rent - monthly_income
         required_guarantor_income = math.ceil(shortfall / 0.30)
@@ -145,7 +147,7 @@ def evaluate(
         )
 
     # ==========================================================
-    # Upfront cost risk (informational only: no penalty)
+    # Upfront cost risk (Informational only: no penalty)
     # ==========================================================
     upfront = rent + deposit + application_fee
     if upfront > effective_income_for_affordability and effective_income_for_affordability > 0:
@@ -163,7 +165,7 @@ def evaluate(
 
     # ==========================================================
     # Cluster docs (recommended docs)
-    # only student + new_professional
+    # ONLY applies for new_professional + student
     # ==========================================================
     cluster_docs = DOC_CLUSTERS.get(renter_type, set())
     missing_cluster = cluster_docs - renter_docs
@@ -178,13 +180,11 @@ def evaluate(
     # Bank statement + payslip logic
     # ==========================================================
     if renter_type == "worker":
-        # payslip rule (strong signal)
         if "payslip" not in renter_docs:
             score -= 10
             reasons.append("No payslip provided (income verification is weak).")
             actions.append("Upload your latest payslip(s) to strengthen your application.")
 
-        # bank statement (heavy worker requirement)
         if "bank_statement" not in renter_docs:
             if "payslip" in renter_docs:
                 score -= 12
@@ -196,7 +196,6 @@ def evaluate(
                 actions.append("Prepare bank statements and payslips before applying.")
 
     elif renter_type == "new_professional":
-        # lighter penalty if they have strong docs
         if "bank_statement" not in renter_docs:
             has_strong_np_docs = ("employment_contract" in renter_docs) and ("guarantor_letter" in renter_docs)
             if has_strong_np_docs:
@@ -209,8 +208,6 @@ def evaluate(
                 actions.append("Provide bank statements or supporting proof of income if possible.")
 
     elif renter_type == "student":
-        # students:
-        # bursary students: no bank statement needed
         if non_bursary_student and ("guarantor_bank_statement" not in renter_docs):
             score -= 8
             reasons.append("No guarantor bank statement provided (may weaken application).")
@@ -244,34 +241,12 @@ def evaluate(
         confidence = "LOW"
 
     # ==========================================================
-    # Application fee logic
-    # - If confidence MEDIUM: informational note, no penalty
+    # Application fee logic (Informational only: no score penalty)
     # ==========================================================
-    if confidence == "MEDIUM":
-        if application_fee >= 800:
-            reasons.append("Application fee is high — consider the risk before applying.")
-        elif application_fee >= 500:
-            reasons.append("Application fee is moderate — consider the risk if unsure.")
-    else:
-        if application_fee >= 800:
-            score -= 8
-            reasons.append("High application fee increases cost of a low-confidence application.")
-            actions.append("Avoid high-fee applications unless score is strong.")
-        elif application_fee >= 500:
-            score -= 4
-            reasons.append("Moderate application fee increases risk if application is weak.")
-
-        score = max(0, min(100, score))
-
-        if score >= 75:
-            verdict = "WORTH_APPLYING"
-            confidence = "HIGH"
-        elif score >= 55:
-            verdict = "BORDERLINE"
-            confidence = "MEDIUM"
-        else:
-            verdict = "NOT_WORTH_IT"
-            confidence = "LOW"
+    if application_fee >= 800:
+        reasons.append("Application fee is high — consider the risk before applying.")
+    elif application_fee >= 500:
+        reasons.append("Application fee is moderate — consider the risk if unsure.")
 
     # ==========================================================
     # Suggested actions polish
@@ -280,8 +255,6 @@ def evaluate(
         actions.insert(0, "Apply — this looks like a strong match.")
     elif confidence == "MEDIUM":
         actions.append("If possible, add a guarantor to strengthen your application.")
-
-        # roommate suggestion if affordability is tight
         if rent > recommended:
             actions.append("Consider roommates/house-sharing to reduce rent burden.")
 
