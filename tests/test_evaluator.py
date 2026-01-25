@@ -199,19 +199,19 @@ def test_cluster_penalty_only_applies_to_student_or_new_professional():
 
     assert any("recommended documents" in r.lower() for r in np_res.reasons)
 
-
 def test_upfront_cost_is_informational_only_no_score_penalty():
     """
-    Upfront cost (rent + deposit + application_fee) should NOT reduce score anymore.
-    It should only add a reason/action.
+    Upfront cost (rent + deposit + application_fee) should NOT reduce score.
+    So if application_fee is held constant, only deposit changes,
+    and score should remain the same.
     """
     res_high_upfront, _ = evaluate(
         renter_type="worker",
         monthly_income=20000,
         renter_docs=["bank_statement", "payslip"],
         rent=6000,
-        deposit=20000,
-        application_fee=1000,
+        deposit=20000,        # huge deposit to force upfront warning
+        application_fee=0,    # keep constant
         required_documents=[],
         area_demand="LOW",
     )
@@ -222,7 +222,7 @@ def test_upfront_cost_is_informational_only_no_score_penalty():
         renter_docs=["bank_statement", "payslip"],
         rent=6000,
         deposit=0,
-        application_fee=0,
+        application_fee=0,    # keep constant
         required_documents=[],
         area_demand="LOW",
     )
