@@ -111,7 +111,10 @@ def evaluate(
         area_demand = "MEDIUM"
 
     is_student = renter_type == "student"
-    bursary_student = is_student and bool(is_bursary_student)
+
+    bursary_student = is_student and (
+        bool(is_bursary_student) or ("bursary_letter" in renter_docs_set)
+    )
     non_bursary_student = is_student and not bursary_student
 
     effective_income_for_affordability = monthly_income
@@ -161,15 +164,8 @@ def evaluate(
                 reasons.append("Guarantor income not provided.")
                 actions.append("Insert guarantor monthly income to assess affordability.")
 
-            if guarantor_monthly_income <= 0:
-                score = _apply(score, breakdown, "Affordability cannot be verified (guarantor income missing)", -10)
-                reasons.append("Affordability cannot be verified without guarantor income for non-bursary students.")
-                actions.append("Add guarantor income and re-evaluate.")
-
     # Affordability
-    affordability_skip = False
-    if bursary_student and monthly_income >= rent:
-        affordability_skip = True
+    affordability_skip = bursary_student and monthly_income >= rent
 
     if not affordability_skip:
         if rent > upper_limit:
@@ -199,6 +195,7 @@ def evaluate(
     if bursary_student and monthly_income < rent:
         shortfall = rent - monthly_income
         required_guarantor_income = math.ceil(shortfall / 0.30)
+
         reasons.append(f"Bursary does not fully cover rent (shortfall: {_format_currency(shortfall)}).")
         actions.append(
             "Consider adding a guarantor to cover the shortfall "
@@ -224,7 +221,7 @@ def evaluate(
         reasons.append("Some required documents are missing.")
         actions.append("Gather the missing documents required by the listing.")
 
-    # Recommended docs clusters (soft signals only)
+    # Recommended docs clusters
     if renter_type in {"student", "new_professional"}:
         cluster_docs = DOC_CLUSTERS.get(renter_type, set())
         missing_cluster = cluster_docs - renter_docs_set
