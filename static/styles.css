@@ -1,34 +1,48 @@
-
 :root {
   --bg: #ffffff;
+
+  /* Prosple-like surfaces */
+  --surface: #f8fafc;
+  --surface-2: #f1f5f9;
+
   --text: #0f172a;
   --muted: #475569;
-  --border: #e2e8f0;
-  --card: #f8fafc;
+
+  /* Softer border */
+  --border: rgba(15, 23, 42, 0.08);
+
+  /* ScoreRent identity */
   --primary: #2563eb;
   --primary-dark: #1d4ed8;
+
   --danger: #dc2626;
-  --shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
-  --radius: 16px;
+
+  /* Softer shadows */
+  --shadow-sm: 0 6px 18px rgba(2, 6, 23, 0.06);
+  --shadow-md: 0 14px 40px rgba(2, 6, 23, 0.09);
+
+  --radius: 18px;
 }
 
 * {
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
-  background: var(--bg);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+    "Helvetica Neue", Arial;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 55%, #ffffff 100%);
   color: var(--text);
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 a {
   color: var(--primary);
   text-decoration: none;
-  font-weight: 600;
+  font-weight: 800;
 }
 
 a:hover {
@@ -36,9 +50,9 @@ a:hover {
 }
 
 .container {
-  width: min(900px, 92vw);
+  width: min(960px, 92vw);
   margin: 0 auto;
-  padding: 24px 0 80px;
+  padding: 28px 0 90px;
 }
 
 nav {
@@ -46,48 +60,66 @@ nav {
   justify-content: space-between;
   align-items: center;
   gap: 14px;
-  padding: 16px 0;
+  padding: 18px 0;
   border-bottom: 1px solid var(--border);
 }
 
 nav .brand {
-  font-weight: 800;
+  font-weight: 900;
   font-size: 18px;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.5px;
   color: var(--text);
 }
 
 nav .links {
   display: flex;
-  gap: 14px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
-h1, h2, h3 {
+nav .links a {
+  font-weight: 800;
+  padding: 8px 10px;
+  border-radius: 999px;
+}
+
+nav .links a:hover {
+  background: rgba(37, 99, 235, 0.08);
+  text-decoration: none;
+}
+
+h1,
+h2,
+h3 {
   margin: 0 0 12px;
-  letter-spacing: -0.6px;
+  letter-spacing: -0.8px;
 }
 
 h1 {
-  font-size: clamp(32px, 4vw, 44px);
-  line-height: 1.1;
+  font-size: clamp(34px, 4vw, 50px);
+  line-height: 1.05;
 }
 
 h2 {
-  font-size: 26px;
+  font-size: 28px;
+}
+
+h3 {
+  font-size: 20px;
 }
 
 p {
   margin: 0 0 14px;
   color: var(--muted);
+  font-size: 16px;
 }
 
 .card {
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 18px;
-  box-shadow: var(--shadow);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
 }
 
 .stack {
@@ -110,26 +142,30 @@ p {
 
 label {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text);
-  margin-top: 10px;
+  margin-top: 12px;
   display: block;
 }
 
-input, select, textarea {
+input,
+select,
+textarea {
   width: 100%;
   margin-top: 6px;
-  padding: 12px 12px;
+  padding: 13px 14px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   background: white;
   color: var(--text);
-  font-size: 14px;
+  font-size: 15px;
 }
 
-input:focus, select:focus, textarea:focus {
-  outline: 3px solid rgba(37, 99, 235, 0.15);
-  border-color: rgba(37, 99, 235, 0.6);
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 3px solid rgba(37, 99, 235, 0.18);
+  border-color: rgba(37, 99, 235, 0.45);
 }
 
 .checkbox-group {
@@ -143,10 +179,16 @@ input:focus, select:focus, textarea:focus {
   display: flex;
   gap: 10px;
   align-items: center;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   background: white;
+  transition: box-shadow 0.12s ease, transform 0.12s ease;
+}
+
+.checkbox:hover {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }
 
 .checkbox input {
@@ -159,15 +201,16 @@ input:focus, select:focus, textarea:focus {
   border: 0;
   background: var(--primary);
   color: white;
-  font-weight: 800;
-  padding: 12px 14px;
-  border-radius: 12px;
+  font-weight: 900;
+  padding: 13px 16px;
+  border-radius: 14px;
   cursor: pointer;
-  transition: 0.15s;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
   display: inline-flex;
   justify-content: center;
   align-items: center;
   gap: 10px;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.18);
 }
 
 .btn:hover {
@@ -175,14 +218,19 @@ input:focus, select:focus, textarea:focus {
   transform: translateY(-1px);
 }
 
+.btn:active {
+  transform: translateY(0px);
+}
+
 .btn.secondary {
   background: white;
   color: var(--text);
   border: 1px solid var(--border);
+  box-shadow: none;
 }
 
 .btn.secondary:hover {
-  background: #f1f5f9;
+  background: var(--surface-2);
   transform: translateY(-1px);
 }
 
@@ -195,27 +243,36 @@ input:focus, select:focus, textarea:focus {
 .badge {
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--border);
-  padding: 6px 10px;
+  padding: 7px 12px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 900;
   background: white;
+  border: 1px solid var(--border);
   color: var(--text);
 }
 
-.badge.good { border-color: rgba(34,197,94,.3); }
-.badge.warn { border-color: rgba(245,158,11,.3); }
-.badge.bad { border-color: rgba(239,68,68,.3); }
+.badge.good {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.25);
+}
+.badge.warn {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+.badge.bad {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.25);
+}
 
 hr {
   border: 0;
   border-top: 1px solid var(--border);
-  margin: 16px 0;
+  margin: 18px 0;
 }
 
 footer {
-  margin-top: 30px;
+  margin-top: 34px;
   padding-top: 18px;
   border-top: 1px solid var(--border);
   color: var(--muted);
@@ -224,5 +281,34 @@ footer {
 
 .error {
   color: var(--danger);
-  font-weight: 700;
+  font-weight: 800;
+}
+
+/* ------------------------------------
+   Extra polish / premium details
+------------------------------------ */
+
+/* Smooth rounded lists inside cards */
+ul.list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+ul.list li {
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+/* Small muted text helpers */
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 13px;
+}
+
+/* Slightly nicer table-ish spacing */
+strong {
+  font-weight: 900;
 }
