@@ -10,6 +10,77 @@
   </div>
 
   <form method="post" class="card stack">
+
+    {% if not user %}
+      <!-- =========================
+           Guest Profile Inputs
+           ========================= -->
+      <div class="stack">
+        <h3 style="margin:0;">Your details (Guest)</h3>
+        <p style="margin-top:-6px;">
+          Guest evaluations require your renter details so we can score the listing correctly.
+        </p>
+      </div>
+
+      <div class="grid-2">
+        <div class="stack">
+          <label>Renter type</label>
+          <select name="guest_renter_type" id="guest_renter_type">
+            <option value="worker">Worker</option>
+            <option value="new_professional">New professional / Recent grad</option>
+            <option value="student">Student</option>
+          </select>
+        </div>
+
+        <div class="stack">
+          <label>Monthly income / support (R)</label>
+          <input name="guest_monthly_income" type="number" min="0" required placeholder="e.g. 18000" />
+        </div>
+      </div>
+
+      <div class="stack">
+        <label>Documents you have</label>
+        <p style="margin-top:-6px;">
+          Tick what you can provide. ScoreRent uses this to check document fit.
+        </p>
+
+        <div class="checkbox-group">
+          <!-- Core docs -->
+          {% set guest_docs = [
+            "bank_statement",
+            "payslip",
+            "employment_contract",
+            "guarantor_letter",
+            "proof_of_registration",
+            "bursary_letter",
+            "guarantor_payslip",
+            "guarantor_bank_statement"
+          ] %}
+
+          {% for doc in guest_docs %}
+            <label class="checkbox">
+              <input type="checkbox" name="guest_renter_docs" value="{{ doc }}" />
+              <span>{{ doc.replace("_", " ").title() }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="stack">
+        <label>Guarantor monthly income (R) (optional)</label>
+        <input name="guest_guarantor_monthly_income" type="number" min="0" placeholder="e.g. 25000" />
+        <p style="margin-top:-6px;">
+          Only needed for non-bursary student evaluations.
+        </p>
+      </div>
+
+      <hr />
+    {% endif %}
+
+    <!-- =========================
+         Listing Inputs
+         ========================= -->
+
     <div class="grid-2">
       <div class="stack">
         <label>Listing name (optional)</label>
@@ -45,7 +116,6 @@
         <label>Application fee (R)</label>
         <input name="application_fee" type="number" required min="0" placeholder="e.g. 250" />
       </div>
-
     </div>
 
     <hr />
