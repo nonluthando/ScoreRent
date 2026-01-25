@@ -38,43 +38,50 @@
     </ul>
   </div>
 
-  <!-- ✅ Score Breakdown (Collapsible) -->
+  <!-- ✅ NEW: Score breakdown -->
   {% if result.breakdown %}
-  <div class="card">
-    <details class="breakdownWrap">
-      <summary class="breakdownSummary">
-        Show how ScoreRent calculated this score
+  <div class="card breakdownCard">
+    <details class="breakdown">
+      <summary>
+        <span class="caret">▼</span>
+        <span>Show how ScoreRent calculated this score</span>
       </summary>
 
-      <div class="breakdownList">
-        {% for b in result.breakdown %}
-          <div class="breakdownRow">
-            <div class="breakdownLeft">
-              <div class="breakdownTitle">{{ b.title }}</div>
+      <div class="breakdownBody">
+        {% for step in result.breakdown %}
+        <div class="breakdownRow">
+          <div class="breakdownLeft">
+            <div class="breakdownTitle">{{ step.title }}</div>
 
-              {% if b.details %}
-                <div class="breakdownDetails">{{ b.details }}</div>
-              {% endif %}
+            {% if step.details %}
+              <div class="breakdownDetails">{{ step.details }}</div>
+            {% endif %}
 
-              <div class="breakdownBar">
-                <div class="breakdownBarFill" style="width: {{ b.after }}%;"></div>
-              </div>
-            </div>
-
-            <div class="breakdownRight">
-              <div class="breakdownDelta
-                {% if b.delta > 0 %}pos{% elif b.delta < 0 %}neg{% else %}zero{% endif %}
-              ">
-                {% if b.delta > 0 %}+{{ b.delta }}{% else %}{{ b.delta }}{% endif %}
-                <span class="arrow">→</span>
-                {{ b.after }}
+            <!-- Mini progress bar -->
+            <div class="miniBar">
+              <div class="miniBarTrack">
+                <div
+                  class="miniBarFill"
+                  style="width: {{ step.after }}%;"
+                ></div>
               </div>
             </div>
           </div>
 
-          {% if not loop.last %}
-            <div class="breakdownDivider"></div>
-          {% endif %}
+          <div class="breakdownRight">
+            <div class="deltaPill
+              {% if step.delta < 0 %}neg{% elif step.delta > 0 %}pos{% else %}zero{% endif %}
+            ">
+              {% if step.delta > 0 %}+{% endif %}{{ step.delta }}
+            </div>
+
+            <div class="arrowScore">
+              <span class="before">{{ step.before }}</span>
+              <span class="arrow">→</span>
+              <span class="after">{{ step.after }}</span>
+            </div>
+          </div>
+        </div>
         {% endfor %}
       </div>
     </details>
