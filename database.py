@@ -9,7 +9,6 @@ DATABASE_URL = os.getenv(
 
 
 def get_conn():
-    # connect_timeout helps avoid hanging in Codespaces/Render
     return psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=5)
 
 
@@ -54,6 +53,7 @@ def init_db():
             confidence TEXT NOT NULL,
             reasons_json TEXT NOT NULL,
             actions_json TEXT NOT NULL,
+            breakdown_json TEXT NOT NULL DEFAULT '[]',
             created_at TIMESTAMP NOT NULL
         )
         """
