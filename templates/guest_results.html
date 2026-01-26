@@ -2,13 +2,38 @@
 {% block content %}
 <h2>Guest evaluation result</h2>
 
-<div class="result stack">
-  <div class="scoreBox card">
-    <div class="score">{{ result.score }}</div>
-    <div class="verdict">{{ result.verdict }}</div>
-    <div class="muted small">Confidence: {{ result.confidence }}</div>
+<div class="stack">
+  <!-- Score -->
+  <div class="scoreBox">
+    <div class="scoreHeader">
+      <div>
+        <div class="scoreTitle">Confidence score</div>
+        <div class="score">{{ result.score }}</div>
+
+        {% set verdict_class = "warn" %}
+        {% if result.verdict == "WORTH_APPLYING" %}
+          {% set verdict_class = "good" %}
+        {% elif result.verdict == "NOT_WORTH_IT" %}
+          {% set verdict_class = "bad" %}
+        {% endif %}
+
+        <div class="verdict {{ verdict_class }}">{{ result.verdict }}</div>
+        <div class="muted small">Confidence: {{ result.confidence }}</div>
+      </div>
+
+      <div class="tipBubble">
+        <span class="tip">What is this?</span>
+        <div class="tipContent">
+          <p>
+            This score shows how strong your application looks based on affordability, document fit, and demand.
+            It is <strong>not</strong> the probability of acceptance.
+          </p>
+        </div>
+      </div>
+    </div>
   </div>
 
+  <!-- Listing summary -->
   <div class="card">
     <h3>Listing summary</h3>
     <ul class="list">
@@ -20,27 +45,27 @@
     </ul>
   </div>
 
+  <!-- Reasons (pill look) -->
   <div class="card">
     <h3>Reasons</h3>
-    <ul class="list">
+    <div class="pillList">
       {% for r in result.reasons %}
-        <li>{{ r }}</li>
+        <div class="pill pillReason">{{ r }}</div>
       {% endfor %}
-    </ul>
+    </div>
   </div>
 
+  <!-- Actions (pill look) -->
   <div class="card">
-    <h3>Suggested actions</h3>
-    <ul class="list">
+    <h3>Recommended actions</h3>
+    <div class="pillList">
       {% for a in result.actions %}
-        <li>{{ a }}</li>
+        <div class="pill pillAction">{{ a }}</div>
       {% endfor %}
-    </ul>
+    </div>
   </div>
 
-  {# --------------------------
-     Breakdown (Prosple-style)
-     -------------------------- #}
+  <!-- Breakdown (bars version, collapsible) -->
   {% if result.breakdown %}
   <div class="card breakdownCard">
     <details class="breakdownDetails">
@@ -56,29 +81,30 @@
           {% if delta > 0 %}{% set badge_class = "pos" %}{% endif %}
           {% if delta < 0 %}{% set badge_class = "neg" %}{% endif %}
 
-          {# bar percent: clamp 0..100 #}
-          {% set pct = after %}
-          {% if pct < 0 %}{% set pct = 0 %}{% endif %}
-          {% if pct > 100 %}{% set pct = 100 %}{% endif %}
+          <!-- width uses "after" clamped into 0..100 -->
+          {% set clamped = after %}
+          {% if clamped < 0 %}{% set clamped = 0 %}{% endif %}
+          {% if clamped > 100 %}{% set clamped = 100 %}{% endif %}
 
           <div class="breakItem">
             <div class="breakTop">
-              <div class="breakTitle">{{ b.title }}</div>
+              <div>
+                <div class="breakTitle">{{ b.title }}</div>
+                {% if b.details %}
+                  <div class="breakDetailsText">{{ b.details }}</div>
+                {% endif %}
+              </div>
 
               <div class="breakRight">
                 <div class="deltaBadge {{ badge_class }}">
-                  {% if delta > 0 %}+{{ delta }}{% else %}{{ delta }}{% endif %}
+                  {% if delta > 0 %}+{% endif %}{{ delta }}
                 </div>
                 <div class="arrowNums">{{ before }} → {{ after }}</div>
               </div>
             </div>
 
-            {% if b.details %}
-              <div class="breakDetailsText">{{ b.details }}</div>
-            {% endif %}
-
             <div class="miniBar">
-              <div class="miniBarFill" style="width: {{ pct }}%;"></div>
+              <div class="miniBarFill" style="width: {{ clamped }}%;"></div>
             </div>
           </div>
         {% endfor %}
@@ -87,9 +113,9 @@
   </div>
   {% endif %}
 
-  <div class="actionsRow">
+  <div class="actions">
     <a class="btn" href="/evaluate">Evaluate another</a>
-    <a class="btn ghost" href="/signup">Sign up to save history</a>
+    <a class="btn secondary" href="/signup">Sign up to save history</a>
   </div>
 </div>
 {% endblock %}
