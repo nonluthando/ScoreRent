@@ -15,7 +15,7 @@ from auth import (
     get_current_user,
 )
 
-from evaluator import evaluate, DOC_CLUSTERS, DEMAND_LEVELS
+from evaluator import evaluate, DOC_CLUSTERS, RENTER_TYPES, DEMAND_LEVELS
 
 app = FastAPI(title="ScoreRent")
 templates = Jinja2Templates(directory="templates")
@@ -34,7 +34,10 @@ def require_user(request: Request):
 @app.get("/")
 def home(request: Request):
     user = get_current_user(request)
-    return templates.TemplateResponse("index.html", {"request": request, "user": user})
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "user": user},
+    )
 
 
 @app.get("/dashboard")
@@ -70,11 +73,16 @@ def signup_page(request: Request):
     user = get_current_user(request)
     if user:
         return RedirectResponse("/dashboard", status_code=303)
+
     return templates.TemplateResponse("signup.html", {"request": request})
 
 
 @app.post("/signup")
-def signup_post(request: Request, email: str = Form(...), password: str = Form(...)):
+def signup_post(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+):
     if len(password.encode("utf-8")) > 72:
         return templates.TemplateResponse(
             "signup.html",
@@ -103,11 +111,16 @@ def login_page(request: Request):
     user = get_current_user(request)
     if user:
         return RedirectResponse("/dashboard", status_code=303)
+
     return templates.TemplateResponse("login.html", {"request": request})
 
 
 @app.post("/login")
-def login_post(request: Request, email: str = Form(...), password: str = Form(...)):
+def login_post(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+):
     user = get_user_by_email(email)
     if not user or not verify_password(password, user["password_hash"]):
         return templates.TemplateResponse(
@@ -250,22 +263,12 @@ def evaluate_post(
     application_fee: int = Form(...),
     area_demand: str = Form("MEDIUM"),
     required_documents: list[str] = Form([]),
-
-    # ✅ guest fields
-    guest_renter_type: str = Form("worker"),
-    guest_monthly_income: int = Form(0),
-    guest_renter_docs: list[str] = Form([]),
-    guest_guarantor_monthly_income: int = Form(0),
-    student_is_bursary: str = Form("no"),  # ✅ NEW
 ):
     user = get_current_user(request)
 
     renter_type = "worker"
     monthly_income = 0
     renter_docs: list[str] = []
-    guarantor_monthly_income = 0
-    is_bursary_student = False
-
     profile_id = None
     user_id = None
 
@@ -287,13 +290,6 @@ def evaluate_post(
 
         cur.close()
         conn.close()
-    else:
-        renter_type = (guest_renter_type or "worker").strip().lower()
-        monthly_income = int(guest_monthly_income or 0)
-        renter_docs = [d.strip().lower() for d in guest_renter_docs if d.strip()]
-        guarantor_monthly_income = int(guest_guarantor_monthly_income or 0)
-
-        is_bursary_student = (student_is_bursary == "yes")
 
     required_docs = [d.strip().lower() for d in required_documents if d.strip()]
 
@@ -306,8 +302,6 @@ def evaluate_post(
         application_fee=int(application_fee),
         required_documents=required_docs,
         area_demand=area_demand,
-        guarantor_monthly_income=int(guarantor_monthly_income),
-        is_bursary_student=is_bursary_student,  # ✅ NEW
     )
 
     listing = {
@@ -317,8 +311,6 @@ def evaluate_post(
         "application_fee": int(application_fee),
         "required_documents": required_docs,
         "area_demand": area_demand,
-        "guarantor_monthly_income": int(guarantor_monthly_income),
-        "student_is_bursary": is_bursary_student,  # ✅ optional helpful field
     }
 
     if not user:
@@ -343,8 +335,8 @@ def evaluate_post(
         """
         INSERT INTO evaluations (
             user_id, profile_id, listing_name, listing_json, score, verdict, confidence,
-            reasons_json, actions_json, created_at
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            reasons_json, actions_json, breakdown_json, created_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
         (
@@ -357,6 +349,7 @@ def evaluate_post(
             result.confidence,
             json.dumps(result.reasons),
             json.dumps(result.actions),
+            json.dumps(result.breakdown),
             datetime.utcnow().isoformat(),
         ),
     )
@@ -392,6 +385,13 @@ def results_page(request: Request, evaluation_id: int):
     reasons = json.loads(ev["reasons_json"])
     actions = json.loads(ev["actions_json"])
 
+    breakdown = []
+    if "breakdown_json" in ev and ev["breakdown_json"]:
+        try:
+            breakdown = json.loads(ev["breakdown_json"])
+        except Exception:
+            breakdown = []
+
     return templates.TemplateResponse(
         "results.html",
         {
@@ -401,6 +401,7 @@ def results_page(request: Request, evaluation_id: int):
             "listing": listing,
             "reasons": reasons,
             "actions": actions,
+            "breakdown": breakdown,
         },
     )
 
