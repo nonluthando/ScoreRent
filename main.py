@@ -187,6 +187,10 @@ def profile_post(
     renter_type: str = Form(...),
     monthly_income: int = Form(...),
     renter_docs: list[str] = Form([]),
+
+    # ✅ NEW student profile fields
+    is_bursary_student: bool = Form(False),
+    guarantor_monthly_income: int = Form(0),
 ):
     user = require_user(request)
     if not user:
@@ -198,14 +202,24 @@ def profile_post(
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO profiles (user_id, renter_type, monthly_income, documents_json, created_at)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO profiles (
+            user_id,
+            renter_type,
+            monthly_income,
+            documents_json,
+            is_bursary_student,
+            guarantor_monthly_income,
+            created_at
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
         (
             user["id"],
-            renter_type,
+            renter_type.strip().lower(),
             int(monthly_income),
             json.dumps(renter_docs),
+            bool(is_bursary_student),
+            int(guarantor_monthly_income or 0),
             datetime.utcnow().isoformat(),
         ),
     )
@@ -224,6 +238,9 @@ def evaluate_page(request: Request):
     monthly_income = 0
     renter_docs: list[str] = []
 
+    is_bursary_student = False
+    guarantor_monthly_income = 0
+
     if user:
         conn = get_conn()
         cur = conn.cursor()
@@ -239,6 +256,8 @@ def evaluate_page(request: Request):
             renter_type = profile["renter_type"]
             monthly_income = int(profile["monthly_income"])
             renter_docs = json.loads(profile["documents_json"])
+            is_bursary_student = bool(profile.get("is_bursary_student", False))
+            guarantor_monthly_income = int(profile.get("guarantor_monthly_income", 0))
 
     return templates.TemplateResponse(
         "evaluate.html",
@@ -248,6 +267,8 @@ def evaluate_page(request: Request):
             "renter_type": renter_type,
             "monthly_income": monthly_income,
             "renter_docs": renter_docs,
+            "is_bursary_student": is_bursary_student,
+            "guarantor_monthly_income": guarantor_monthly_income,
             "doc_clusters": {k: sorted(list(v)) for k, v in DOC_CLUSTERS.items()},
             "demand_levels": DEMAND_LEVELS,
         },
@@ -263,12 +284,22 @@ def evaluate_post(
     application_fee: int = Form(...),
     area_demand: str = Form("MEDIUM"),
     required_documents: list[str] = Form([]),
+
+    # ✅ guest-only fields (your existing guest profile)
+    guest_renter_type: str = Form("worker"),
+    guest_monthly_income: int = Form(0),
+    guest_renter_docs: list[str] = Form([]),
+    guest_guarantor_monthly_income: int = Form(0),
+    guest_is_bursary_student: bool = Form(False),
 ):
     user = get_current_user(request)
 
     renter_type = "worker"
     monthly_income = 0
     renter_docs: list[str] = []
+    guarantor_monthly_income = 0
+    is_bursary_student = False
+
     profile_id = None
     user_id = None
 
@@ -281,15 +312,23 @@ def evaluate_post(
             (user["id"],),
         )
         profile = cur.fetchone()
+        cur.close()
+        conn.close()
 
         if profile:
             profile_id = profile["id"]
             renter_type = profile["renter_type"]
             monthly_income = int(profile["monthly_income"])
             renter_docs = json.loads(profile["documents_json"])
+            guarantor_monthly_income = int(profile.get("guarantor_monthly_income", 0))
+            is_bursary_student = bool(profile.get("is_bursary_student", False))
 
-        cur.close()
-        conn.close()
+    else:
+        renter_type = (guest_renter_type or "worker").strip().lower()
+        monthly_income = int(guest_monthly_income or 0)
+        renter_docs = [d.strip().lower() for d in guest_renter_docs if d.strip()]
+        guarantor_monthly_income = int(guest_guarantor_monthly_income or 0)
+        is_bursary_student = bool(guest_is_bursary_student)
 
     required_docs = [d.strip().lower() for d in required_documents if d.strip()]
 
@@ -302,6 +341,8 @@ def evaluate_post(
         application_fee=int(application_fee),
         required_documents=required_docs,
         area_demand=area_demand,
+        guarantor_monthly_income=int(guarantor_monthly_income),
+        is_bursary_student=is_bursary_student,
     )
 
     listing = {
@@ -335,8 +376,8 @@ def evaluate_post(
         """
         INSERT INTO evaluations (
             user_id, profile_id, listing_name, listing_json, score, verdict, confidence,
-            reasons_json, actions_json, breakdown_json, created_at
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            reasons_json, actions_json, created_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
         (
@@ -349,7 +390,6 @@ def evaluate_post(
             result.confidence,
             json.dumps(result.reasons),
             json.dumps(result.actions),
-            json.dumps(result.breakdown),
             datetime.utcnow().isoformat(),
         ),
     )
@@ -385,13 +425,6 @@ def results_page(request: Request, evaluation_id: int):
     reasons = json.loads(ev["reasons_json"])
     actions = json.loads(ev["actions_json"])
 
-    breakdown = []
-    if "breakdown_json" in ev and ev["breakdown_json"]:
-        try:
-            breakdown = json.loads(ev["breakdown_json"])
-        except Exception:
-            breakdown = []
-
     return templates.TemplateResponse(
         "results.html",
         {
@@ -401,7 +434,6 @@ def results_page(request: Request, evaluation_id: int):
             "listing": listing,
             "reasons": reasons,
             "actions": actions,
-            "breakdown": breakdown,
         },
     )
 
