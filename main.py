@@ -15,7 +15,7 @@ from auth import (
     get_current_user,
 )
 
-from evaluator import evaluate, DOC_CLUSTERS, RENTER_TYPES, DEMAND_LEVELS
+from evaluator import evaluate, DOC_CLUSTERS, DEMAND_LEVELS
 
 app = FastAPI(title="ScoreRent")
 templates = Jinja2Templates(directory="templates")
@@ -83,6 +83,7 @@ def signup_post(
     email: str = Form(...),
     password: str = Form(...),
 ):
+    # bcrypt limit (72 bytes)
     if len(password.encode("utf-8")) > 72:
         return templates.TemplateResponse(
             "signup.html",
@@ -161,11 +162,13 @@ def profile_page(request: Request):
     docs_selected = []
     renter_type = "worker"
     monthly_income = 0
+    is_bursary_student = False
 
     if profile:
         docs_selected = json.loads(profile["documents_json"])
         renter_type = profile["renter_type"]
         monthly_income = profile["monthly_income"]
+        is_bursary_student = bool(profile.get("is_bursary_student", False))
 
     return templates.TemplateResponse(
         "profile.html",
@@ -175,6 +178,7 @@ def profile_page(request: Request):
             "profile": profile,
             "renter_type": renter_type,
             "monthly_income": monthly_income,
+            "is_bursary_student": is_bursary_student,
             "docs_selected": docs_selected,
             "doc_clusters": {k: sorted(list(v)) for k, v in DOC_CLUSTERS.items()},
         },
@@ -187,39 +191,29 @@ def profile_post(
     renter_type: str = Form(...),
     monthly_income: int = Form(...),
     renter_docs: list[str] = Form([]),
-
-    # ✅ NEW student profile fields
-    is_bursary_student: bool = Form(False),
-    guarantor_monthly_income: int = Form(0),
+    is_bursary_student: str = Form("no"),
 ):
     user = require_user(request)
     if not user:
         return RedirectResponse("/login", status_code=303)
 
-    renter_docs = [d.strip().lower() for d in renter_docs if d.strip()]
+    renter_type = (renter_type or "worker").strip().lower()
+    renter_docs = [d.strip().lower() for d in renter_docs if d and d.strip()]
+    is_bursary_bool = (is_bursary_student == "yes")
 
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO profiles (
-            user_id,
-            renter_type,
-            monthly_income,
-            documents_json,
-            is_bursary_student,
-            guarantor_monthly_income,
-            created_at
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO profiles (user_id, renter_type, monthly_income, is_bursary_student, documents_json, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s)
         """,
         (
             user["id"],
-            renter_type.strip().lower(),
+            renter_type,
             int(monthly_income),
+            is_bursary_bool,
             json.dumps(renter_docs),
-            bool(is_bursary_student),
-            int(guarantor_monthly_income or 0),
             datetime.utcnow().isoformat(),
         ),
     )
@@ -237,9 +231,7 @@ def evaluate_page(request: Request):
     renter_type = "worker"
     monthly_income = 0
     renter_docs: list[str] = []
-
     is_bursary_student = False
-    guarantor_monthly_income = 0
 
     if user:
         conn = get_conn()
@@ -257,7 +249,6 @@ def evaluate_page(request: Request):
             monthly_income = int(profile["monthly_income"])
             renter_docs = json.loads(profile["documents_json"])
             is_bursary_student = bool(profile.get("is_bursary_student", False))
-            guarantor_monthly_income = int(profile.get("guarantor_monthly_income", 0))
 
     return templates.TemplateResponse(
         "evaluate.html",
@@ -268,7 +259,6 @@ def evaluate_page(request: Request):
             "monthly_income": monthly_income,
             "renter_docs": renter_docs,
             "is_bursary_student": is_bursary_student,
-            "guarantor_monthly_income": guarantor_monthly_income,
             "doc_clusters": {k: sorted(list(v)) for k, v in DOC_CLUSTERS.items()},
             "demand_levels": DEMAND_LEVELS,
         },
@@ -285,12 +275,12 @@ def evaluate_post(
     area_demand: str = Form("MEDIUM"),
     required_documents: list[str] = Form([]),
 
-    # ✅ guest-only fields (your existing guest profile)
+    # Guest fields
     guest_renter_type: str = Form("worker"),
     guest_monthly_income: int = Form(0),
     guest_renter_docs: list[str] = Form([]),
     guest_guarantor_monthly_income: int = Form(0),
-    guest_is_bursary_student: bool = Form(False),
+    student_is_bursary: str = Form("no"),
 ):
     user = get_current_user(request)
 
@@ -312,25 +302,25 @@ def evaluate_post(
             (user["id"],),
         )
         profile = cur.fetchone()
-        cur.close()
-        conn.close()
 
         if profile:
             profile_id = profile["id"]
             renter_type = profile["renter_type"]
             monthly_income = int(profile["monthly_income"])
             renter_docs = json.loads(profile["documents_json"])
-            guarantor_monthly_income = int(profile.get("guarantor_monthly_income", 0))
             is_bursary_student = bool(profile.get("is_bursary_student", False))
+
+        cur.close()
+        conn.close()
 
     else:
         renter_type = (guest_renter_type or "worker").strip().lower()
         monthly_income = int(guest_monthly_income or 0)
-        renter_docs = [d.strip().lower() for d in guest_renter_docs if d.strip()]
+        renter_docs = [d.strip().lower() for d in guest_renter_docs if d and d.strip()]
         guarantor_monthly_income = int(guest_guarantor_monthly_income or 0)
-        is_bursary_student = bool(guest_is_bursary_student)
+        is_bursary_student = (student_is_bursary == "yes")
 
-    required_docs = [d.strip().lower() for d in required_documents if d.strip()]
+    required_docs = [d.strip().lower() for d in required_documents if d and d.strip()]
 
     result, bands = evaluate(
         renter_type=renter_type,
@@ -352,6 +342,7 @@ def evaluate_post(
         "application_fee": int(application_fee),
         "required_documents": required_docs,
         "area_demand": area_demand,
+        "guarantor_monthly_income": int(guarantor_monthly_income),
     }
 
     if not user:
