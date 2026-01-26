@@ -3,78 +3,75 @@
 
 <section class="stack" style="padding-top: 26px;">
   <div class="stack" style="gap:10px;">
-    <h2>Renter profile</h2>
-    <p>Save your profile once — then ScoreRent will evaluate listings consistently.</p>
+    <h2>Your renter profile</h2>
+    <p>Set your details once, then evaluate listings quickly.</p>
   </div>
 
   <form method="post" class="card stack">
+
     <div class="grid-2">
       <div class="stack">
         <label>Renter type</label>
-        <select name="renter_type" id="renterType" required>
-          {% for t in doc_clusters.keys() %}
-            <option value="{{ t }}" {% if renter_type == t %}selected{% endif %}>
-              {{ t.replace("_", " ").title() }}
-            </option>
-          {% endfor %}
+        <select name="renter_type" id="renter_type">
+          <option value="worker" {% if renter_type=="worker" %}selected{% endif %}>Worker</option>
+          <option value="new_professional" {% if renter_type=="new_professional" %}selected{% endif %}>New professional</option>
+          <option value="student" {% if renter_type=="student" %}selected{% endif %}>Student</option>
         </select>
       </div>
 
       <div class="stack">
-        <label>Monthly income (R)</label>
-        <input
-          name="monthly_income"
-          type="number"
-          min="0"
-          required
-          value="{{ monthly_income }}"
-          placeholder="e.g. 18000"
-        />
+        <label>Monthly income / support (R)</label>
+        <input name="monthly_income" type="number" min="0" required value="{{ monthly_income }}" />
       </div>
     </div>
 
-    <!-- ✅ bursary checkbox FIRST -->
-    <div id="bursaryWrap" class="stack" style="display:none;">
-      <label>Student support</label>
-      <label class="checkbox" style="margin-top:6px;">
-        <input type="checkbox" name="is_bursary_student" value="true" {% if profile and profile.is_bursary_student %}checked{% endif %}/>
-        <span>Bursary student (income/support covers rent)</span>
-      </label>
-      <p style="margin-top:-6px;">This affects affordability rules for students.</p>
-    </div>
-
-    <div id="guarantorWrap" class="stack" style="display:none;">
-      <label>Guarantor monthly income (R)</label>
-      <input
-        name="guarantor_monthly_income"
-        type="number"
-        min="0"
-        value="{% if profile %}{{ profile.guarantor_monthly_income }}{% else %}0{% endif %}"
-        placeholder="e.g. 22000"
-      />
-      <p style="margin-top:-6px;">Only needed for non-bursary students.</p>
+    <div class="stack" id="bursary_block" style="display:none;">
+      <label>Are you a bursary student?</label>
+      <select name="is_bursary_student">
+        <option value="no" {% if not is_bursary_student %}selected{% endif %}>No</option>
+        <option value="yes" {% if is_bursary_student %}selected{% endif %}>Yes</option>
+      </select>
+      <p class="muted small" style="margin-top:-6px;">
+        This ensures ScoreRent applies the correct student rules.
+      </p>
     </div>
 
     <hr />
 
     <div class="stack">
-      <label>Documents you can provide</label>
-      <p style="margin-top:-6px;">Select all documents you can submit with an application.</p>
+      <label>Documents you have</label>
+      <p class="muted" style="margin-top:-6px;">
+        Tick what you can provide. ScoreRent uses this to check document fit.
+      </p>
 
       <div class="checkbox-group">
-        {% for doc in doc_clusters[renter_type] %}
+        {% for doc in (doc_clusters["worker"] | sort) %}
           <label class="checkbox">
-            <input
-              type="checkbox"
-              name="renter_docs"
-              value="{{ doc }}"
-              {% if doc in docs_selected %}checked{% endif %}
-            />
+            <input type="checkbox" name="renter_docs" value="{{ doc }}"
+              {% if doc in docs_selected %}checked{% endif %}/>
+            <span>{{ doc.replace("_", " ").title() }}</span>
+          </label>
+        {% endfor %}
+
+        {% for doc in (doc_clusters["new_professional"] | sort) %}
+          <label class="checkbox">
+            <input type="checkbox" name="renter_docs" value="{{ doc }}"
+              {% if doc in docs_selected %}checked{% endif %}/>
+            <span>{{ doc.replace("_", " ").title() }}</span>
+          </label>
+        {% endfor %}
+
+        {% for doc in (doc_clusters["student"] | sort) %}
+          <label class="checkbox">
+            <input type="checkbox" name="renter_docs" value="{{ doc }}"
+              {% if doc in docs_selected %}checked{% endif %}/>
             <span>{{ doc.replace("_", " ").title() }}</span>
           </label>
         {% endfor %}
       </div>
     </div>
+
+    <hr />
 
     <div class="actions">
       <button class="btn" type="submit">Save profile</button>
@@ -84,18 +81,16 @@
 </section>
 
 <script>
-  function syncStudentFields() {
-    const renterType = document.getElementById("renterType").value;
-    const bursaryWrap = document.getElementById("bursaryWrap");
-    const guarantorWrap = document.getElementById("guarantorWrap");
+  const renterTypeSelect = document.getElementById("renter_type");
+  const bursaryBlock = document.getElementById("bursary_block");
 
-    const isStudent = renterType === "student";
-    bursaryWrap.style.display = isStudent ? "block" : "none";
-    guarantorWrap.style.display = isStudent ? "block" : "none";
+  function updateBursaryVisibility() {
+    if (!renterTypeSelect || !bursaryBlock) return;
+    bursaryBlock.style.display = (renterTypeSelect.value === "student") ? "block" : "none";
   }
 
-  document.getElementById("renterType").addEventListener("change", syncStudentFields);
-  syncStudentFields();
+  renterTypeSelect.addEventListener("change", updateBursaryVisibility);
+  updateBursaryVisibility();
 </script>
 
 {% endblock %}
