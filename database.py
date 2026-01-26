@@ -9,6 +9,7 @@ DATABASE_URL = os.getenv(
 
 
 def get_conn():
+    # connect_timeout helps avoid hanging in Codespaces/Render
     return psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=5)
 
 
@@ -35,13 +36,16 @@ def init_db():
             renter_type TEXT NOT NULL,
             monthly_income INTEGER NOT NULL,
             documents_json TEXT NOT NULL,
-
-            -- ✅ NEW FIELDS (saved student context)
-            is_bursary_student BOOLEAN NOT NULL DEFAULT FALSE,
-            guarantor_monthly_income INTEGER NOT NULL DEFAULT 0,
-
             created_at TIMESTAMP NOT NULL
         )
+        """
+    )
+
+    # Auto-migration (safe on Render + local)
+    cur.execute(
+        """
+        ALTER TABLE profiles
+        ADD COLUMN IF NOT EXISTS is_bursary_student BOOLEAN NOT NULL DEFAULT FALSE
         """
     )
 
@@ -60,22 +64,6 @@ def init_db():
             actions_json TEXT NOT NULL,
             created_at TIMESTAMP NOT NULL
         )
-        """
-    )
-
-    # ✅ Option 1 migration approach:
-    # If table already exists, ensure new columns exist.
-    cur.execute(
-        """
-        ALTER TABLE profiles
-        ADD COLUMN IF NOT EXISTS is_bursary_student BOOLEAN NOT NULL DEFAULT FALSE
-        """
-    )
-
-    cur.execute(
-        """
-        ALTER TABLE profiles
-        ADD COLUMN IF NOT EXISTS guarantor_monthly_income INTEGER NOT NULL DEFAULT 0
         """
     )
 
