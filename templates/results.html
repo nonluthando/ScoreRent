@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
+
 <h2>Evaluation result</h2>
 
 <div class="stack">
+
   <!-- Score -->
   <div class="scoreBox">
     <div class="scoreHeader">
@@ -17,7 +19,16 @@
           {% set verdict_class = "bad" %}
         {% endif %}
 
-        <div class="verdict {{ verdict_class }}">{{ evaluation.verdict }}</div>
+        {% set verdict_label = evaluation.verdict %}
+        {% if evaluation.verdict == "WORTH_APPLYING" %}
+          {% set verdict_label = "Worth applying" %}
+        {% elif evaluation.verdict == "BORDERLINE" %}
+          {% set verdict_label = "Borderline" %}
+        {% elif evaluation.verdict == "NOT_WORTH_IT" %}
+          {% set verdict_label = "Not worth it" %}
+        {% endif %}
+
+        <div class="verdict {{ verdict_class }}">{{ verdict_label }}</div>
         <div class="muted small">Confidence: {{ evaluation.confidence }}</div>
       </div>
 
@@ -37,7 +48,7 @@
   <div class="card">
     <h3>Listing summary</h3>
     <ul class="list">
-      <li><strong>Name:</strong> {{ evaluation.listing_name }}</li>
+      <li><strong>Name:</strong> {{ listing.listing_name or evaluation.listing_name or "Unnamed listing" }}</li>
       <li><strong>Rent:</strong> R{{ listing.rent }}</li>
       <li><strong>Deposit:</strong> R{{ listing.deposit }}</li>
       <li><strong>Application fee:</strong> R{{ listing.application_fee }}</li>
@@ -45,7 +56,7 @@
     </ul>
   </div>
 
-  <!-- Reasons -->
+  <!-- Reasons (pill look) -->
   <div class="card">
     <h3>Reasons</h3>
     <div class="pillList">
@@ -55,7 +66,7 @@
     </div>
   </div>
 
-  <!-- Actions -->
+  <!-- Actions (pill look) -->
   <div class="card">
     <h3>Recommended actions</h3>
     <div class="pillList">
@@ -65,14 +76,14 @@
     </div>
   </div>
 
-  <!-- Breakdown -->
-  {% if breakdown %}
+  <!-- Breakdown (bars version, collapsible) -->
+  {% if listing.breakdown %}
   <div class="card breakdownCard">
     <details class="breakdownDetails">
       <summary class="breakdownSummary">Show how ScoreRent calculated this score</summary>
 
       <div class="breakdownList">
-        {% for b in breakdown %}
+        {% for b in listing.breakdown %}
           {% set delta = b.delta %}
           {% set before = b.before %}
           {% set after = b.after %}
@@ -113,8 +124,9 @@
   {% endif %}
 
   <div class="actions">
-    <a class="btn" href="/evaluate">Evaluate another</a>
-    <a class="btn secondary" href="/history">View history</a>
+    <a class="btn" href="/history">View history</a>
+    <a class="btn secondary" href="/evaluate">Evaluate another</a>
   </div>
 </div>
+
 {% endblock %}
