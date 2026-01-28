@@ -332,13 +332,13 @@ def evaluate(
         _push_breakdown(breakdown, "Final score clamp", 0, before, score)
 
     if score >= 75:
-        verdict = "WORTH_APPLYING"
+        verdict = "WORTH APPLYING"
         confidence = "HIGH"
     elif score >= 55:
         verdict = "BORDERLINE"
         confidence = "MEDIUM"
     else:
-        verdict = "NOT_WORTH_IT"
+        verdict = "NOT WORTH IT"
         confidence = "LOW"
 
     _push_breakdown(breakdown, "Verdict assigned", 0, score, score, f"{verdict} ({confidence})")
