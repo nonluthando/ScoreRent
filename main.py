@@ -343,6 +343,7 @@ def evaluate_post(
         "required_documents": required_docs,
         "area_demand": area_demand,
         "guarantor_monthly_income": int(guarantor_monthly_income),
+        "breakdown": result.breakdown,
     }
 
     if not user:
