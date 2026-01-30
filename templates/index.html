@@ -1,41 +1,76 @@
 {% extends "base.html" %}
 {% block content %}
 
-<section class="stack" style="padding-top: 30px;">
+<section class="stack" style="padding-top: 34px;">
+  <!-- Hero -->
   <div class="stack" style="gap:10px;">
     <h1>Decide if a rental listing is worth applying for.</h1>
+
     <p>
-      ScoreRent compares your renter profile against listing requirements and gives a clear recommendation:
-      apply, proceed with caution, or avoid.
+      ScoreRent evaluates <strong>affordability</strong>, <strong>document fit</strong>, and <strong>market demand</strong>
+      to produce a confidence score and recommendation — helping renters avoid wasting money on low-confidence applications.
     </p>
+
+    <div class="pillList" style="margin-top: 6px;">
+      <div class="pill pillReason">FastAPI + PostgreSQL</div>
+      <div class="pill pillReason">Rule-based scoring engine</div>
+      <div class="pill pillReason">pytest + GitHub Actions CI</div>
+      <div class="pill pillReason">Docker (local setup)</div>
+    </div>
   </div>
 
-  <div class="actions">
+  <!-- Primary actions -->
+  <div class="actions" style="margin-top: 6px;">
     <a class="btn" href="/evaluate">Start evaluation</a>
+
     {% if user %}
       <a class="btn secondary" href="/history">View saved evaluations</a>
     {% else %}
       <a class="btn secondary" href="/login">Login to save history</a>
+      <a class="btn secondary" href="/evaluate">Try as guest</a>
     {% endif %}
   </div>
 
-  <div class="grid-2" style="margin-top: 10px;">
+  <!-- How it works -->
+  <div class="card stack" style="margin-top: 14px;">
+    <h3>How it works</h3>
+    <ul class="list">
+      <li><strong>Step 1:</strong> Enter listing details (rent, deposit, required docs).</li>
+      <li><strong>Step 2:</strong> Add your renter info (guest) or use your saved profile.</li>
+      <li><strong>Step 3:</strong> Get a confidence score + “Apply / Borderline / Avoid”.</li>
+      <li><strong>Step 4:</strong> See the breakdown explaining exactly how the score was calculated.</li>
+    </ul>
+  </div>
+
+  <!-- Value props -->
+  <div class="grid-2" style="margin-top: 12px;">
     <div class="card stack">
       <div class="badge good">✅ Fast & simple</div>
       <h3>Instant decision support</h3>
       <p>
-        Quickly identify document gaps, affordability risks, and demand pressure.
+        Identify document gaps, affordability risk, and demand pressure in under a minute.
       </p>
+      <ul class="list">
+        <li>Affordability checks using rent-to-income bands</li>
+        <li>Missing documents flagged clearly</li>
+        <li>Demand weighting (low/medium/high)</li>
+      </ul>
     </div>
 
     <div class="card stack">
-      <div class="badge warn">📌 Product-style recommendations</div>
+      <div class="badge warn">📌 Clear recommendations</div>
       <h3>Actionable next steps</h3>
       <p>
-        Get suggested actions like “apply”, “add guarantor”, or “request proof of income”.
+        ScoreRent outputs what to do next (not just a score).
       </p>
+      <ul class="list">
+        <li>Apply when confidence is strong</li>
+        <li>Gather missing docs before paying fees</li>
+        <li>Guarantor guidance for student flows</li>
+      </ul>
     </div>
   </div>
+
 </section>
 
 {% endblock %}
