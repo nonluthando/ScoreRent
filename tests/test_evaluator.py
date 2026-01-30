@@ -1,6 +1,5 @@
 from evaluator import evaluate
 
-
 def test_affordability_penalty_when_rent_exceeds_upper_limit():
     result, bands = evaluate(
         renter_type="worker",
