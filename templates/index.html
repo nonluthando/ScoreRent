@@ -1,76 +1,55 @@
 {% extends "base.html" %}
 {% block content %}
 
-<section class="stack" style="padding-top: 34px;">
-  <!-- Hero -->
+<section class="stack" style="padding-top: 30px;">
   <div class="stack" style="gap:10px;">
     <h1>Decide if a rental listing is worth applying for.</h1>
-
     <p>
-      ScoreRent evaluates <strong>affordability</strong>, <strong>document fit</strong>, and <strong>market demand</strong>
-      to produce a confidence score and recommendation — helping renters avoid wasting money on low-confidence applications.
+      ScoreRent helps renters avoid wasting money on application fees by checking affordability,
+      document fit, and demand pressure before applying.
     </p>
-
-    <div class="pillList" style="margin-top: 6px;">
-      <div class="pill pillReason">FastAPI + PostgreSQL</div>
-      <div class="pill pillReason">Rule-based scoring engine</div>
-      <div class="pill pillReason">pytest + GitHub Actions CI</div>
-      <div class="pill pillReason">Docker (local setup)</div>
-    </div>
   </div>
 
-  <!-- Primary actions -->
-  <div class="actions" style="margin-top: 6px;">
+  <div class="actions">
     <a class="btn" href="/evaluate">Start evaluation</a>
-
     {% if user %}
       <a class="btn secondary" href="/history">View saved evaluations</a>
     {% else %}
-      <a class="btn secondary" href="/login">Login to save history</a>
-      <a class="btn secondary" href="/evaluate">Try as guest</a>
+      <a class="btn secondary" href="/login">Log in to save evaluations</a>
     {% endif %}
   </div>
 
-  <!-- How it works -->
-  <div class="card stack" style="margin-top: 14px;">
-    <h3>How it works</h3>
-    <ul class="list">
-      <li><strong>Step 1:</strong> Enter listing details (rent, deposit, required docs).</li>
-      <li><strong>Step 2:</strong> Add your renter info (guest) or use your saved profile.</li>
-      <li><strong>Step 3:</strong> Get a confidence score + “Apply / Borderline / Avoid”.</li>
-      <li><strong>Step 4:</strong> See the breakdown explaining exactly how the score was calculated.</li>
-    </ul>
-  </div>
-
-  <!-- Value props -->
   <div class="grid-2" style="margin-top: 12px;">
     <div class="card stack">
-      <div class="badge good">✅ Fast & simple</div>
-      <h3>Instant decision support</h3>
+      <div class="badge good">Fast and simple</div>
+      <h3>Get a clear recommendation</h3>
       <p>
-        Identify document gaps, affordability risk, and demand pressure in under a minute.
+        ScoreRent outputs one of three recommendations: Apply, Borderline, or Not worth it.
+        You also get the reasons behind the result.
       </p>
-      <ul class="list">
-        <li>Affordability checks using rent-to-income bands</li>
-        <li>Missing documents flagged clearly</li>
-        <li>Demand weighting (low/medium/high)</li>
-      </ul>
     </div>
 
     <div class="card stack">
-      <div class="badge warn">📌 Clear recommendations</div>
-      <h3>Actionable next steps</h3>
+      <div class="badge warn">Practical guidance</div>
+      <h3>Know what to fix first</h3>
       <p>
-        ScoreRent outputs what to do next (not just a score).
+        See missing documents, affordability risks, and next steps such as adding a guarantor
+        or targeting a lower rent range.
       </p>
-      <ul class="list">
-        <li>Apply when confidence is strong</li>
-        <li>Gather missing docs before paying fees</li>
-        <li>Guarantor guidance for student flows</li>
-      </ul>
     </div>
   </div>
 
+  <div class="card stack" style="margin-top: 14px;">
+    <h3>How it works</h3>
+    <ol style="margin:0; padding-left: 18px; color: var(--muted); font-weight: 600;">
+      <li>Create a renter profile (or use guest mode)</li>
+      <li>Enter the listing details and required documents</li>
+      <li>Get a confidence score with reasons and recommended actions</li>
+    </ol>
+    <p class="muted small" style="margin-top: 10px;">
+      Note: The confidence score is not the probability of acceptance.
+    </p>
+  </div>
 </section>
 
 {% endblock %}
