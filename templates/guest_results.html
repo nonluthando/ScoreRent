@@ -1,32 +1,50 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Guest evaluation result</h2>
 
-<div class="stack">
+<section class="stack" style="gap:16px;">
+
+  <header class="stack" style="gap:6px;">
+    <h2 style="margin:0;">Evaluation result</h2>
+    <p class="muted" style="margin:0;">
+      This shows how strong your application looks based on affordability, documents, and area demand.
+    </p>
+  </header>
+
+  <!-- Verdict formatting -->
+  {% set verdict_label = "Borderline" %}
+  {% set verdict_class = "warn" %}
+
+  {% if result.verdict == "WORTH_APPLYING" %}
+    {% set verdict_label = "Worth applying" %}
+    {% set verdict_class = "good" %}
+  {% elif result.verdict == "NOT_WORTH_IT" %}
+    {% set verdict_label = "Not worth it" %}
+    {% set verdict_class = "bad" %}
+  {% endif %}
+
+  {% set confidence_label = "Medium confidence" %}
+  {% if result.confidence == "HIGH" %}
+    {% set confidence_label = "High confidence" %}
+  {% elif result.confidence == "LOW" %}
+    {% set confidence_label = "Low confidence" %}
+  {% endif %}
+
   <!-- Score -->
   <div class="scoreBox">
     <div class="scoreHeader">
-      <div>
-        <div class="scoreTitle">Confidence score</div>
+      <div class="stack" style="gap:6px;">
+        <div class="scoreTitle">Match score</div>
         <div class="score">{{ result.score }}</div>
 
-        {% set verdict_class = "warn" %}
-        {% if result.verdict == "WORTH_APPLYING" %}
-          {% set verdict_class = "good" %}
-        {% elif result.verdict == "NOT_WORTH_IT" %}
-          {% set verdict_class = "bad" %}
-        {% endif %}
-
-        <div class="verdict {{ verdict_class }}">{{ result.verdict }}</div>
-        <div class="muted small">Confidence: {{ result.confidence }}</div>
+        <div class="verdict {{ verdict_class }}">{{ verdict_label }}</div>
+        <div class="muted small">{{ confidence_label }}</div>
       </div>
 
       <div class="tipBubble">
         <span class="tip">What is this?</span>
         <div class="tipContent">
-          <p>
-            This score shows how strong your application looks based on affordability, document fit, and demand.
-            It is <strong>not</strong> the probability of acceptance.
+          <p style="margin:0;">
+            The score is a practical guide, not a guarantee. A high score means your affordability and documents look strong.
           </p>
         </div>
       </div>
@@ -45,27 +63,31 @@
     </ul>
   </div>
 
-  <!-- Reasons (pill look) -->
+  <!-- Reasons -->
+  {% if result.reasons %}
   <div class="card">
-    <h3>Reasons</h3>
+    <h3>Why this recommendation?</h3>
     <div class="pillList">
       {% for r in result.reasons %}
         <div class="pill pillReason">{{ r }}</div>
       {% endfor %}
     </div>
   </div>
+  {% endif %}
 
-  <!-- Actions (pill look) -->
+  <!-- Actions -->
+  {% if result.actions %}
   <div class="card">
-    <h3>Recommended actions</h3>
+    <h3>What you should do next</h3>
     <div class="pillList">
       {% for a in result.actions %}
         <div class="pill pillAction">{{ a }}</div>
       {% endfor %}
     </div>
   </div>
+  {% endif %}
 
-  <!-- Breakdown (bars version, collapsible) -->
+  <!-- Breakdown (collapsible) -->
   {% if result.breakdown %}
   <div class="card breakdownCard">
     <details class="breakdownDetails">
@@ -81,7 +103,6 @@
           {% if delta > 0 %}{% set badge_class = "pos" %}{% endif %}
           {% if delta < 0 %}{% set badge_class = "neg" %}{% endif %}
 
-          <!-- width uses "after" clamped into 0..100 -->
           {% set clamped = after %}
           {% if clamped < 0 %}{% set clamped = 0 %}{% endif %}
           {% if clamped > 100 %}{% set clamped = 100 %}{% endif %}
@@ -99,7 +120,7 @@
                 <div class="deltaBadge {{ badge_class }}">
                   {% if delta > 0 %}+{% endif %}{{ delta }}
                 </div>
-                <div class="arrowNums">{{ before }} → {{ after }}</div>
+                <div class="arrowNums">{{ before }} to {{ after }}</div>
               </div>
             </div>
 
@@ -115,7 +136,11 @@
 
   <div class="actions">
     <a class="btn" href="/evaluate">Evaluate another</a>
-    <a class="btn secondary" href="/signup">Sign up to save history</a>
+    {% if not user %}
+      <a class="btn secondary" href="/signup">Sign up to save history</a>
+    {% endif %}
   </div>
-</div>
+
+</section>
+
 {% endblock %}
