@@ -397,7 +397,15 @@ def evaluate(
     if confidence == "HIGH":
         _add_action(actions, "You can apply. This looks like a strong match.")
     elif confidence == "MEDIUM":
-        _add_action(actions, "Proceed carefully. Improve documents or affordability before applying.")
+    rent_above_recommended = any(
+        "affordability: rent above recommended" in (b.get("title", "").lower())
+        for b in breakdown
+    )
+
+    if rent_above_recommended:
+        actions.append("Consider roommates/house-sharing to reduce rent burden.")
+
+    actions.append("Improve docs or affordability before applying.")
     else:
         _add_action(actions, "Avoid unless you can fix the missing requirements and affordability.")
 
