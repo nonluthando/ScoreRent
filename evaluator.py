@@ -26,6 +26,7 @@ DEMAND_LEVELS = ["LOW", "MEDIUM", "HIGH"]
 
 
 def suggested_budget_bands(monthly_income: int) -> Dict[str, int]:
+    monthly_income = max(0, int(monthly_income))
     return {
         "conservative": int(monthly_income * 0.25),
         "recommended": int(monthly_income * 0.30),
@@ -38,7 +39,8 @@ def _dedupe_keep_order(items: List[str]) -> List[str]:
 
 
 def _has_action(actions: List[str], text: str) -> bool:
-    return any(a.strip().lower() == text.strip().lower() for a in actions)
+    t = (text or "").strip().lower()
+    return any((a or "").strip().lower() == t for a in actions)
 
 
 def _format_currency(value: int) -> str:
@@ -71,13 +73,15 @@ def _apply(
     delta: int,
     details: str = "",
 ) -> int:
-    before = score
-    after = score + int(delta)
+    before = int(score)
+    after = int(score) + int(delta)
     _push_breakdown(breakdown, title, int(delta), before, after, details=details)
     return after
 
 
 def _ratio_pct(numerator: int, denominator: int) -> float:
+    numerator = int(numerator)
+    denominator = int(denominator)
     if denominator <= 0:
         return 999.0
     return (numerator / denominator) * 100.0
@@ -105,8 +109,12 @@ def evaluate(
     if renter_type not in RENTER_TYPES:
         renter_type = "worker"
 
-    renter_docs_set = set(d.strip().lower() for d in (renter_docs or []) if d and d.strip())
-    required_docs_set = set(d.strip().lower() for d in (required_documents or []) if d and d.strip())
+    renter_docs_set = set(
+        d.strip().lower() for d in (renter_docs or []) if d and d.strip()
+    )
+    required_docs_set = set(
+        d.strip().lower() for d in (required_documents or []) if d and d.strip()
+    )
 
     area_demand = (area_demand or "MEDIUM").upper().strip()
     if area_demand not in DEMAND_LEVELS:
@@ -127,32 +135,34 @@ def evaluate(
         0,
         score,
         "Starts at 100 and is adjusted by affordability, document fit, and demand. "
-        "This is NOT probability of acceptance.",
+        "This score is not the probability of acceptance.",
     )
 
-    # ------------------------------------------------------------
-    # Affordability (dominant signal)
-    # ------------------------------------------------------------
-    effective_income_for_affordability = int(monthly_income)
+    monthly_income = int(monthly_income)
+    rent = int(rent)
+    deposit = int(deposit)
+    application_fee = int(application_fee)
+    guarantor_monthly_income = int(guarantor_monthly_income)
 
-    if non_bursary_student and int(guarantor_monthly_income) > 0:
+    effective_income_for_affordability = int(monthly_income)
+    if non_bursary_student and guarantor_monthly_income > 0:
         effective_income_for_affordability = int(guarantor_monthly_income)
 
-    bands = suggested_budget_bands(int(max(0, effective_income_for_affordability)))
+    bands = suggested_budget_bands(max(0, effective_income_for_affordability))
     recommended = bands["recommended"]
     upper_limit = bands["upper_limit"]
 
-    affordability_skip = bursary_student and int(monthly_income) >= int(rent)
+    affordability_skip = bursary_student and monthly_income >= rent
 
     if bursary_student:
         reasons.append("Bursary student selected (financial support assumed).")
 
-        if int(monthly_income) >= int(rent):
+        if monthly_income >= rent:
             score = _apply(score, breakdown, "Bursary/support covers rent", +10)
             reasons.append("Bursary/financial support covers rent.")
             actions.append("Apply — affordability looks strong for your situation.")
         else:
-            shortfall = int(rent) - int(monthly_income)
+            shortfall = rent - monthly_income
             required_guarantor_income = math.ceil(shortfall / 0.30)
             suggest_contact_agent = True
             reasons.append(f"Bursary does not fully cover rent (shortfall: {_format_currency(shortfall)}).")
@@ -162,7 +172,7 @@ def evaluate(
             )
 
     if not affordability_skip:
-        pct = _ratio_pct(int(rent), int(effective_income_for_affordability))
+        pct = _ratio_pct(rent, effective_income_for_affordability)
 
         if pct > 40:
             suggest_contact_agent = True
@@ -175,6 +185,7 @@ def evaluate(
             )
             reasons.append("Rent is extremely high relative to income (over 40%).")
             actions.append("Avoid — rent is too high for your income.")
+
         elif pct > 35:
             suggest_contact_agent = True
             score = _apply(
@@ -186,6 +197,7 @@ def evaluate(
             )
             reasons.append("Rent exceeds affordability limit (over 35% of income).")
             actions.append("Avoid or look for cheaper listings.")
+
         elif pct > 30:
             suggest_contact_agent = True
             score = _apply(
@@ -200,11 +212,7 @@ def evaluate(
         else:
             reasons.append("Rent is within recommended affordability range (≤ 30%).")
 
-    # ------------------------------------------------------------
-    # Student-specific doc logic
-    # ------------------------------------------------------------
     if is_student:
-        # ✅ softer + realistic
         if "proof_of_registration" not in renter_docs_set:
             suggest_contact_agent = True
             score = _apply(score, breakdown, "Student: proof of registration not available yet", -10)
@@ -212,7 +220,7 @@ def evaluate(
                 "Proof of registration is missing (this may be normal if you are securing accommodation before registration)."
             )
             actions.append("Ask the agent if conditional approval is possible before paying fees.")
-            actions.append("Prepare alternative proof (acceptance letter / student number / proof of application).")
+            actions.append("Prepare alternative proof (acceptance letter, student number, proof of application).")
 
         if non_bursary_student:
             required_guarantor_docs = {
@@ -234,15 +242,12 @@ def evaluate(
                 reasons.append("Non-bursary student applications rely on guarantor documentation.")
                 actions.append("Provide guarantor documentation (letter, payslip, bank statement).")
 
-            if int(guarantor_monthly_income) <= 0:
+            if guarantor_monthly_income <= 0:
                 suggest_contact_agent = True
                 score = _apply(score, breakdown, "Guarantor income missing", -20)
                 reasons.append("Guarantor income not provided.")
                 actions.append("Insert guarantor monthly income to assess affordability.")
 
-    # ------------------------------------------------------------
-    # Required listing documents
-    # ------------------------------------------------------------
     missing_required = required_docs_set - renter_docs_set
     if missing_required:
         suggest_contact_agent = True
@@ -267,9 +272,6 @@ def evaluate(
 
     already_penalised_docs = set(missing_required)
 
-    # ------------------------------------------------------------
-    # Worker document rules
-    # ------------------------------------------------------------
     if renter_type == "worker":
         if "payslip" not in renter_docs_set and "payslip" not in already_penalised_docs:
             suggest_contact_agent = True
@@ -288,9 +290,6 @@ def evaluate(
                 reasons.append("Missing bank statement and payslip (very weak documentation).")
                 actions.append("Prepare bank statements and payslips.")
 
-    # ------------------------------------------------------------
-    # New professional document rules
-    # ------------------------------------------------------------
     if renter_type == "new_professional":
         if has_employment_contract:
             score = _apply(score, breakdown, "Employment contract provided", +8)
@@ -318,9 +317,6 @@ def evaluate(
             else:
                 score = _apply(score, breakdown, "New professional: missing payslip (contract present)", -3)
 
-    # ------------------------------------------------------------
-    # Demand weighting
-    # ------------------------------------------------------------
     if area_demand == "HIGH":
         suggest_contact_agent = True
         score = _apply(score, breakdown, "High demand area", -10)
@@ -330,25 +326,19 @@ def evaluate(
         score = _apply(score, breakdown, "Low demand area", +5)
         reasons.append("Lower demand area may reduce competition.")
 
-    # ------------------------------------------------------------
-    # Application fee
-    # ------------------------------------------------------------
-    if int(application_fee) >= 800:
+    if application_fee >= 800:
         suggest_contact_agent = True
-        reasons.append("Application fee is high — consider the risk before applying.")
-    elif int(application_fee) >= 500:
+        reasons.append("Application fee is high. Consider the risk before applying.")
+    elif application_fee >= 500:
         suggest_contact_agent = True
-        reasons.append("Application fee is moderate — consider the risk if unsure.")
+        reasons.append("Application fee is moderate. Consider the risk if unsure.")
 
-    upfront = int(rent) + int(deposit) + int(application_fee)
+    upfront = rent + deposit + application_fee
     if effective_income_for_affordability > 0 and upfront > effective_income_for_affordability:
         suggest_contact_agent = True
         reasons.append("Upfront cost (rent + deposit + fee) is high relative to monthly income.")
         actions.append("Ensure deposit and fees are affordable before applying.")
 
-    # ------------------------------------------------------------
-    # Clamp and verdict
-    # ------------------------------------------------------------
     before = score
     score = max(0, min(100, int(score)))
     if score != before:
@@ -369,9 +359,9 @@ def evaluate(
     if confidence == "HIGH":
         actions.insert(0, "Apply — this looks like a strong match.")
     elif confidence == "MEDIUM":
-        if any("rent above recommended" in b["title"].lower() for b in breakdown):
-            actions.append("Consider roommates/house-sharing to reduce rent burden.")
-        actions.append("Improve docs or affordability before applying.")
+        if any("rent above recommended" in (b.get("title") or "").lower() for b in breakdown):
+            actions.append("Consider roommates or house-sharing to reduce rent burden.")
+        actions.append("Improve documents or affordability before applying.")
 
     if suggest_contact_agent and confidence in ("MEDIUM", "LOW"):
         contact_action = "Contact the agent to confirm requirements before paying the application fee."
