@@ -393,19 +393,21 @@ def evaluate(
 
     _push_breakdown(breakdown, "Verdict assigned", 0, score, score, f"{verdict} ({confidence})")
 
-    # Make the top action feel like the app is talking
+      # Make the top action feel like the app is talking
     if confidence == "HIGH":
         _add_action(actions, "You can apply. This looks like a strong match.")
+
     elif confidence == "MEDIUM":
-    rent_above_recommended = any(
-        "affordability: rent above recommended" in (b.get("title", "").lower())
-        for b in breakdown
-    )
+        rent_above_recommended = any(
+            "affordability warning: rent above 30% recommendation" in (b.get("title", "").lower())
+            for b in breakdown
+        )
 
-    if rent_above_recommended:
-        actions.append("Consider roommates/house-sharing to reduce rent burden.")
+        if rent_above_recommended:
+            _add_action(actions, "Consider roommates/house-sharing to reduce rent burden.")
 
-    actions.append("Improve docs or affordability before applying.")
+        _add_action(actions, "Improve docs or affordability before applying.")
+
     else:
         _add_action(actions, "Avoid unless you can fix the missing requirements and affordability.")
 
