@@ -9,31 +9,43 @@
 
   <body>
     <div class="container">
-      <nav>
-        <a class="brand" href="/">ScoreRent</a>
+      <nav class="topNav">
+        <div class="navLeft">
+          <a class="brand" href="/">ScoreRent</a>
+          <span class="brandTag">Rental confidence scoring</span>
+        </div>
 
-        <div class="links">
-          <a href="/evaluate">Evaluate</a>
+        <div class="links navLinks">
+          <a class="navLink navCta" href="/evaluate">Evaluate</a>
 
           {% if user %}
-            <a href="/dashboard">Dashboard</a>
-            <a href="/profile">Profile</a>
-            <a href="/history">History</a>
-            <a href="/logout">Logout</a>
+            <a class="navLink" href="/dashboard">Dashboard</a>
+            <a class="navLink" href="/profile">Profile</a>
+            <a class="navLink" href="/history">History</a>
+            <a class="navLink dangerLink" href="/logout">Logout</a>
           {% else %}
-            <a href="/login">Login</a>
-            <a href="/signup">Sign up</a>
+            <a class="navLink" href="/login">Login</a>
+            <a class="navLink secondaryLink" href="/signup">Sign up</a>
           {% endif %}
         </div>
       </nav>
 
-      <main class="stack" style="margin-top: 28px;">
+      <main class="stack mainContent">
         {% block content %}{% endblock %}
       </main>
 
-      <footer>
+      <footer class="siteFooter">
         <p>ScoreRent © 2026</p>
       </footer>
     </div>
+
+    <script>
+      // Active link highlight
+      const current = window.location.pathname;
+      document.querySelectorAll(".navLink").forEach((link) => {
+        const href = link.getAttribute("href");
+        if (href === current) link.classList.add("active");
+      });
+    </script>
   </body>
 </html>
