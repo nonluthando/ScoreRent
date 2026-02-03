@@ -76,16 +76,6 @@ Guest users can evaluate instantly. Logged in users can save evaluations and vie
 - **Docker + Docker Compose**
 - Deployed on **Render**
 
-## Screenshots (recommended)
-
-Suggested screenshots to include:
-- Home page
-- Evaluation form (guest mode)
-- Guest result output
-- Breakdown section expanded (shows the scoring flow)
-- Login page
-- Evaluation history page
-
 ## How scoring works (high level)
 
 ScoreRent uses rules based on:
