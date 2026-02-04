@@ -1,59 +1,75 @@
-{% extends "base.html" %}
-{% block content %}
+<section class="result">
 
-<h2>Evaluation result</h2>
+  <div class="score-block">
+    <div class="score-number">{{ evaluation.score }}</div>
+    <div class="score-verdict bad">Not worth it</div>
+    <div class="score-confidence">Low confidence</div>
+    <p class="score-note">
+      The score is a practical guide, not a guarantee. It reflects affordability pressure,
+      missing documentation, and demand for this listing.
+    </p>
+  </div>
 
-<div class="stack">
-
-  <div class="scoreBox">
-    <div class="scoreTitle">Match score</div>
-    <div class="score">{{ evaluation.score }}</div>
-    <div class="verdict">{{ evaluation.verdict.replace("_", " ").title() }}</div>
-    <div class="muted">Confidence: {{ evaluation.confidence }}</div>
+  <div class="progress-section">
+    <div class="progress-label">Overall confidence</div>
+    <div class="progress-bar">
+      <div class="progress-fill bad" style="width: {{ evaluation.score }}%;"></div>
+    </div>
+    <div class="progress-value">{{ evaluation.score }} / 100</div>
   </div>
 
   <div class="card">
-    <h3>Why this result</h3>
-    <ul>
-      {% for r in reasons %}
-        <li>{{ r }}</li>
-      {% endfor %}
-    </ul>
+    <h3>Listing summary</h3>
+    <div class="summary-grid">
+      <div>Name</div><div>{{ listing.listing_name or "Unnamed listing" }}</div>
+      <div>Rent</div><div>R{{ listing.rent }}</div>
+      <div>Deposit</div><div>R{{ listing.deposit }}</div>
+      <div>Application fee</div><div>R{{ listing.application_fee }}</div>
+      <div>Demand</div><div>{{ listing.area_demand }}</div>
+    </div>
   </div>
 
   <div class="card">
+    <h3>Why this recommendation</h3>
+    {% for r in reasons %}
+      <p class="reason-line">{{ r }}</p>
+    {% endfor %}
+  </div>
+
+  <div class="card warning">
     <h3>What you should do next</h3>
-
-    <p><strong>{{ actions[0] }}</strong></p>
-
-    {% if actions|length > 1 %}
-      <ul>
-        {% for a in actions[1:] %}
-          <li>{{ a }}</li>
-        {% endfor %}
-      </ul>
-    {% endif %}
+    <p class="action-primary">
+      Do not apply yet. You are likely to lose the application fee unless key issues are resolved.
+    </p>
   </div>
 
   {% if listing.breakdown %}
-  <details class="card">
-    <summary>How this score was calculated</summary>
-    <ul>
+  <div class="card">
+    <details>
+      <summary>Show how this score was calculated</summary>
+
       {% for b in listing.breakdown %}
-        <li>
-          <strong>{{ b.title }}</strong>
-          {% if b.details %} – {{ b.details }}{% endif %}
-          ({{ b.before }} → {{ b.after }})
-        </li>
+        {% set after = b.after %}
+        {% if after < 0 %}{% set after = 0 %}{% endif %}
+        {% if after > 100 %}{% set after = 100 %}{% endif %}
+
+        <div class="breakdown-item">
+          <div class="breakdown-header">
+            <span class="breakdown-title">{{ b.title }}</span>
+            <span class="breakdown-change">{{ b.before }} → {{ b.after }}</span>
+          </div>
+
+          {% if b.details %}
+            <div class="breakdown-details">{{ b.details }}</div>
+          {% endif %}
+
+          <div class="progress-bar small">
+            <div class="progress-fill bad" style="width: {{ after }}%;"></div>
+          </div>
+        </div>
       {% endfor %}
-    </ul>
-  </details>
+    </details>
+  </div>
   {% endif %}
 
-  <div class="actions">
-    <a class="btn" href="/evaluate">Evaluate another</a>
-    <a class="btn secondary" href="/history">View history</a>
-  </div>
-
-</div>
-{% endblock %}
+</section>
