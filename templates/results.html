@@ -1,20 +1,35 @@
 <section class="result">
 
+  {% set confidence = evaluation.confidence.lower() %}
+  {% set verdict = evaluation.verdict.replace("_", " ").title() %}
+
   <div class="score-block">
     <div class="score-number">{{ evaluation.score }}</div>
-    <div class="score-verdict bad">Not worth it</div>
-    <div class="score-confidence">Low confidence</div>
+
+    <div class="score-verdict {{ confidence }}">
+      {{ verdict }}
+    </div>
+
+    <div class="score-confidence">
+      {{ evaluation.confidence.title() }} confidence
+    </div>
+
     <p class="score-note">
-      The score is a practical guide, not a guarantee. It reflects affordability pressure,
-      missing documentation, and demand for this listing.
+      The score is a practical guide, not a guarantee. It reflects affordability,
+      documentation fit, and demand for this listing.
     </p>
   </div>
 
   <div class="progress-section">
     <div class="progress-label">Overall confidence</div>
+
     <div class="progress-bar">
-      <div class="progress-fill bad" style="width: {{ evaluation.score }}%;"></div>
+      <div
+        class="progress-fill {{ confidence }}"
+        style="width: {{ evaluation.score }}%;"
+      ></div>
     </div>
+
     <div class="progress-value">{{ evaluation.score }} / 100</div>
   </div>
 
@@ -31,32 +46,33 @@
 
   <div class="card">
     <h3>Why this recommendation</h3>
-    {% for r in reasons %}
+    {% for r in evaluation.reasons %}
       <p class="reason-line">{{ r }}</p>
     {% endfor %}
   </div>
 
-  <div class="card warning">
+  <div class="card {{ confidence }}">
     <h3>What you should do next</h3>
+
     <p class="action-primary">
-      Do not apply yet. You are likely to lose the application fee unless key issues are resolved.
+      {{ evaluation.actions[0] }}
     </p>
   </div>
 
-  {% if listing.breakdown %}
+  {% if evaluation.breakdown %}
   <div class="card">
     <details>
       <summary>Show how this score was calculated</summary>
 
-      {% for b in listing.breakdown %}
-        {% set after = b.after %}
-        {% if after < 0 %}{% set after = 0 %}{% endif %}
-        {% if after > 100 %}{% set after = 100 %}{% endif %}
+      {% for b in evaluation.breakdown %}
+        {% set after = b.after | max(0) | min(100) %}
 
         <div class="breakdown-item">
           <div class="breakdown-header">
             <span class="breakdown-title">{{ b.title }}</span>
-            <span class="breakdown-change">{{ b.before }} → {{ b.after }}</span>
+            <span class="breakdown-change">
+              {{ b.before }} → {{ b.after }}
+            </span>
           </div>
 
           {% if b.details %}
@@ -64,7 +80,10 @@
           {% endif %}
 
           <div class="progress-bar small">
-            <div class="progress-fill bad" style="width: {{ after }}%;"></div>
+            <div
+              class="progress-fill {{ confidence }}"
+              style="width: {{ after }}%;"
+            ></div>
           </div>
         </div>
       {% endfor %}
