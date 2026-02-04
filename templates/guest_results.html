@@ -1,44 +1,146 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2>Guest evaluation result</h2>
+<section class="stack" style="gap:16px;">
 
-<div class="stack">
+  <header class="stack" style="gap:6px;">
+    <h2 style="margin:0;">Evaluation result</h2>
+    <p class="muted" style="margin:0;">
+      This shows how strong your application looks based on affordability, documents, and area demand.
+    </p>
+  </header>
 
+  <!-- Verdict formatting -->
+  {% set verdict_label = "Borderline" %}
+  {% set verdict_class = "warn" %}
+
+  {% if result.verdict == "WORTH_APPLYING" %}
+    {% set verdict_label = "Worth applying" %}
+    {% set verdict_class = "good" %}
+  {% elif result.verdict == "NOT_WORTH_IT" %}
+    {% set verdict_label = "Not worth it" %}
+    {% set verdict_class = "bad" %}
+  {% endif %}
+
+  {% set confidence_label = "Medium confidence" %}
+  {% if result.confidence == "HIGH" %}
+    {% set confidence_label = "High confidence" %}
+  {% elif result.confidence == "LOW" %}
+    {% set confidence_label = "Low confidence" %}
+  {% endif %}
+
+  <!-- Score -->
   <div class="scoreBox">
-    <div class="scoreTitle">Match score</div>
-    <div class="score">{{ result.score }}</div>
-    <div class="verdict">{{ result.verdict.replace("_", " ").title() }}</div>
-    <div class="muted">Confidence: {{ result.confidence }}</div>
+    <div class="scoreHeader">
+      <div class="stack" style="gap:6px;">
+        <div class="scoreTitle">Match score</div>
+        <div class="score">{{ result.score }}</div>
+
+        <div class="verdict {{ verdict_class }}">{{ verdict_label }}</div>
+        <div class="muted small">{{ confidence_label }}</div>
+      </div>
+
+      <div class="tipBubble">
+        <span class="tip">What is this?</span>
+        <div class="tipContent">
+          <p style="margin:0;">
+            The score is a practical guide, not a guarantee. A high score means your affordability and documents look strong.
+          </p>
+        </div>
+      </div>
+    </div>
   </div>
 
+  <!-- Listing summary -->
   <div class="card">
-    <h3>Why this result</h3>
-    <ul>
-      {% for r in result.reasons %}
-        <li>{{ r }}</li>
-      {% endfor %}
+    <h3>Listing summary</h3>
+    <ul class="list">
+      <li><strong>Name:</strong> {{ listing.listing_name or "Unnamed listing" }}</li>
+      <li><strong>Rent:</strong> R{{ listing.rent }}</li>
+      <li><strong>Deposit:</strong> R{{ listing.deposit }}</li>
+      <li><strong>Application fee:</strong> R{{ listing.application_fee }}</li>
+      <li><strong>Demand:</strong> {{ listing.area_demand }}</li>
     </ul>
   </div>
 
+  <!-- Reasons -->
+  {% if result.reasons %}
+  <div class="card">
+    <h3>Why this recommendation?</h3>
+    <div class="pillList">
+      {% for r in result.reasons %}
+        <div class="pill pillReason">{{ r }}</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Actions -->
+  {% if result.actions %}
   <div class="card">
     <h3>What you should do next</h3>
-
-    <p><strong>{{ result.actions[0] }}</strong></p>
-
-    {% if result.actions|length > 1 %}
-      <ul>
-        {% for a in result.actions[1:] %}
-          <li>{{ a }}</li>
-        {% endfor %}
-      </ul>
-    {% endif %}
+    <div class="pillList">
+      {% for a in result.actions %}
+        <div class="pill pillAction">{{ a }}</div>
+      {% endfor %}
+    </div>
   </div>
+  {% endif %}
+
+  <!-- Breakdown (collapsible) -->
+  {% if result.breakdown %}
+  <div class="card breakdownCard">
+    <details class="breakdownDetails">
+      <summary class="breakdownSummary">Show how ScoreRent calculated this score</summary>
+
+      <div class="breakdownList">
+        {% for b in result.breakdown %}
+          {% set delta = b.delta %}
+          {% set before = b.before %}
+          {% set after = b.after %}
+
+          {% set badge_class = "zero" %}
+          {% if delta > 0 %}{% set badge_class = "pos" %}{% endif %}
+          {% if delta < 0 %}{% set badge_class = "neg" %}{% endif %}
+
+          {% set clamped = after %}
+          {% if clamped < 0 %}{% set clamped = 0 %}{% endif %}
+          {% if clamped > 100 %}{% set clamped = 100 %}{% endif %}
+
+          <div class="breakItem">
+            <div class="breakTop">
+              <div>
+                <div class="breakTitle">{{ b.title }}</div>
+                {% if b.details %}
+                  <div class="breakDetailsText">{{ b.details }}</div>
+                {% endif %}
+              </div>
+
+              <div class="breakRight">
+                <div class="deltaBadge {{ badge_class }}">
+                  {% if delta > 0 %}+{% endif %}{{ delta }}
+                </div>
+                <div class="arrowNums">{{ before }} to {{ after }}</div>
+              </div>
+            </div>
+
+            <div class="miniBar">
+              <div class="miniBarFill" style="width: {{ clamped }}%;"></div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </details>
+  </div>
+  {% endif %}
 
   <div class="actions">
     <a class="btn" href="/evaluate">Evaluate another</a>
-    <a class="btn secondary" href="/signup">Sign up to save history</a>
+    {% if not user %}
+      <a class="btn secondary" href="/signup">Sign up to save history</a>
+    {% endif %}
   </div>
 
-</div>
+</section>
+
 {% endblock %}
