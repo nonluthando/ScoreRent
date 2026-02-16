@@ -4,7 +4,7 @@ from datetime import datetime
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
+from fastapi.staticfiles import from api import router as api_router
 
 from database import init_db, get_conn
 from auth import (
@@ -21,6 +21,7 @@ app = FastAPI(title="ScoreRent")
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+app.include_router(api_router)
 
 @app.on_event("startup")
 def startup():
