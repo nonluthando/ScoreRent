@@ -4,7 +4,8 @@ from datetime import datetime
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import from api import router as api_router
+from fastapi.staticfiles import StaticFiles
+from api import router as api_router
 
 from database import init_db, get_conn
 from auth import (
