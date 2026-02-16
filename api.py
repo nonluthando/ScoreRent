@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException
 from auth import get_current_user
 from database import get_conn
-import from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException
 from auth import get_current_user
 from database import get_conn
 import json
