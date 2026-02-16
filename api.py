@@ -104,3 +104,20 @@ def get_evaluation(request: Request, evaluation_id: int):
         "confidence": ev["confidence"],
         "created_at": ev["created_at"],
     }
+@router.get("/api/evaluations")
+def api_list_evaluations(request: Request):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, score, verdict, confidence, created_at FROM evaluations WHERE user_id = %s",
+        (user["id"],)
+    )
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return {"evaluations": rows}
