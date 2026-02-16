@@ -149,7 +149,6 @@ Every push and pull request to main triggers tests.
 
 ## Future Enhancements
 	•	Better student accommodation flow (separate mode)
-	•	Saved listings per user
 	•	“Compare listings” view (side by side)
 	•	Admin/rules page to tune penalties without code changes
 	•	Export evaluation as a PDF report
