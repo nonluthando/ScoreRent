@@ -194,7 +194,7 @@ def evaluate(
 
     is_student = renter_type == "student"
     bursary_student = is_student and is_bursary_student
-    non_bursary_student = is_student and not bursary_student
+    non_bursary_student = is_student and not is_bursary_student
 
     score = 100
 
@@ -204,7 +204,7 @@ def evaluate(
         0,
         0,
         score,
-        f"Evaluation calibrated for {APP_MARKET} rental market.",
+        f"Evaluation calibrated for {APP_MARKET} rental market (2026).",
     )
 
     # ------------------------------------------------------------
@@ -219,54 +219,123 @@ def evaluate(
     bands = suggested_budget_bands(effective_income)
 
     # ------------------------------------------------------------
-    # Bursary affordability logic (Cape Town realistic)
+    # Bursary affordability logic (Cape Town 2026 realistic)
     # ------------------------------------------------------------
 
     affordability_skip = False
 
     if bursary_student:
 
-        if monthly_income >= rent:
-
-            score = _apply(
-                score,
-                breakdown,
-                "Bursary covers rent",
-                +15,
-                f"{_format_currency(monthly_income)} ≥ {_format_currency(rent)}",
-            )
-
-            _add_reason(
-                reasons,
-                "Your bursary fully covers the rent.",
-            )
-
-        else:
-
-            shortfall = rent - monthly_income
-
-            score = _apply(
-                score,
-                breakdown,
-                "Bursary shortfall",
-                -10,
-                f"Shortfall {_format_currency(shortfall)}",
-            )
-
-            _add_reason(
-                reasons,
-                "Your bursary does not fully cover the rent.",
-            )
-
-            _add_action(
-                actions,
-                "Adding a guarantor will improve approval chances.",
-            )
-
         affordability_skip = True
 
+        # 1. Proof of bursary required — big hit if missing
+        bursary_doc_terms = ["bursary letter", "bursary confirmation", "award letter", "nsfas", "bursary agreement"]
+        has_bursary_proof = any(any(term in doc for term in bursary_doc_terms) for doc in renter_docs_set)
+
+        if not has_bursary_proof:
+            score = _apply(
+                score,
+                breakdown,
+                "Missing official bursary confirmation letter",
+                -35,
+                "Landlords/agencies almost always require this"
+            )
+            _add_reason(reasons, "Official bursary award letter is missing.")
+            _add_action(actions, "Upload bursary confirmation letter / NSFAS award letter.")
+
+        # 2. Coverage + buffer assessment
+        covers_rent = monthly_income >= rent
+        living_buffer = monthly_income - rent   # leftover after rent
+        shortfall = max(0, rent - monthly_income)
+
+        if covers_rent:
+            if living_buffer >= 4000:  # decent buffer for food/utilities/transport (2026 CT reality)
+                score = _apply(
+                    score,
+                    breakdown,
+                    "Bursary covers rent + strong living buffer",
+                    +28,
+                    f"Buffer: {_format_currency(living_buffer)}"
+                )
+                _add_reason(reasons, "Bursary fully covers rent with good buffer for living costs.")
+            elif living_buffer >= 1500:  # marginal buffer — still acceptable to many
+                score = _apply(
+                    score,
+                    breakdown,
+                    "Bursary covers rent + modest living buffer",
+                    +12,
+                    f"Buffer: {_format_currency(living_buffer)}"
+                )
+                _add_reason(reasons, "Bursary covers rent but living costs will be tight.")
+            else:  # barely covers rent — risky
+                score = _apply(
+                    score,
+                    breakdown,
+                    "Bursary covers rent but very tight/no buffer",
+                    -8,
+                    "Minimal buffer for food/utilities"
+                )
+                _add_reason(reasons, "Bursary covers rent exactly — little room for other expenses.")
+        else:
+            # Shortfall logic — harsher than original
+            if shortfall <= 800:
+                score = _apply(
+                    score,
+                    breakdown,
+                    "Small bursary shortfall",
+                    -18,
+                    f"Shortfall: {_format_currency(shortfall)}"
+                )
+            elif shortfall <= 2000:
+                score = _apply(
+                    score,
+                    breakdown,
+                    "Moderate bursary shortfall",
+                    -38,
+                    f"Shortfall: {_format_currency(shortfall)}"
+                )
+            else:
+                score = _apply(
+                    score,
+                    breakdown,
+                    "Large bursary shortfall",
+                    -65,
+                    f"Shortfall: {_format_currency(shortfall)}"
+                )
+                _add_reason(reasons, "Bursary falls well short of rent — high risk without strong guarantor.")
+
+            _add_action(actions, "Consider properties within bursary allowance or add guarantor.")
+
+        # 3. Guarantor still very important (even with bursary)
+        if guarantor_monthly_income > 0:
+            guar_ratio = _ratio_pct(rent, guarantor_monthly_income)
+            if guar_ratio <= 25:  # guarantor very strong
+                score = _apply(
+                    score,
+                    breakdown,
+                    "Very strong guarantor backup",
+                    +22,
+                    f"Guarantor rent ratio: {guar_ratio:.0f}%"
+                )
+            elif guar_ratio <= 40:
+                score = _apply(
+                    score,
+                    breakdown,
+                    "Solid guarantor present",
+                    +10,
+                    f"Guarantor rent ratio: {guar_ratio:.0f}%"
+                )
+            else:
+                score = _apply(
+                    score,
+                    breakdown,
+                    "Guarantor present but stretched",
+                    -5,
+                    f"Guarantor rent ratio: {guar_ratio:.0f}%"
+                )
+
     # ------------------------------------------------------------
-    # Normal affordability logic
+    # Normal affordability logic (non-bursary or fallback)
     # ------------------------------------------------------------
 
     if not affordability_skip:
@@ -274,7 +343,6 @@ def evaluate(
         pct = _ratio_pct(rent, effective_income)
 
         if pct > CAPE_TOWN_EXTREME_CAP * 100:
-
             score = _apply(
                 score,
                 breakdown,
@@ -282,14 +350,12 @@ def evaluate(
                 -70,
                 f"{pct:.0f}% of income",
             )
-
             _add_reason(
                 reasons,
                 "Rent is far above typical approval range for Cape Town.",
             )
 
         elif pct > CAPE_TOWN_UPPER_CAP * 100:
-
             score = _apply(
                 score,
                 breakdown,
@@ -297,14 +363,12 @@ def evaluate(
                 -50,
                 f"{pct:.0f}% of income",
             )
-
             _add_reason(
                 reasons,
                 "Rent exceeds common approval affordability in Cape Town.",
             )
 
         elif pct > CAPE_TOWN_RECOMMENDED_CAP * 100:
-
             score = _apply(
                 score,
                 breakdown,
@@ -312,21 +376,19 @@ def evaluate(
                 -25,
                 f"{pct:.0f}% of income",
             )
-
             _add_reason(
                 reasons,
                 "Rent is slightly high relative to income.",
             )
 
         else:
-
             _add_reason(
                 reasons,
                 "Rent is within safe approval range for Cape Town.",
             )
 
     # ------------------------------------------------------------
-    # Required documents
+    # Required documents (unchanged)
     # ------------------------------------------------------------
 
     missing_required = required_docs_set - renter_docs_set
@@ -352,7 +414,7 @@ def evaluate(
         )
 
     # ------------------------------------------------------------
-    # Demand adjustment
+    # Demand adjustment (unchanged)
     # ------------------------------------------------------------
 
     if area_demand == "HIGH":
@@ -379,7 +441,7 @@ def evaluate(
         )
 
     # ------------------------------------------------------------
-    # Upfront cost warning
+    # Upfront cost warning (unchanged)
     # ------------------------------------------------------------
 
     upfront = rent + deposit + application_fee
