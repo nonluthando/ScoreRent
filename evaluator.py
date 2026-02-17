@@ -32,9 +32,33 @@ class EvaluationResult:
     breakdown: List[Dict[str, Any]]
 
 
+
+
 RENTER_TYPES = ["worker", "new_professional", "student"]
 
 DEMAND_LEVELS = ["LOW", "MEDIUM", "HIGH"]
+
+DOC_CLUSTERS = {
+    "worker": [
+        "bank statement",
+        "payslip",
+        "employment letter"
+    ],
+    "new_professional": [
+        "employment contract",
+        "offer letter",
+        "bank statement",
+        "guarantor letter"
+    ],
+    "student": [
+        "bursary award letter",
+        "nsfas award letter",
+        "bursary confirmation",
+        "proof of registration",
+        "student ID",
+        "guarantor letter"
+    ],
+}
 
 
 # ------------------------------------------------------------
