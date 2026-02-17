@@ -220,6 +220,59 @@ def evaluate(
     bursary_student = is_student and is_bursary_student
     non_bursary_student = is_student and not is_bursary_student
 
+    # ------------------------------------------------------------
+# Non-bursary student guarantor substitution logic
+# ------------------------------------------------------------
+
+if non_bursary_student:
+
+    has_guarantor_letter = any("guarantor" in doc for doc in renter_docs_set)
+    has_guarantor_payslip = any("guarantor payslip" in doc or "guarantor_payslips" in doc for doc in renter_docs_set)
+    has_guarantor_bank = any("guarantor bank" in doc for doc in renter_docs_set)
+
+    guarantor_docs_complete = (
+        has_guarantor_letter and
+        has_guarantor_payslip and
+        has_guarantor_bank
+    )
+
+    if guarantor_docs_complete and guarantor_monthly_income > 0:
+
+        # Guarantor fully replaces student income
+        effective_income = guarantor_monthly_income
+
+        score = _apply(
+            score,
+            breakdown,
+            "Guarantor fully supports affordability",
+            +18,
+            f"Guarantor income {_format_currency(guarantor_monthly_income)}"
+        )
+
+        _add_reason(
+            reasons,
+            "Application supported by financially qualified guarantor."
+        )
+
+    else:
+
+        score = _apply(
+            score,
+            breakdown,
+            "Missing or incomplete guarantor support",
+            -45,
+        )
+
+        _add_reason(
+            reasons,
+            "Non-bursary students typically require full guarantor support."
+        )
+
+        _add_action(
+            actions,
+            "Provide guarantor letter, payslip, and bank statements."
+        )
+
     score = 100
 
     _push_breakdown(
