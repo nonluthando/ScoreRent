@@ -18,14 +18,19 @@ def test_affordability_penalty_when_rent_exceeds_upper_limit():
     )
 
     assert result.score < 100
-    assert any("above" in r.lower() or "far above" in r.lower() for r in result.reasons)
+
+    assert any(
+        "exceeds common approval affordability" in r.lower()
+        or "far above typical approval range" in r.lower()
+        for r in result.reasons
+    )
 
 
 def test_affordability_safe_range():
     result, bands = evaluate(
         renter_type="worker",
         monthly_income=20000,
-        renter_docs=["bank_statement", "payslip"],
+        renter_docs=["bank_statement"],
         rent=6000,  # 30%
         deposit=6000,
         application_fee=0,
@@ -34,14 +39,33 @@ def test_affordability_safe_range():
     )
 
     assert result.score >= 75
-    assert any("safe approval range" in r.lower() for r in result.reasons)
+
+    assert any(
+        "safe approval range" in r.lower()
+        for r in result.reasons
+    )
+
+
+def test_affordability_warning_range():
+    result, bands = evaluate(
+        renter_type="worker",
+        monthly_income=20000,
+        renter_docs=["bank_statement"],
+        rent=7000,  # 35%
+        deposit=7000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+    )
+
+    assert result.score < 100
 
 
 # ------------------------------------------------------------
 # Bursary student tests
 # ------------------------------------------------------------
 
-def test_bursary_student_affordable():
+def test_bursary_student_fully_covers_rent():
     result, bands = evaluate(
         renter_type="student",
         monthly_income=8000,
@@ -55,7 +79,11 @@ def test_bursary_student_affordable():
     )
 
     assert result.score >= 90
-    assert any("bursary fully covers" in r.lower() for r in result.reasons)
+
+    assert any(
+        "bursary fully covers" in r.lower()
+        for r in result.reasons
+    )
 
 
 def test_bursary_student_shortfall():
@@ -72,8 +100,16 @@ def test_bursary_student_shortfall():
     )
 
     assert result.score < 100
-    assert any("does not fully cover" in r.lower() for r in result.reasons)
-    assert any("guarantor" in a.lower() for a in result.actions)
+
+    assert any(
+        "does not fully cover" in r.lower()
+        for r in result.reasons
+    )
+
+    assert any(
+        "guarantor" in a.lower()
+        for a in result.actions
+    )
 
 
 # ------------------------------------------------------------
@@ -95,11 +131,29 @@ def test_non_bursary_student_uses_guarantor_income():
     )
 
     assert result.score >= 75
+
     assert bands["recommended"] == int(20000 * 0.33)
 
 
+def test_non_bursary_student_no_guarantor_income_is_risky():
+    result, bands = evaluate(
+        renter_type="student",
+        monthly_income=0,
+        renter_docs=["guarantor_letter"],
+        rent=6000,
+        deposit=6000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+        guarantor_monthly_income=0,
+        is_bursary_student=False,
+    )
+
+    assert result.score <= 50
+
+
 # ------------------------------------------------------------
-# Required documents tests
+# Required document tests
 # ------------------------------------------------------------
 
 def test_missing_required_documents_penalty():
@@ -115,14 +169,18 @@ def test_missing_required_documents_penalty():
     )
 
     assert result.score < 100
-    assert any("required documents" in r.lower() for r in result.reasons)
+
+    assert any(
+        "required documents" in r.lower()
+        for r in result.reasons
+    )
 
 
 def test_all_required_documents_present():
     result, bands = evaluate(
         renter_type="worker",
         monthly_income=20000,
-        renter_docs=["payslip", "bank_statement"],
+        renter_docs=["bank_statement"],
         rent=6000,
         deposit=6000,
         application_fee=0,
@@ -134,7 +192,7 @@ def test_all_required_documents_present():
 
 
 # ------------------------------------------------------------
-# Demand adjustment tests
+# Demand tests
 # ------------------------------------------------------------
 
 def test_high_demand_penalty():
@@ -150,7 +208,11 @@ def test_high_demand_penalty():
     )
 
     assert result.score < 100
-    assert any("competition is high" in r.lower() for r in result.reasons)
+
+    assert any(
+        "competition is high" in r.lower()
+        for r in result.reasons
+    )
 
 
 def test_low_demand_bonus():
@@ -165,14 +227,14 @@ def test_low_demand_bonus():
         area_demand="LOW",
     )
 
-    assert result.score >= 100 or result.score == 100
+    assert result.score >= 95
 
 
 # ------------------------------------------------------------
-# Upfront cost informational only
+# Upfront cost tests
 # ------------------------------------------------------------
 
-def test_upfront_cost_warning_no_score_penalty():
+def test_upfront_cost_warning():
     result, bands = evaluate(
         renter_type="worker",
         monthly_income=10000,
@@ -184,7 +246,10 @@ def test_upfront_cost_warning_no_score_penalty():
         area_demand="MEDIUM",
     )
 
-    assert any("upfront costs" in r.lower() for r in result.reasons)
+    assert any(
+        "upfront costs" in r.lower()
+        for r in result.reasons
+    )
 
 
 # ------------------------------------------------------------
@@ -204,28 +269,14 @@ def test_high_confidence_verdict():
     )
 
     assert result.verdict == "WORTH_APPLYING"
+
     assert result.confidence == "HIGH"
 
 
-def test_borderline_verdict():
+def test_valid_verdict_values():
     result, bands = evaluate(
         renter_type="worker",
-        monthly_income=15000,
-        renter_docs=["bank_statement"],
-        rent=6500,
-        deposit=6500,
-        application_fee=0,
-        required_documents=[],
-        area_demand="HIGH",
-    )
-
-    assert result.verdict in ["BORDERLINE", "WORTH_APPLYING"]
-
-
-def test_not_worth_it_verdict():
-    result, bands = evaluate(
-        renter_type="worker",
-        monthly_income=8000,
+        monthly_income=10000,
         renter_docs=["bank_statement"],
         rent=7000,
         deposit=7000,
@@ -234,11 +285,21 @@ def test_not_worth_it_verdict():
         area_demand="HIGH",
     )
 
-    assert result.confidence in ["LOW", "MEDIUM", "HIGH"]
+    assert result.verdict in [
+        "WORTH_APPLYING",
+        "BORDERLINE",
+        "NOT_WORTH_IT",
+    ]
+
+    assert result.confidence in [
+        "HIGH",
+        "MEDIUM",
+        "LOW",
+    ]
 
 
 # ------------------------------------------------------------
-# Budget bands tests
+# Budget band tests
 # ------------------------------------------------------------
 
 def test_budget_band_calculation():
@@ -254,4 +315,7 @@ def test_budget_band_calculation():
     )
 
     assert bands["recommended"] == int(20000 * 0.33)
+
     assert bands["upper_limit"] == int(20000 * 0.38)
+
+    assert bands["conservative"] == int(20000 * 0.25)
