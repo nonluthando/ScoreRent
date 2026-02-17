@@ -4,19 +4,23 @@ from typing import Any, Dict, List, Tuple
 
 
 # ------------------------------------------------------------
-# Market + Currency configuration (Cape Town only)
+# Market configuration (Cape Town only)
 # ------------------------------------------------------------
 
 APP_MARKET = "Cape Town"
+
 CURRENCY_CODE = "ZAR"
 CURRENCY_SYMBOL = "R"
 
 # Cape Town calibrated affordability thresholds
-# Derived from ~2.6× income multiple acceptance
 CAPE_TOWN_RECOMMENDED_CAP = 0.33
 CAPE_TOWN_UPPER_CAP = 0.38
 CAPE_TOWN_EXTREME_CAP = 0.45
 
+
+# ------------------------------------------------------------
+# Result object
+# ------------------------------------------------------------
 
 @dataclass
 class EvaluationResult:
@@ -28,14 +32,7 @@ class EvaluationResult:
     breakdown: List[Dict[str, Any]]
 
 
-VERDICTS = ["WORTH_APPLYING", "BORDERLINE", "NOT_WORTH_IT"]
 RENTER_TYPES = ["worker", "new_professional", "student"]
-
-DOC_CLUSTERS = {
-    "worker": {"bank_statement", "payslip"},
-    "new_professional": {"employment_contract", "guarantor_letter"},
-    "student": {"proof_of_registration", "bursary_letter", "guarantor_letter"},
-}
 
 DEMAND_LEVELS = ["LOW", "MEDIUM", "HIGH"]
 
@@ -57,7 +54,7 @@ def _format_currency(value: int) -> str:
 
 
 # ------------------------------------------------------------
-# Budget bands calibrated for Cape Town
+# Budget bands (Cape Town calibrated)
 # ------------------------------------------------------------
 
 def suggested_budget_bands(monthly_income: int) -> Dict[str, int]:
@@ -171,10 +168,7 @@ def evaluate(
     is_bursary_student: bool = False,
 ) -> Tuple[EvaluationResult, Dict[str, int]]:
 
-    # ------------------------------------------------------------
     # Normalize money inputs
-    # ------------------------------------------------------------
-
     monthly_income = _money(monthly_income)
     rent = _money(rent)
     deposit = _money(deposit)
@@ -214,7 +208,7 @@ def evaluate(
     )
 
     # ------------------------------------------------------------
-    # Affordability logic (Cape Town calibrated)
+    # Determine effective income
     # ------------------------------------------------------------
 
     effective_income = monthly_income
@@ -224,72 +218,115 @@ def evaluate(
 
     bands = suggested_budget_bands(effective_income)
 
-    pct = _ratio_pct(rent, effective_income)
+    # ------------------------------------------------------------
+    # Bursary affordability logic (Cape Town realistic)
+    # ------------------------------------------------------------
 
-    if pct > CAPE_TOWN_EXTREME_CAP * 100:
+    affordability_skip = False
 
-        score = _apply(
-            score,
-            breakdown,
-            "Affordability risk: far above Cape Town approval range",
-            -70,
-            f"{pct:.0f}% of income",
-        )
+    if bursary_student:
 
-        _add_reason(
-            reasons,
-            "Rent is far above typical approval range for Cape Town.",
-        )
+        if monthly_income >= rent:
 
-        _add_action(
-            actions,
-            "This listing is financially risky. Consider cheaper options.",
-        )
+            score = _apply(
+                score,
+                breakdown,
+                "Bursary covers rent",
+                +15,
+                f"{_format_currency(monthly_income)} ≥ {_format_currency(rent)}",
+            )
 
-    elif pct > CAPE_TOWN_UPPER_CAP * 100:
+            _add_reason(
+                reasons,
+                "Your bursary fully covers the rent.",
+            )
 
-        score = _apply(
-            score,
-            breakdown,
-            "Affordability risk: above Cape Town approval range",
-            -50,
-            f"{pct:.0f}% of income",
-        )
+        else:
 
-        _add_reason(
-            reasons,
-            "Rent exceeds common approval affordability in Cape Town.",
-        )
+            shortfall = rent - monthly_income
 
-        _add_action(
-            actions,
-            "Approval possible but risk is higher. Strengthen documents.",
-        )
+            score = _apply(
+                score,
+                breakdown,
+                "Bursary shortfall",
+                -10,
+                f"Shortfall {_format_currency(shortfall)}",
+            )
 
-    elif pct > CAPE_TOWN_RECOMMENDED_CAP * 100:
+            _add_reason(
+                reasons,
+                "Your bursary does not fully cover the rent.",
+            )
 
-        score = _apply(
-            score,
-            breakdown,
-            "Affordability warning",
-            -25,
-            f"{pct:.0f}% of income",
-        )
+            _add_action(
+                actions,
+                "Adding a guarantor will improve approval chances.",
+            )
 
-        _add_reason(
-            reasons,
-            "Rent is slightly high relative to income.",
-        )
-
-    else:
-
-        _add_reason(
-            reasons,
-            "Rent is within safe approval range for Cape Town.",
-        )
+        affordability_skip = True
 
     # ------------------------------------------------------------
-    # Document completeness
+    # Normal affordability logic
+    # ------------------------------------------------------------
+
+    if not affordability_skip:
+
+        pct = _ratio_pct(rent, effective_income)
+
+        if pct > CAPE_TOWN_EXTREME_CAP * 100:
+
+            score = _apply(
+                score,
+                breakdown,
+                "Affordability risk: far above Cape Town approval range",
+                -70,
+                f"{pct:.0f}% of income",
+            )
+
+            _add_reason(
+                reasons,
+                "Rent is far above typical approval range for Cape Town.",
+            )
+
+        elif pct > CAPE_TOWN_UPPER_CAP * 100:
+
+            score = _apply(
+                score,
+                breakdown,
+                "Affordability risk: above Cape Town approval range",
+                -50,
+                f"{pct:.0f}% of income",
+            )
+
+            _add_reason(
+                reasons,
+                "Rent exceeds common approval affordability in Cape Town.",
+            )
+
+        elif pct > CAPE_TOWN_RECOMMENDED_CAP * 100:
+
+            score = _apply(
+                score,
+                breakdown,
+                "Affordability warning",
+                -25,
+                f"{pct:.0f}% of income",
+            )
+
+            _add_reason(
+                reasons,
+                "Rent is slightly high relative to income.",
+            )
+
+        else:
+
+            _add_reason(
+                reasons,
+                "Rent is within safe approval range for Cape Town.",
+            )
+
+    # ------------------------------------------------------------
+    # Required documents
     # ------------------------------------------------------------
 
     missing_required = required_docs_set - renter_docs_set
@@ -360,7 +397,7 @@ def evaluate(
         )
 
     # ------------------------------------------------------------
-    # Clamp score
+    # Clamp score and assign verdict
     # ------------------------------------------------------------
 
     score = max(0, min(100, score))
