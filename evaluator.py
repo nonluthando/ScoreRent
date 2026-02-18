@@ -192,7 +192,7 @@ def evaluate(
     is_bursary_student: bool = False,
 ) -> Tuple[EvaluationResult, Dict[str, int]]:
 
-    # Normalize inputs
+    # Normalize money inputs
     monthly_income = _money(monthly_income)
     rent = _money(rent)
     deposit = _money(deposit)
@@ -207,8 +207,8 @@ def evaluate(
     if renter_type not in RENTER_TYPES:
         renter_type = "worker"
 
-    renter_docs_set = set(d.lower().strip() for d in (renter_docs or []))
-    required_docs_set = set(d.lower().strip() for d in (required_documents or []))
+    renter_docs_set = set(d.strip().lower() for d in renter_docs or [])
+    required_docs_set = set(d.strip().lower() for d in required_documents or [])
 
     area_demand = (area_demand or "MEDIUM").upper()
     if area_demand not in DEMAND_LEVELS:
@@ -218,7 +218,10 @@ def evaluate(
     bursary_student = is_student and is_bursary_student
     non_bursary_student = is_student and not is_bursary_student
 
+    # ------------------------------------------------------------
     # Base score
+    # ------------------------------------------------------------
+
     score = 100
 
     _push_breakdown(
@@ -227,26 +230,22 @@ def evaluate(
         0,
         0,
         score,
-        f"Evaluation calibrated for {APP_MARKET}",
+        f"Evaluation calibrated for {APP_MARKET} rental market (2026).",
     )
 
     # ------------------------------------------------------------
-    # Determine effective income
+    # Determine effective income (with guarantor substitution)
     # ------------------------------------------------------------
 
     effective_income = monthly_income
 
     if non_bursary_student:
 
-        has_guarantor_letter = any("guarantor" in d for d in renter_docs_set)
-        has_guarantor_payslip = any("guarantor payslip" in d for d in renter_docs_set)
-        has_guarantor_bank = any("guarantor bank" in d for d in renter_docs_set)
+        has_letter = any("guarantor" in d for d in renter_docs_set)
+        has_payslip = any("guarantor payslip" in d for d in renter_docs_set)
+        has_bank = any("guarantor bank" in d for d in renter_docs_set)
 
-        guarantor_docs_complete = (
-            has_guarantor_letter and
-            has_guarantor_payslip and
-            has_guarantor_bank
-        )
+        guarantor_docs_complete = has_letter and has_payslip and has_bank
 
         if guarantor_docs_complete and guarantor_monthly_income > 0:
 
@@ -255,14 +254,14 @@ def evaluate(
             score = _apply(
                 score,
                 breakdown,
-                "Guarantor replaces student affordability",
-                +10,
-                f"{_format_currency(guarantor_monthly_income)} guarantor income"
+                "Guarantor fully supports affordability",
+                +18,
+                f"Guarantor income {_format_currency(guarantor_monthly_income)}",
             )
 
             _add_reason(
                 reasons,
-                "Strong guarantor supports application."
+                "Application supported by financially qualified guarantor.",
             )
 
         else:
@@ -276,18 +275,18 @@ def evaluate(
 
             _add_reason(
                 reasons,
-                "Non-bursary students require guarantor income."
+                "Non-bursary students typically require full guarantor support.",
             )
 
             _add_action(
                 actions,
-                "Provide guarantor payslip and bank statements."
+                "Provide guarantor letter, payslip, and bank statements.",
             )
 
     bands = suggested_budget_bands(effective_income)
 
     # ------------------------------------------------------------
-    # Bursary logic
+    # Bursary affordability logic
     # ------------------------------------------------------------
 
     affordability_skip = False
@@ -296,60 +295,55 @@ def evaluate(
 
         affordability_skip = True
 
-        has_bursary = any(
+        has_bursary_proof = any(
             term in doc
             for doc in renter_docs_set
             for term in ["bursary", "nsfas", "award"]
         )
 
-        if not has_bursary:
+        if not has_bursary_proof:
 
             score = _apply(
                 score,
                 breakdown,
-                "Missing bursary proof",
+                "Missing official bursary confirmation letter",
                 -35,
             )
 
             _add_reason(
                 reasons,
-                "Official bursary letter missing."
+                "Official bursary award letter is missing.",
+            )
+
+        shortfall = rent - monthly_income
+
+        if shortfall > 0:
+
+            score = _apply(
+                score,
+                breakdown,
+                "Bursary shortfall",
+                -38,
+                f"Shortfall {_format_currency(shortfall)}",
+            )
+
+            _add_reason(
+                reasons,
+                "Bursary does not fully cover rent.",
             )
 
             _add_action(
                 actions,
-                "Upload bursary award letter."
+                "Add guarantor income to strengthen application.",
             )
-
-        if monthly_income >= rent:
-
-            buffer = monthly_income - rent
-
-            if buffer >= 4000:
-                score = _apply(score, breakdown, "Strong bursary coverage", +28)
-
-            elif buffer >= 1500:
-                score = _apply(score, breakdown, "Moderate bursary coverage", +12)
-
-            else:
-                score = _apply(score, breakdown, "Minimal bursary buffer", -8)
 
         else:
 
-            shortfall = rent - monthly_income
-
-            if shortfall <= 800:
-                score = _apply(score, breakdown, "Small bursary shortfall", -18)
-
-            elif shortfall <= 2000:
-                score = _apply(score, breakdown, "Moderate bursary shortfall", -38)
-
-            else:
-                score = _apply(score, breakdown, "Large bursary shortfall", -65)
-
-            _add_action(
-                actions,
-                "Add guarantor to offset bursary shortfall."
+            score = _apply(
+                score,
+                breakdown,
+                "Bursary covers rent",
+                +20,
             )
 
     # ------------------------------------------------------------
@@ -362,42 +356,58 @@ def evaluate(
 
         if pct > 45:
 
-            score = _apply(score, breakdown, "Extreme affordability risk", -70)
+            score = _apply(
+                score,
+                breakdown,
+                "Affordability risk: far above Cape Town approval range",
+                -70,
+                f"{pct:.0f}% of income",
+            )
 
             _add_reason(
                 reasons,
-                "Rent far exceeds affordability."
+                "Rent is far above typical approval range for Cape Town.",
             )
 
         elif pct > 38:
 
-            score = _apply(score, breakdown, "High affordability risk", -50)
+            score = _apply(
+                score,
+                breakdown,
+                "Affordability risk",
+                -50,
+                f"{pct:.0f}% of income",
+            )
 
         elif pct > 33:
 
-            score = _apply(score, breakdown, "Affordability warning", -25)
+            score = _apply(
+                score,
+                breakdown,
+                "Affordability warning",
+                -25,
+            )
 
         else:
 
             _add_reason(
                 reasons,
-                "Rent within affordability range."
+                "Rent is within safe approval range for Cape Town.",
             )
 
     # ------------------------------------------------------------
-    # Missing listing docs
+    # Required docs penalty
     # ------------------------------------------------------------
 
-    missing = required_docs_set - renter_docs_set
+    missing_required = required_docs_set - renter_docs_set
 
-    if missing:
+    if missing_required:
 
         score = _apply(
             score,
             breakdown,
-            "Missing required listing documents",
+            "Missing required documents",
             -20,
-            ", ".join(missing),
         )
 
     # ------------------------------------------------------------
@@ -406,27 +416,24 @@ def evaluate(
 
     if area_demand == "HIGH":
 
-        score = _apply(score, breakdown, "High demand", -10)
+        score = _apply(
+            score,
+            breakdown,
+            "High demand area",
+            -10,
+        )
 
     elif area_demand == "LOW":
 
-        score = _apply(score, breakdown, "Low demand bonus", +5)
-
-    # ------------------------------------------------------------
-    # Upfront warning
-    # ------------------------------------------------------------
-
-    upfront = rent + deposit + application_fee
-
-    if effective_income > 0 and upfront > effective_income:
-
-        _add_reason(
-            reasons,
-            "Upfront costs high relative to income."
+        score = _apply(
+            score,
+            breakdown,
+            "Low demand area",
+            +5,
         )
 
     # ------------------------------------------------------------
-    # Verdict
+    # Clamp score
     # ------------------------------------------------------------
 
     score = max(0, min(100, score))
@@ -449,7 +456,7 @@ def evaluate(
         0,
         score,
         score,
-        verdict,
+        f"{verdict} ({confidence})",
     )
 
     reasons, actions = _trim_output(reasons, actions)
