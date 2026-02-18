@@ -241,11 +241,16 @@ def evaluate(
 
     if non_bursary_student:
 
-        has_letter = any("guarantor" in d for d in renter_docs_set)
-        has_payslip = any("guarantor payslip" in d for d in renter_docs_set)
-        has_bank = any("guarantor bank" in d for d in renter_docs_set)
+        has_letter = any("letter" in d and "guarantor" in d for d in renter_docs_set)
+        has_payslip = any("payslip" in d and "guarantor" in d for d in renter_docs_set)
+        has_bank = any("bank" in d and "guarantor" in d for d in renter_docs_set)
 
-        guarantor_docs_complete =  has_payslip and has_bank
+        guarantor_docs_complete = has_letter and has_payslip and has_bank
+
+        print("RENTER DOCS:", renter_docs_set)
+        print("HAS LETTER:", has_letter)
+        print("HAS PAYSLIP:", has_payslip)
+        print("HAS BANK:", has_bank)
 
         if guarantor_docs_complete and guarantor_monthly_income > 0:
 
