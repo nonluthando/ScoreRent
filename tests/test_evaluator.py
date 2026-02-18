@@ -271,5 +271,5 @@ def test_low_score_returns_low_confidence():
         area_demand="HIGH",
     )
 
-    assert result.confidence == "LOW"(
+    assert result.confidence == "LOW"
        
