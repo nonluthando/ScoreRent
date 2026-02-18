@@ -245,7 +245,7 @@ def evaluate(
         has_payslip = any("guarantor payslip" in d for d in renter_docs_set)
         has_bank = any("guarantor bank" in d for d in renter_docs_set)
 
-        guarantor_docs_complete = has_letter and has_payslip and has_bank
+        guarantor_docs_complete =  has_payslip and has_bank
 
         if guarantor_docs_complete and guarantor_monthly_income > 0:
 
