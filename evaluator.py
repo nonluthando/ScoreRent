@@ -1,184 +1,3 @@
-import math
-from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
-
-
-# ------------------------------------------------------------
-# Market configuration (Cape Town only)
-# ------------------------------------------------------------
-
-APP_MARKET = "Cape Town"
-
-CURRENCY_CODE = "ZAR"
-CURRENCY_SYMBOL = "R"
-
-# Cape Town calibrated affordability thresholds
-CAPE_TOWN_RECOMMENDED_CAP = 0.33
-CAPE_TOWN_UPPER_CAP = 0.38
-CAPE_TOWN_EXTREME_CAP = 0.45
-
-
-# ------------------------------------------------------------
-# Result object
-# ------------------------------------------------------------
-
-@dataclass
-class EvaluationResult:
-    score: int
-    verdict: str
-    confidence: str
-    reasons: List[str]
-    actions: List[str]
-    breakdown: List[Dict[str, Any]]
-
-
-
-
-RENTER_TYPES = ["worker", "new_professional", "student"]
-
-DEMAND_LEVELS = ["LOW", "MEDIUM", "HIGH"]
-
-DOC_CLUSTERS = {
-    "worker": [
-        "bank statement",
-        "payslip",
-        "employment letter"
-    ],
-    "new_professional": [
-        "employment contract",
-        "offer letter",
-        "bank statement",
-        "guarantor letter"
-    ],
-    "student": [
-        "bursary award letter",
-        "nsfas award letter",
-        "bursary confirmation",
-        "proof of registration",
-        "student ID",
-        "guarantor letter"
-    ],
-}
-
-
-# ------------------------------------------------------------
-# Money helpers
-# ------------------------------------------------------------
-
-def _money(value: Any) -> int:
-    try:
-        return max(0, int(round(float(value))))
-    except:
-        return 0
-
-
-def _format_currency(value: int) -> str:
-    value = _money(value)
-    return f"{CURRENCY_SYMBOL}{value:,}".replace(",", " ")
-
-
-# ------------------------------------------------------------
-# Budget bands (Cape Town calibrated)
-# ------------------------------------------------------------
-
-def suggested_budget_bands(monthly_income: int) -> Dict[str, int]:
-
-    monthly_income = _money(monthly_income)
-
-    return {
-        "conservative": int(monthly_income * 0.25),
-        "recommended": int(monthly_income * CAPE_TOWN_RECOMMENDED_CAP),
-        "upper_limit": int(monthly_income * CAPE_TOWN_UPPER_CAP),
-    }
-
-
-# ------------------------------------------------------------
-# Utility helpers
-# ------------------------------------------------------------
-
-def _dedupe_keep_order(items: List[str]) -> List[str]:
-    return list(dict.fromkeys(items))
-
-
-def _ratio_pct(numerator: int, denominator: int) -> float:
-    if denominator <= 0:
-        return 999.0
-    return (numerator / denominator) * 100.0
-
-
-def _has_item(items: List[str], text: str) -> bool:
-    target = text.strip().lower()
-    return any(i.strip().lower() == target for i in items)
-
-
-def _push_breakdown(
-    breakdown: List[Dict[str, Any]],
-    title: str,
-    delta: int,
-    before: int,
-    after: int,
-    details: str = "",
-) -> None:
-
-    breakdown.append(
-        {
-            "title": title,
-            "delta": int(delta),
-            "before": int(before),
-            "after": int(after),
-            "details": details,
-        }
-    )
-
-
-def _apply(
-    score: int,
-    breakdown: List[Dict[str, Any]],
-    title: str,
-    delta: int,
-    details: str = "",
-) -> int:
-
-    before = score
-    after = score + int(delta)
-
-    _push_breakdown(
-        breakdown,
-        title,
-        delta,
-        before,
-        after,
-        details,
-    )
-
-    return after
-
-
-def _add_reason(reasons: List[str], text: str) -> None:
-    if not _has_item(reasons, text):
-        reasons.append(text)
-
-
-def _add_action(actions: List[str], text: str) -> None:
-    if not _has_item(actions, text):
-        actions.append(text)
-
-
-def _trim_output(
-    reasons: List[str],
-    actions: List[str],
-) -> Tuple[List[str], List[str]]:
-
-    reasons = _dedupe_keep_order(reasons)[:5]
-    actions = _dedupe_keep_order(actions)[:4]
-
-    return reasons, actions
-
-
-# ------------------------------------------------------------
-# Main evaluator
-# ------------------------------------------------------------
-
 def evaluate(
     renter_type: str,
     monthly_income: int,
@@ -218,10 +37,6 @@ def evaluate(
     bursary_student = is_student and is_bursary_student
     non_bursary_student = is_student and not is_bursary_student
 
-    # ------------------------------------------------------------
-    # Base score
-    # ------------------------------------------------------------
-
     score = 100
 
     _push_breakdown(
@@ -233,11 +48,11 @@ def evaluate(
         f"Evaluation calibrated for {APP_MARKET} rental market (2026).",
     )
 
-    # ------------------------------------------------------------
-    # Determine effective income (with guarantor substitution)
-    # ------------------------------------------------------------
-
     effective_income = monthly_income
+
+    # ------------------------------------------------------------
+    # Guarantor logic (non-bursary students)
+    # ------------------------------------------------------------
 
     if non_bursary_student:
 
@@ -246,11 +61,6 @@ def evaluate(
         has_bank = any("bank" in d and "guarantor" in d for d in renter_docs_set)
 
         guarantor_docs_complete = has_letter and has_payslip and has_bank
-
-        print("RENTER DOCS:", renter_docs_set)
-        print("HAS LETTER:", has_letter)
-        print("HAS PAYSLIP:", has_payslip)
-        print("HAS BANK:", has_bank)
 
         if guarantor_docs_complete and guarantor_monthly_income > 0:
 
@@ -291,7 +101,7 @@ def evaluate(
     bands = suggested_budget_bands(effective_income)
 
     # ------------------------------------------------------------
-    # Bursary affordability logic
+    # Bursary logic
     # ------------------------------------------------------------
 
     affordability_skip = False
@@ -352,56 +162,48 @@ def evaluate(
             )
 
     # ------------------------------------------------------------
-    # Affordability logic
+    # Proportional affordability logic
     # ------------------------------------------------------------
 
     if not affordability_skip:
 
-        pct = _ratio_pct(rent, effective_income)
+        pct = _ratio_pct(rent, effective_income) / 100.0
 
-        if pct > 45:
+        recommended = CAPE_TOWN_RECOMMENDED_CAP
+        extreme = CAPE_TOWN_EXTREME_CAP
 
-            score = _apply(
-                score,
-                breakdown,
-                "Affordability risk: far above Cape Town approval range",
-                -70,
-                f"{pct:.0f}% of income",
-            )
-
-            _add_reason(
-                reasons,
-                "Rent is far above typical approval range for Cape Town.",
-            )
-
-        elif pct > 38:
-
-            score = _apply(
-                score,
-                breakdown,
-                "Affordability risk",
-                -50,
-                f"{pct:.0f}% of income",
-            )
-
-        elif pct > 33:
-
-            score = _apply(
-                score,
-                breakdown,
-                "Affordability warning",
-                -25,
-            )
-
-        else:
+        if pct <= recommended:
 
             _add_reason(
                 reasons,
                 "Rent is within safe approval range for Cape Town.",
             )
 
+        else:
+
+            max_penalty = 70
+            risk_range = extreme - recommended
+            over_ratio = min(pct, extreme) - recommended
+
+            proportional_penalty = int((over_ratio / risk_range) * max_penalty)
+
+            score = _apply(
+                score,
+                breakdown,
+                "Affordability risk (proportional)",
+                -proportional_penalty,
+                f"{pct*100:.0f}% of income",
+            )
+
+            if pct >= extreme:
+
+                _add_reason(
+                    reasons,
+                    "Rent is far above typical approval range for Cape Town.",
+                )
+
     # ------------------------------------------------------------
-    # Required docs penalty
+    # Required documents penalty
     # ------------------------------------------------------------
 
     missing_required = required_docs_set - renter_docs_set
@@ -438,7 +240,42 @@ def evaluate(
         )
 
     # ------------------------------------------------------------
-    # Clamp score
+    # Upfront burden warning (no penalty)
+    # ------------------------------------------------------------
+
+    if monthly_income > 0:
+
+        upfront_cost = rent + deposit + application_fee
+        upfront_ratio = upfront_cost / monthly_income
+
+        if upfront_ratio > 3.0:
+
+            _add_reason(
+                reasons,
+                "Upfront cost is very high relative to monthly income.",
+            )
+
+            _add_action(
+                actions,
+                "Ensure sufficient savings are available before applying.",
+            )
+
+        elif upfront_ratio > 2.0:
+
+            _add_reason(
+                reasons,
+                "Upfront cost may be difficult to mobilize quickly.",
+            )
+
+        elif upfront_ratio > 1.2:
+
+            _add_reason(
+                reasons,
+                "Upfront cost is moderately high compared to income.",
+            )
+
+    # ------------------------------------------------------------
+    # Finalize score and verdict
     # ------------------------------------------------------------
 
     score = max(0, min(100, score))
@@ -446,11 +283,9 @@ def evaluate(
     if score >= 75:
         verdict = "WORTH_APPLYING"
         confidence = "HIGH"
-
     elif score >= 55:
         verdict = "BORDERLINE"
         confidence = "MEDIUM"
-
     else:
         verdict = "NOT_WORTH_IT"
         confidence = "LOW"
