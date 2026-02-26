@@ -113,4 +113,3 @@ CI (GitHub Actions) runs tests on each push/PR to prevent regressions.
 - Add structured logging and metrics
 - Add rate-limiting and CSRF protections
 - Add listing text parsing (LLM extraction) to auto-fill requirements
-- Add deployment configuration 
