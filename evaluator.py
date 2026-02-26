@@ -225,7 +225,7 @@ def evaluate(
 
     effective_income = monthly_income
 
-    # ---------------- Guarantor logic ----------------
+    # ---------------- Non-bursary student guarantor logic ----------------
 
     if non_bursary_student:
 
@@ -271,46 +271,105 @@ def evaluate(
                 "Provide guarantor letter, payslip, and bank statements.",
             )
 
-    bands = suggested_budget_bands(effective_income)
+    # ---------------- Bursary logic ----------------
 
-    # ---------------- Proportional affordability ----------------
+    affordability_skip = False
 
-    pct = _ratio_pct(rent, effective_income) / 100.0
+    if bursary_student:
 
-    recommended = CAPE_TOWN_RECOMMENDED_CAP
-    extreme = CAPE_TOWN_EXTREME_CAP
+        affordability_skip = True
 
-    if pct <= recommended:
-
-        _add_reason(
-            reasons,
-            "Rent is within safe approval range for Cape Town.",
+        has_bursary_proof = any(
+            term in doc
+            for doc in renter_docs_set
+            for term in ["bursary", "nsfas", "award"]
         )
 
-    else:
+        if not has_bursary_proof:
 
-        max_penalty = 70
-        risk_range = extreme - recommended
-        over_ratio = min(pct, extreme) - recommended
-
-        proportional_penalty = int((over_ratio / risk_range) * max_penalty)
-
-        score = _apply(
-            score,
-            breakdown,
-            "Affordability risk (proportional)",
-            -proportional_penalty,
-            f"{pct*100:.0f}% of income",
-        )
-
-        if pct >= extreme:
+            score = _apply(
+                score,
+                breakdown,
+                "Missing official bursary confirmation letter",
+                -35,
+            )
 
             _add_reason(
                 reasons,
-                "Rent is far above typical approval range for Cape Town.",
+                "Official bursary award letter is missing.",
             )
 
-    # ---------------- Required docs ----------------
+        shortfall = rent - monthly_income
+
+        if shortfall > 0:
+
+            score = _apply(
+                score,
+                breakdown,
+                "Bursary shortfall",
+                -38,
+                f"Shortfall {_format_currency(shortfall)}",
+            )
+
+            _add_reason(
+                reasons,
+                "Bursary does not fully cover rent.",
+            )
+
+            _add_action(
+                actions,
+                "Add guarantor income to strengthen application.",
+            )
+
+        else:
+
+            score = _apply(
+                score,
+                breakdown,
+                "Bursary covers rent",
+                +20,
+            )
+
+    # ---------------- Proportional affordability ----------------
+
+    if not affordability_skip:
+
+        pct = _ratio_pct(rent, effective_income) / 100.0
+
+        recommended = CAPE_TOWN_RECOMMENDED_CAP
+        extreme = CAPE_TOWN_EXTREME_CAP
+
+        if pct <= recommended:
+
+            _add_reason(
+                reasons,
+                "Rent is within safe approval range for Cape Town.",
+            )
+
+        else:
+
+            max_penalty = 70
+            risk_range = extreme - recommended
+            over_ratio = min(pct, extreme) - recommended
+
+            proportional_penalty = int((over_ratio / risk_range) * max_penalty)
+
+            score = _apply(
+                score,
+                breakdown,
+                "Affordability risk (proportional)",
+                -proportional_penalty,
+                f"{pct*100:.0f}% of income",
+            )
+
+            if pct >= extreme:
+
+                _add_reason(
+                    reasons,
+                    "Rent is far above typical approval range for Cape Town.",
+                )
+
+    # ---------------- Required documents ----------------
 
     missing_required = required_docs_set - renter_docs_set
 
@@ -389,5 +448,5 @@ def evaluate(
             actions=actions,
             breakdown=breakdown,
         ),
-        bands,
+        suggested_budget_bands(effective_income),
     )
