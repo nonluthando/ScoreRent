@@ -272,4 +272,128 @@ def test_low_score_returns_low_confidence():
     )
 
     assert result.confidence == "LOW"
+    # ------------------------------------------------------------
+# Proportional affordability behaviour
+# ------------------------------------------------------------
+
+def test_affordability_penalty_is_monotonic():
+
+    lower_rent, _ = evaluate(
+        renter_type="worker",
+        monthly_income=20000,
+        renter_docs=["bank statement", "payslip"],
+        rent=7000,   # 35%
+        deposit=0,
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+    )
+
+    higher_rent, _ = evaluate(
+        renter_type="worker",
+        monthly_income=20000,
+        renter_docs=["bank statement", "payslip"],
+        rent=8000,   # 40%
+        deposit=0,
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+    )
+
+    assert higher_rent.score < lower_rent.score
+
+
+# ------------------------------------------------------------
+# Zero income safety
+# ------------------------------------------------------------
+
+def test_zero_income_does_not_crash_and_penalises():
+
+    result, _ = evaluate(
+        renter_type="worker",
+        monthly_income=0,
+        renter_docs=["bank statement"],
+        rent=6000,
+        deposit=0,
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+    )
+
+    assert result.score >= 0
+    assert result.verdict == "NOT_WORTH_IT"
+
+
+# ------------------------------------------------------------
+# Upfront burden warnings (no penalty)
+# ------------------------------------------------------------
+
+def test_upfront_burden_adds_warning_not_penalty():
+
+    normal, _ = evaluate(
+        renter_type="worker",
+        monthly_income=30000,
+        renter_docs=["bank statement", "payslip"],
+        rent=8000,
+        deposit=8000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+    )
+
+    heavy_upfront, _ = evaluate(
+        renter_type="worker",
+        monthly_income=30000,
+        renter_docs=["bank statement", "payslip"],
+        rent=8000,
+        deposit=90000,   # extreme upfront
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+    )
+
+    assert heavy_upfront.score == normal.score
+    assert_reason_contains(heavy_upfront, "Upfront cost")
+
+
+# ------------------------------------------------------------
+# Score clamping
+# ------------------------------------------------------------
+
+def test_score_never_negative():
+
+    result, _ = evaluate(
+        renter_type="worker",
+        monthly_income=10000,
+        renter_docs=[],
+        rent=20000,
+        deposit=0,
+        application_fee=0,
+        required_documents=["payslip"],
+        area_demand="HIGH",
+    )
+
+    assert result.score >= 0
+
+
+def test_score_never_exceeds_100():
+
+    result, _ = evaluate(
+        renter_type="student",
+        monthly_income=20000,
+        renter_docs=[
+            "guarantor letter",
+            "guarantor payslip",
+            "guarantor bank statement",
+        ],
+        rent=2000,
+        deposit=0,
+        application_fee=0,
+        required_documents=[],
+        area_demand="LOW",
+        guarantor_monthly_income=50000,
+        is_bursary_student=False,
+    )
+
+    assert result.score <= 100
        

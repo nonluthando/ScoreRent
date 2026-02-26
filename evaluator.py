@@ -12,7 +12,6 @@ APP_MARKET = "Cape Town"
 CURRENCY_CODE = "ZAR"
 CURRENCY_SYMBOL = "R"
 
-# Cape Town calibrated affordability thresholds
 CAPE_TOWN_RECOMMENDED_CAP = 0.33
 CAPE_TOWN_UPPER_CAP = 0.38
 CAPE_TOWN_EXTREME_CAP = 0.45
@@ -32,10 +31,7 @@ class EvaluationResult:
     breakdown: List[Dict[str, Any]]
 
 
-
-
 RENTER_TYPES = ["worker", "new_professional", "student"]
-
 DEMAND_LEVELS = ["LOW", "MEDIUM", "HIGH"]
 
 DOC_CLUSTERS = {
@@ -68,7 +64,7 @@ DOC_CLUSTERS = {
 def _money(value: Any) -> int:
     try:
         return max(0, int(round(float(value))))
-    except:
+    except Exception:
         return 0
 
 
@@ -78,11 +74,10 @@ def _format_currency(value: int) -> str:
 
 
 # ------------------------------------------------------------
-# Budget bands (Cape Town calibrated)
+# Budget bands
 # ------------------------------------------------------------
 
 def suggested_budget_bands(monthly_income: int) -> Dict[str, int]:
-
     monthly_income = _money(monthly_income)
 
     return {
@@ -192,7 +187,6 @@ def evaluate(
     is_bursary_student: bool = False,
 ) -> Tuple[EvaluationResult, Dict[str, int]]:
 
-    # Normalize money inputs
     monthly_income = _money(monthly_income)
     rent = _money(rent)
     deposit = _money(deposit)
@@ -218,10 +212,6 @@ def evaluate(
     bursary_student = is_student and is_bursary_student
     non_bursary_student = is_student and not is_bursary_student
 
-    # ------------------------------------------------------------
-    # Base score
-    # ------------------------------------------------------------
-
     score = 100
 
     _push_breakdown(
@@ -233,11 +223,9 @@ def evaluate(
         f"Evaluation calibrated for {APP_MARKET} rental market (2026).",
     )
 
-    # ------------------------------------------------------------
-    # Determine effective income (with guarantor substitution)
-    # ------------------------------------------------------------
-
     effective_income = monthly_income
+
+    # ---------------- Non-bursary student guarantor logic ----------------
 
     if non_bursary_student:
 
@@ -246,11 +234,6 @@ def evaluate(
         has_bank = any("bank" in d and "guarantor" in d for d in renter_docs_set)
 
         guarantor_docs_complete = has_letter and has_payslip and has_bank
-
-        print("RENTER DOCS:", renter_docs_set)
-        print("HAS LETTER:", has_letter)
-        print("HAS PAYSLIP:", has_payslip)
-        print("HAS BANK:", has_bank)
 
         if guarantor_docs_complete and guarantor_monthly_income > 0:
 
@@ -288,11 +271,7 @@ def evaluate(
                 "Provide guarantor letter, payslip, and bank statements.",
             )
 
-    bands = suggested_budget_bands(effective_income)
-
-    # ------------------------------------------------------------
-    # Bursary affordability logic
-    # ------------------------------------------------------------
+    # ---------------- Bursary logic ----------------
 
     affordability_skip = False
 
@@ -351,58 +330,46 @@ def evaluate(
                 +20,
             )
 
-    # ------------------------------------------------------------
-    # Affordability logic
-    # ------------------------------------------------------------
+    # ---------------- Proportional affordability ----------------
 
     if not affordability_skip:
 
-        pct = _ratio_pct(rent, effective_income)
+        pct = _ratio_pct(rent, effective_income) / 100.0
 
-        if pct > 45:
+        recommended = CAPE_TOWN_RECOMMENDED_CAP
+        extreme = CAPE_TOWN_EXTREME_CAP
 
-            score = _apply(
-                score,
-                breakdown,
-                "Affordability risk: far above Cape Town approval range",
-                -70,
-                f"{pct:.0f}% of income",
-            )
-
-            _add_reason(
-                reasons,
-                "Rent is far above typical approval range for Cape Town.",
-            )
-
-        elif pct > 38:
-
-            score = _apply(
-                score,
-                breakdown,
-                "Affordability risk",
-                -50,
-                f"{pct:.0f}% of income",
-            )
-
-        elif pct > 33:
-
-            score = _apply(
-                score,
-                breakdown,
-                "Affordability warning",
-                -25,
-            )
-
-        else:
+        if pct <= recommended:
 
             _add_reason(
                 reasons,
                 "Rent is within safe approval range for Cape Town.",
             )
 
-    # ------------------------------------------------------------
-    # Required docs penalty
-    # ------------------------------------------------------------
+        else:
+
+            max_penalty = 70
+            risk_range = extreme - recommended
+            over_ratio = min(pct, extreme) - recommended
+
+            proportional_penalty = int((over_ratio / risk_range) * max_penalty)
+
+            score = _apply(
+                score,
+                breakdown,
+                "Affordability risk (proportional)",
+                -proportional_penalty,
+                f"{pct*100:.0f}% of income",
+            )
+
+            if pct >= extreme:
+
+                _add_reason(
+                    reasons,
+                    "Rent is far above typical approval range for Cape Town.",
+                )
+
+    # ---------------- Required documents ----------------
 
     missing_required = required_docs_set - renter_docs_set
 
@@ -415,42 +382,48 @@ def evaluate(
             -20,
         )
 
-    # ------------------------------------------------------------
-    # Demand adjustment
-    # ------------------------------------------------------------
+    # ---------------- Demand ----------------
 
     if area_demand == "HIGH":
-
-        score = _apply(
-            score,
-            breakdown,
-            "High demand area",
-            -10,
-        )
-
+        score = _apply(score, breakdown, "High demand area", -10)
     elif area_demand == "LOW":
+        score = _apply(score, breakdown, "Low demand area", +5)
 
-        score = _apply(
-            score,
-            breakdown,
-            "Low demand area",
-            +5,
-        )
+    # ---------------- Upfront warning only ----------------
 
-    # ------------------------------------------------------------
-    # Clamp score
-    # ------------------------------------------------------------
+    if monthly_income > 0:
+
+        upfront_cost = rent + deposit + application_fee
+        upfront_ratio = upfront_cost / monthly_income
+
+        if upfront_ratio > 3.0:
+            _add_reason(
+                reasons,
+                "Upfront cost is very high relative to monthly income.",
+            )
+            _add_action(
+                actions,
+                "Ensure sufficient savings are available before applying.",
+            )
+        elif upfront_ratio > 2.0:
+            _add_reason(
+                reasons,
+                "Upfront cost may be difficult to mobilize quickly.",
+            )
+        elif upfront_ratio > 1.2:
+            _add_reason(
+                reasons,
+                "Upfront cost is moderately high compared to income.",
+            )
 
     score = max(0, min(100, score))
 
     if score >= 75:
         verdict = "WORTH_APPLYING"
         confidence = "HIGH"
-
     elif score >= 55:
         verdict = "BORDERLINE"
         confidence = "MEDIUM"
-
     else:
         verdict = "NOT_WORTH_IT"
         confidence = "LOW"
@@ -475,5 +448,5 @@ def evaluate(
             actions=actions,
             breakdown=breakdown,
         ),
-        bands,
+        suggested_budget_bands(effective_income),
     )
