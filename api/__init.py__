@@ -1,0 +1,13 @@
+from .auth_routes import router as auth_router
+from .profile_routes import router as profile_router
+from .evaluation_routes import router as evaluation_router
+from .history_routes import router as history_router
+from .api_routes import router as api_router
+
+__all__ = [
+    "auth_router",
+    "profile_router",
+    "evaluation_router",
+    "history_router",
+    "api_router",
+]
