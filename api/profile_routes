@@ -1,0 +1,40 @@
+from fastapi import APIRouter
+from fastapi import Request
+from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
+
+from auth import get_current_user
+from evaluator import DOC_CLUSTERS
+
+router = APIRouter()
+
+templates = Jinja2Templates(
+    directory="templates"
+)
+
+
+@router.get("/profile")
+def profile_page(
+    request: Request
+):
+
+    user = get_current_user(
+        request
+    )
+
+    if not user:
+
+        return RedirectResponse(
+            "/login",
+            status_code=303
+        )
+
+    return templates.TemplateResponse(
+        "profile.html",
+        {
+            "request": request,
+            "user": user,
+            "doc_clusters":
+            DOC_CLUSTERS
+        }
+    )
