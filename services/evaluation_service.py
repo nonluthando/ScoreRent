@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from database.connection import get_conn
+from database import get_conn
 
 from schemas.evaluation_schema import (
     EvaluationSummary,
