@@ -20,6 +20,9 @@ from auth import (
 
 from evaluator import (
     evaluate,
+)
+
+from engine.config import (
     DOC_CLUSTERS,
     DEMAND_LEVELS,
 )
