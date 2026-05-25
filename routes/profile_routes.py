@@ -19,7 +19,7 @@ from auth import (
     get_current_user,
 )
 
-from evaluator import (
+from engine.student_rules import (
     DOC_CLUSTERS,
 )
 
