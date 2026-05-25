@@ -1,6 +1,6 @@
 import json
 
-from database.connection import (
+from database import (
     get_conn
 )
 
