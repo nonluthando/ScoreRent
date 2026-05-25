@@ -1,4 +1,4 @@
-from database.connection import get_conn
+from database import get_conn
 
 
 def get_latest_evaluation(
