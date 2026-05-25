@@ -149,3 +149,39 @@ def evaluate_upfront_cost_risk(
         )
 
     return score
+
+"""
+Budget calculations.
+"""
+
+
+def suggested_budget_bands(
+    monthly_income: int,
+):
+    """
+    Calculate rental
+    affordability bands.
+    """
+
+    monthly_income = max(
+        0,
+        int(monthly_income),
+    )
+
+    return {
+
+        "conservative":
+            int(
+                monthly_income * 0.25
+            ),
+
+        "recommended":
+            int(
+                monthly_income * 0.33
+            ),
+
+        "upper_limit":
+            int(
+                monthly_income * 0.38
+            ),
+    }
