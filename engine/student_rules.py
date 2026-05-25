@@ -3,7 +3,29 @@ from typing import List
 from engine.breakdown import apply_score_change
 from engine.helpers import has_item
 
+DOC_CLUSTERS = {
+    "worker": [
+        "bank statement",
+        "payslip",
+        "employment letter",
+    ],
 
+    "new_professional": [
+        "employment contract",
+        "offer letter",
+        "bank statement",
+        "guarantor letter",
+    ],
+
+    "student": [
+        "bursary award letter",
+        "nsfas award letter",
+        "bursary confirmation",
+        "proof of registration",
+        "student ID",
+        "guarantor letter",
+    ],
+}
 def evaluate_student_support(
     score: int,
     breakdown: List,
