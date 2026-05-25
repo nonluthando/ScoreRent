@@ -1,12 +1,18 @@
-from typing import Optional
 import json
+from datetime import datetime
+from typing import Optional
 
 from database.connection import get_conn
+
 from schemas.evaluation_schema import (
-    EvaluationDetail,
     EvaluationSummary,
+    EvaluationDetail,
 )
 
+
+# ---------------------------------------------------------
+# Evaluation retrieval
+# ---------------------------------------------------------
 
 def get_user_evaluations(
     user_id: int,
@@ -15,33 +21,13 @@ def get_user_evaluations(
     verdict: Optional[str] = None,
 ):
     """
-    Retrieve paginated evaluation history
-    for a specific user.
+    Retrieve paginated evaluation
+    history.
 
-    Supports optional filtering by verdict.
+    Supports:
 
-    Args:
-        user_id:
-            Authenticated user identifier.
-
-        limit:
-            Maximum number of records.
-
-        offset:
-            Pagination offset.
-
-        verdict:
-            Optional verdict filter.
-
-    Returns:
-        dict containing:
-
-        {
-            total,
-            limit,
-            offset,
-            evaluations
-        }
+    - pagination
+    - verdict filtering
     """
 
     conn = get_conn()
@@ -58,6 +44,7 @@ def get_user_evaluations(
             cur.execute(
                 f"""
                 SELECT COUNT(*)
+
                 {query}
                 """,
                 params,
@@ -68,12 +55,19 @@ def get_user_evaluations(
             cur.execute(
                 f"""
                 SELECT
+
                     id,
+
                     listing_name,
+
                     score,
+
                     verdict,
+
                     confidence,
+
                     created_at
+
                 {query}
 
                 ORDER BY created_at DESC
@@ -91,20 +85,31 @@ def get_user_evaluations(
             rows = cur.fetchall()
 
         summaries = [
+
             map_summary(
                 row
             )
+
             for row in rows
         ]
 
         return {
-            "total": total,
-            "limit": limit,
-            "offset": offset,
-            "evaluations": summaries,
+
+            "total":
+                total,
+
+            "limit":
+                limit,
+
+            "offset":
+                offset,
+
+            "evaluations":
+                summaries,
         }
 
     finally:
+
         conn.close()
 
 
@@ -113,21 +118,8 @@ def get_single_evaluation(
     user_id: int,
 ):
     """
-    Retrieve a single evaluation
-    belonging to a user.
-
-    Ownership validation is enforced.
-
-    Args:
-        evaluation_id:
-            Evaluation identifier.
-
-        user_id:
-            Current authenticated user.
-
-    Returns:
-        EvaluationDetail
-        or None.
+    Retrieve single evaluation
+    owned by user.
     """
 
     conn = get_conn()
@@ -143,9 +135,12 @@ def get_single_evaluation(
                 FROM evaluations
 
                 WHERE
-                    id = %s
+
+                    id=%s
+
                 AND
-                    user_id = %s
+
+                    user_id=%s
                 """,
                 (
                     evaluation_id,
@@ -153,45 +148,292 @@ def get_single_evaluation(
                 ),
             )
 
-            result = cur.fetchone()
+            row = cur.fetchone()
 
-        if not result:
+        if not row:
             return None
 
         return map_detail(
-            result
+            row
         )
 
     finally:
+
         conn.close()
 
+
+# ---------------------------------------------------------
+# Persistence
+# ---------------------------------------------------------
+
+def create_listing_payload(
+    listing_name: str,
+
+    rent: int,
+
+    deposit: int,
+
+    application_fee: int,
+
+    required_documents,
+
+    area_demand: str,
+
+    guarantor_monthly_income: int,
+
+    breakdown,
+):
+    """
+    Build evaluation payload.
+    """
+
+    return {
+
+        "listing_name":
+            listing_name.strip(),
+
+        "rent":
+            int(rent),
+
+        "deposit":
+            int(deposit),
+
+        "application_fee":
+            int(
+                application_fee
+            ),
+
+        "required_documents":
+            required_documents,
+
+        "area_demand":
+            area_demand,
+
+        "guarantor_monthly_income":
+            int(
+                guarantor_monthly_income
+            ),
+
+        "breakdown":
+            breakdown,
+    }
+
+
+def build_guest_result(
+    listing,
+    result,
+    bands,
+):
+    """
+    Guest evaluations are
+    returned but not saved.
+    """
+
+    return {
+
+        "listing":
+            listing,
+
+        "result":
+            result,
+
+        "bands":
+            bands,
+
+        "guest":
+            True,
+    }
+
+
+def save_evaluation(
+    user_id: int,
+
+    profile_id: int,
+
+    listing_name: str,
+
+    listing,
+
+    result,
+):
+    """
+    Save evaluation and return ID.
+    """
+
+    conn = get_conn()
+
+    try:
+
+        with conn.cursor() as cur:
+
+            cur.execute(
+                """
+                INSERT INTO evaluations(
+
+                    user_id,
+
+                    profile_id,
+
+                    listing_name,
+
+                    listing_json,
+
+                    score,
+
+                    verdict,
+
+                    confidence,
+
+                    reasons_json,
+
+                    actions_json,
+
+                    created_at
+
+                )
+
+                VALUES(
+
+                    %s,
+
+                    %s,
+
+                    %s,
+
+                    %s,
+
+                    %s,
+
+                    %s,
+
+                    %s,
+
+                    %s,
+
+                    %s,
+
+                    %s
+                )
+
+                RETURNING id
+                """,
+
+                (
+                    user_id,
+
+                    profile_id,
+
+                    listing_name,
+
+                    json.dumps(
+                        listing
+                    ),
+
+                    int(
+                        result.score
+                    ),
+
+                    result.verdict,
+
+                    result.confidence,
+
+                    json.dumps(
+                        result.reasons
+                    ),
+
+                    json.dumps(
+                        result.actions
+                    ),
+
+                    datetime.utcnow(
+                    ).isoformat(),
+                ),
+            )
+
+            evaluation_id = (
+                cur.fetchone()[
+                    "id"
+                ]
+            )
+
+            conn.commit()
+
+        return evaluation_id
+
+    finally:
+
+        conn.close()
+
+
+def insert_evaluation(
+    user_id,
+
+    profile_id,
+
+    listing_name,
+
+    listing,
+
+    result,
+):
+    """
+    Wrapper for persistence.
+    """
+
+    return save_evaluation(
+
+        user_id=
+            user_id,
+
+        profile_id=
+            profile_id,
+
+        listing_name=
+            listing_name,
+
+        listing=
+            listing,
+
+        result=
+            result,
+    )
+
+
+def default_listing_name(
+    listing_name: str,
+    rent: int,
+):
+    """
+    Generate fallback name.
+    """
+
+    name = (
+        listing_name
+        .strip()
+    )
+
+    if name:
+        return name
+
+    return f"Listing (R{rent})"
+
+
+# ---------------------------------------------------------
+# Query helpers
+# ---------------------------------------------------------
 
 def build_filters(
     user_id: int,
     verdict: Optional[str],
 ):
     """
-    Build reusable query filters.
-
-    Args:
-        user_id:
-            User ownership filter.
-
-        verdict:
-            Optional verdict value.
-
-    Returns:
-        tuple:
-            (
-                sql,
-                params
-            )
+    Build reusable filters.
     """
 
     query = """
         FROM evaluations
 
-        WHERE user_id = %s
+        WHERE user_id=%s
     """
 
     params = [user_id]
@@ -199,38 +441,55 @@ def build_filters(
     if verdict:
 
         query += """
-            AND verdict = %s
+            AND verdict=%s
         """
 
         params.append(
             verdict
         )
 
-    return query, params
+    return (
+        query,
+        params,
+    )
 
+
+# ---------------------------------------------------------
+# Mapping
+# ---------------------------------------------------------
 
 def map_summary(
     row,
 ):
     """
-    Convert database row
-    into EvaluationSummary.
+    Map DB row to summary.
     """
 
     return EvaluationSummary(
+
         id=row["id"],
-        listing_name=row[
-            "listing_name"
-        ],
+
+        listing_name=
+            row[
+                "listing_name"
+            ],
+
         score=row["score"],
-        verdict=row[
-            "verdict"
-        ],
-        confidence=row[
-            "confidence"
-        ],
+
+        verdict=
+            row[
+                "verdict"
+            ],
+
+        confidence=
+            row[
+                "confidence"
+            ],
+
         created_at=str(
-            row["created_at"]
+            row[
+                "created_at"
+            ]
         ),
     )
 
@@ -239,11 +498,11 @@ def map_detail(
     row,
 ):
     """
-    Convert database row
-    into EvaluationDetail.
+    Map DB row to detail.
     """
 
     return EvaluationDetail(
+
         id=row["id"],
 
         listing=json.loads(
@@ -254,15 +513,19 @@ def map_detail(
 
         score=row["score"],
 
-        verdict=row[
-            "verdict"
-        ],
+        verdict=
+            row[
+                "verdict"
+            ],
 
-        confidence=row[
-            "confidence"
-        ],
+        confidence=
+            row[
+                "confidence"
+            ],
 
         created_at=str(
-            row["created_at"]
+            row[
+                "created_at"
+            ]
         ),
     )
