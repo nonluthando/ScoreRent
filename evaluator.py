@@ -330,58 +330,21 @@ def evaluate(
                 +20,
             )
 
-    # ---------------- Proportional affordability ----------------
+    from engine.affordability import (
+    evaluate_affordability
+)
 
-    if not affordability_skip:
+score = evaluate_affordability(
+    score=score,
 
-        pct = _ratio_pct(rent, effective_income) / 100.0
+    breakdown=breakdown,
 
-        recommended = CAPE_TOWN_RECOMMENDED_CAP
-        extreme = CAPE_TOWN_EXTREME_CAP
+    reasons=reasons,
 
-        if pct <= recommended:
+    monthly_income=effective_income,
 
-            _add_reason(
-                reasons,
-                "Rent is within safe approval range for Cape Town.",
-            )
-
-        else:
-
-            max_penalty = 70
-            risk_range = extreme - recommended
-            over_ratio = min(pct, extreme) - recommended
-
-            proportional_penalty = int((over_ratio / risk_range) * max_penalty)
-
-            score = _apply(
-                score,
-                breakdown,
-                "Affordability risk (proportional)",
-                -proportional_penalty,
-                f"{pct*100:.0f}% of income",
-            )
-
-            if pct >= extreme:
-
-                _add_reason(
-                    reasons,
-                    "Rent is far above typical approval range for Cape Town.",
-                )
-
-    # ---------------- Required documents ----------------
-
-    missing_required = required_docs_set - renter_docs_set
-
-    if missing_required:
-
-        score = _apply(
-            score,
-            breakdown,
-            "Missing required documents",
-            -20,
-        )
-
+    rent=rent,
+)
     # ---------------- Demand ----------------
 
     if area_demand == "HIGH":
