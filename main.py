@@ -5,6 +5,10 @@ from database import init_db
 
 from api import router as api_router
 
+from routes.home_routes import (
+    router as home_router,
+)
+
 from routes.auth_routes import (
     router as auth_router,
 )
@@ -64,6 +68,15 @@ def startup():
     """
 
     init_db()
+
+
+# ---------------------------------------------------------
+# Homepage
+# ---------------------------------------------------------
+
+app.include_router(
+    home_router
+)
 
 
 # ---------------------------------------------------------
