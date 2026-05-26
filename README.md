@@ -1,103 +1,268 @@
 ![CI Tests](https://github.com/nonluthando/ScoreRent/actions/workflows/tests.yml/badge.svg)
+
 # ScoreRent
 
-ScoreRent helps you decide if a rental listing is worth applying for *before* you waste money on application fees.
+Rules-based rental decision-support platform helping renters evaluate listings before spending money on rental applications.
 
-It compares your renter profile to listing requirements and returns a confidence score (0 to 100) with a clear verdict:
+**Live Demo:** https://scorerent.onrender.com
 
-- **Worth applying**
-- **Borderline**
-- **Not worth it**
+ScoreRent compares renter profiles against listing requirements and produces:
 
-The score is **not** a probability of acceptance. It is a confidence indicator based on affordability, documents, and demand.
+- Explainable score (0–100)
+- Recommendation verdict
+- Confidence level
+- Reasons behind results
+- Suggested actions
+- Budget guidance
 
-## Why I built this
+The system is intentionally **deterministic rather than ML-based** to prioritise transparency, explainability, and predictable behaviour.
 
-When I was applying for rentals for my final year of university, the process was expensive and frustrating. Application fees are often non refundable, and many listings reject people quickly for missing documents (like 3 month bank statements) or affordability issues.
+---
 
-This hit newly graduated renters and students especially hard, because many people simply cannot afford paying multiple application fees while trying to find a place urgently.
+# Why I Built This
 
-ScoreRent was built to make that process less wasteful.
+When I was applying for rentals during my final year at university, the process was expensive and frustrating.
 
-## What it does
+Application fees are often non-refundable, and many listings reject applicants quickly because of affordability issues or missing documentation such as bank statements and proof of income.
 
-ScoreRent takes:
-- your renter profile (worker / new professional / student)
-- what documents you have
-- a listing (rent, deposit, application fee, demand, required docs)
+This affects students, recent graduates, and first-time renters especially hard because multiple unsuccessful applications become expensive very quickly.
 
-Then it outputs:
-- a **confidence score (0 to 100)**
-- a verdict (**Worth applying / Borderline / Not worth it**)
-- the main reasons behind the result
-- recommended actions (what to fix / what to upload / what to do next)
-- an explainable breakdown showing how the score was calculated step by step
+ScoreRent was built to help reduce wasted applications and support better decisions before paying fees.
 
-Guest users can evaluate instantly. Logged in users can save evaluations and view history.
+---
 
-## Features
+# Features
 
-### Guest mode
-- Evaluate listings without creating an account
-- Enter renter type + income/support + documents
-- Student bursary toggle supported
-- See reasons, actions, and breakdown instantly
+## Guest Mode
 
-### Logged in users
-- Sign up / login
-- Save renter profile (type, income, documents)
-- Save evaluation history (persistent)
-- View past evaluations
+Guests can evaluate listings immediately without creating an account.
 
-### Scoring engine
-- Deterministic rules (same inputs always give the same output)
-- Affordability based on rent to income bands
-- Document fit checks
-- Demand level weighting (LOW / MEDIUM / HIGH)
-- Explainable breakdown:
-  - each rule shows score change like `-30` and `70 → 40`
-  - progress bar updates after every rule
+Supported inputs include:
 
-### Engineering / reliability
-- PostgreSQL persistence
-- pytest unit tests for evaluator rules
-- GitHub Actions CI runs tests on every push / PR
-- Docker setup for reproducible development environment
+- Renter type
+- Income / support information
+- Documents
+- Bursary support
+- Listing requirements
+- Deposit
+- Demand level
 
+Outputs include:
 
-## Tech stack
+- Score
+- Verdict
+- Confidence
+- Reasons
+- Actions
+- Breakdown view
 
-- **Python**
-- **FastAPI**
-- **Jinja2 templates**
-- **PostgreSQL (psycopg)**
-- **pytest**
-- **GitHub Actions (CI)**
-- **Docker + Docker Compose**
-- Deployed on **Render**
+No information is stored.
 
-## How scoring works (high level)
+---
 
-ScoreRent uses rules based on:
-- **Affordability** (dominant factor):
-  - rent above recommended affordability gets penalised heavily
-  - rent above affordability limit usually results in “not worth it”
-- **Document fit**
-  - missing listing required documents reduces confidence
-  - worker applications require stronger income proof
-  - new professional logic is lighter and supports employment contract alternatives
-  - student logic supports bursary vs guarantor pathways
-- **Demand**
-  - high demand areas reduce confidence because competition is stronger
+## Authenticated Users
 
-The goal is to model realistic decision-making that a letting agent might follow.
+Users can:
 
+- Create accounts
+- Login
+- Save renter profiles
+- Store evaluations
+- View history
+- Revisit previous recommendations
 
-## Run locally
+Stored profile information includes:
 
-### Option 1: Docker (recommended)
+- Income
+- Renter type
+- Documents
+- Support details
+- Guarantor information
+
+---
+
+## Decision Engine
+
+ScoreRent evaluates:
+
+- Affordability
+- Deposit burden
+- Application fees
+- Required documents
+- Demand level
+- Supporting documentation
+- Renter pathways
+
+Example:
+
+```text
+Score: 78
+
+Verdict:
+WORTH_APPLYING
+
+Confidence:
+HIGH
+
+Reasons:
+✓ Affordable rent range
+✓ Strong document fit
+✓ Lower upfront risk
+
+Actions:
+- Proceed with application
+- Upload remaining documents
+```
+
+Results include:
+
+- Score explanation
+- Rule breakdown
+- Suggested actions
+- Confidence indicators
+- Budget guidance
+
+---
+
+# Tech Stack
+
+### Backend
+
+- Python
+- FastAPI
+- Jinja2
+
+### Persistence
+
+- PostgreSQL (psycopg)
+
+### Authentication
+
+- passlib
+- bcrypt
+- signed cookies
+- itsdangerous
+
+### Testing
+
+- pytest
+- GitHub Actions
+
+### Deployment
+
+- Docker
+- Docker Compose
+- Render
+
+---
+
+# Architecture
+
+ScoreRent follows a layered backend design using separated routes, services, schemas, evaluation logic, and persistence layers.
+
+Detailed architecture documentation:
+
+[ScoreRent_Architecture.md](./ScoreRent_Architecture.md)
+
+The project was later refactored after commercial Laravel experience, applying production-inspired separation patterns and translating them into FastAPI.
+
+Refactor highlights:
+
+- Route separation
+- Service layer introduction
+- Schema organisation
+- Cleaner responsibility ownership
+- Improved testing boundaries
+
+---
+
+# Evaluation Logic (High Level)
+
+## Affordability
+
+Primary factor.
+
+Rules include:
+
+- Rent-to-income analysis
+- Budget recommendations
+- Affordability bands
+- Upper affordability thresholds
+
+---
+
+## Financial Risk
+
+Evaluates:
+
+- Deposit burden
+- Application fees
+- Upfront costs
+
+Higher risk lowers confidence.
+
+---
+
+## Documentation
+
+Checks include:
+
+- Required documents
+- Missing items
+- Student pathways
+- Guarantor support
+- Bursary support
+- Worker requirements
+
+---
+
+## Demand
+
+Demand weighting:
+
+```text
+LOW
+MEDIUM
+HIGH
+```
+
+Higher demand reduces confidence because competition increases.
+
+---
+
+# Testing
+
+Testing focuses on evaluator correctness.
+
+Covered scenarios:
+
+- Affordability penalties
+- Demand weighting
+- Application fees
+- Document validation
+- Boundary scores
+- Verdict mapping
+- Confidence behaviour
+
+Run locally:
+
+```bash
+pytest
+```
+
+CI runs automatically through GitHub Actions on:
+
+- Push
+- Pull Request
+
+---
+
+# Run Locally
+
+## Option 1 — Docker (Recommended)
 
 Requirements:
+
 - Docker
 - Docker Compose
 
@@ -106,55 +271,103 @@ Run:
 ```bash
 docker compose up --build
 ```
-Then open:
-	•	http://localhost:8000
 
-### Option 2: Local Python + Postgres
+Open:
+
+```text
+http://localhost:8000
+```
+
+---
+
+## Option 2 — Python + PostgreSQL
+
 Requirements:
-	•	Python 3.11+
-	•	PostgreSQL
-	
-1.	Create a virtual environment:
+
+- Python 3.11+
+- PostgreSQL
+
+Create environment:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 ```
-2.	Install dependencies:
+
+Install dependencies:
+
 ```bash
-python -m venv .venv
 pip install -r requirements.txt
 ```
-3. Setup database url:
+
+Configure database:
+
 ```bash
 export DATABASE_URL="postgresql://scorerent:scorerent@localhost:5432/scorerent"
 ```
 
-4. Start app:
+Run application:
+
 ```bash
 uvicorn main:app --reload
 ```
-## CI
-GitHub Actions runs:
-	•	pytest
-	•	coverage report generation
 
-Every push and pull request to main triggers tests.
+---
 
+# Limitations
 
-## Limitations
-	•	The score is a confidence indicator. It does not guarantee acceptance.
-	•	Rental requirements vary by landlord and agency. Rules are designed to be realistic and extendable, not universal truth.
-	•	Student requirements are tricky because real processes differ (some listings accept students before registration). ScoreRent tries to surface these risks without assuming one single standard.
+- Score is a confidence indicator rather than acceptance probability
+- Rules aim to be realistic but are not universal
+- Rental processes differ between landlords and agencies
+- Student accommodation processes vary significantly
 
-## Future Enhancements
-	•	Better student accommodation flow (separate mode)
-	•	“Compare listings” view (side by side)
-	•	Admin/rules page to tune penalties without code changes
-	•	Export evaluation as a PDF report
+The goal is decision support rather than prediction.
 
-## Author
-Luthando Mbuyane
+---
 
-## Live demo: https://scorerent.onrender.com
+# Future Improvements
 
+Planned work:
+
+- Accessibility improvements
+- UX refinement
+- Student accommodation mode
+- Compare listings feature
+- PDF exports
+- Structured logging
+- Metrics
+- Alembic migrations
+- Rate limiting
+- CSRF protection
+- Listing extraction workflows
+- LLM-assisted requirement parsing
+
+---
+
+# What I Learned
+
+ScoreRent became my strongest example of learning beyond coursework.
+
+The project started as an independent backend application and later evolved after commercial software engineering experience.
+
+Following work in a Laravel production environment, I revisited the system and refactored it by introducing:
+
+- Route separation
+- Service layers
+- Schemas
+- Cleaner architecture
+- Improved testing boundaries
+
+This process strengthened my ability to transfer architectural ideas across technologies and improve systems iteratively.
+
+---
+
+# Author
+
+**Luthando Mbuyane**
+
+GitHub: https://github.com/nonluthando
+
+Portfolio: https://nonluthando.github.io/portfolio-v2
+
+Live Demo: https://scorerent.onrender.com
