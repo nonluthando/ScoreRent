@@ -97,17 +97,53 @@ def read_session_token(token: str, max_age_seconds: int = 60 * 60 * 24 * 7):
         return None
 
 
-def get_current_user(request: Request):
-    token = request.cookies.get("session")
+def get_current_user(
+    request: Request
+):
+
+    token = request.cookies.get(
+        "session"
+    )
+
+    print(
+        "TOKEN:",
+        token
+    )
+
     if not token:
         return None
 
-    data = read_session_token(token)
+    data = read_session_token(
+        token
+    )
+
+    print(
+        "SESSION DATA:",
+        data
+    )
+
     if not data:
         return None
 
-    user_id = data.get("user_id")
+    user_id = data.get(
+        "user_id"
+    )
+
+    print(
+        "USER ID:",
+        user_id
+    )
+
     if not user_id:
         return None
 
-    return get_user_by_id(int(user_id))
+    user = get_user_by_id(
+        int(user_id)
+    )
+
+    print(
+        "USER:",
+        user
+    )
+
+    return user
