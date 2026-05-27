@@ -7,13 +7,8 @@ from database import (
 
 def get_result(
     evaluation_id: int,
-
     user_id: int,
 ):
-    """
-    Retrieve evaluation result
-    owned by a user.
-    """
 
     conn = get_conn()
 
@@ -21,38 +16,38 @@ def get_result(
 
         with conn.cursor() as cur:
 
-    cur.execute(
-        """
-        SELECT *
+            cur.execute(
+                """
+                SELECT *
 
-        FROM evaluations
+                FROM evaluations
 
-        WHERE
+                WHERE
 
-            id=%s
+                    id=%s
 
-        AND
+                AND
 
-            user_id=%s
-        """,
-        (
-            evaluation_id,
-            user_id,
-        ),
-    )
+                    user_id=%s
+                """,
+                (
+                    evaluation_id,
+                    user_id,
+                ),
+            )
 
-    row = cur.fetchone()
+            row = cur.fetchone()
 
-    print(
-        "LOOKUP",
-        evaluation_id,
-        user_id,
-    )
+            print(
+                "LOOKUP",
+                evaluation_id,
+                user_id,
+            )
 
-    print(
-        "ROW",
-        row,
-    )
+            print(
+                "ROW",
+                row,
+            )
 
         if not row:
             return None
