@@ -94,6 +94,11 @@ def map_result(
         evaluation
     )
 
+    bands = listing.get(
+        "budget_bands",
+        {}
+    )
+
     return {
 
         "evaluation":
@@ -107,6 +112,9 @@ def map_result(
 
         "actions":
             actions,
+
+        "bands":
+            bands,
     }
 
 
