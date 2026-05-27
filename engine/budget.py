@@ -1,5 +1,11 @@
 from typing import List
 
+from engine.config import (
+    CAPE_TOWN_RECOMMENDED_CAP,
+    CAPE_TOWN_UPPER_CAP,
+    CAPE_TOWN_EXTREME_CAP,
+)
+
 from engine.breakdown import (
     apply_score_change,
 )
@@ -150,38 +156,71 @@ def evaluate_upfront_cost_risk(
 
     return score
 
-"""
-Budget calculations.
-"""
 
+# ---------------------------------------------------------
+# Budget guidance
+# ---------------------------------------------------------
 
 def suggested_budget_bands(
     monthly_income: int,
 ):
     """
     Calculate rental
-    affordability bands.
+    affordability guidance.
+
+    Returns:
+
+    conservative:
+        safer target
+
+    recommended:
+        normal affordability
+
+    stretch:
+        higher risk
+
+    high_risk:
+        likely pressure zone
     """
 
     monthly_income = max(
         0,
-        int(monthly_income),
+        int(
+            monthly_income
+        ),
+    )
+
+    conservative = round(
+        monthly_income *
+        0.25
+    )
+
+    recommended = round(
+        monthly_income *
+        CAPE_TOWN_RECOMMENDED_CAP
+    )
+
+    stretch = round(
+        monthly_income *
+        CAPE_TOWN_UPPER_CAP
+    )
+
+    high_risk = round(
+        monthly_income *
+        CAPE_TOWN_EXTREME_CAP
     )
 
     return {
 
         "conservative":
-            int(
-                monthly_income * 0.25
-            ),
+            conservative,
 
         "recommended":
-            int(
-                monthly_income * 0.33
-            ),
+            recommended,
 
-        "upper_limit":
-            int(
-                monthly_income * 0.38
-            ),
+        "stretch":
+            stretch,
+
+        "high_risk":
+            high_risk,
     }
