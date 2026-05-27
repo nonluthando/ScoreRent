@@ -106,38 +106,42 @@ def results_page(
 
     return templates.TemplateResponse(
 
-        "results.html",
+    "results.html",
 
-        {
+    {
 
-            "request":
-                request,
+        "request":
+            request,
 
-            "user":
-                user,
+        "user":
+            user,
 
-            "evaluation":
-                result[
-                    "evaluation"
-                ],
+        "evaluation":
+            result[
+                "evaluation"
+            ],
 
-            "listing":
-                result[
-                    "listing"
-                ],
+        "listing":
+            result[
+                "listing"
+            ],
 
-            "reasons":
-                result[
-                    "reasons"
-                ],
+        "reasons":
+            result[
+                "reasons"
+            ],
 
-            "actions":
-                result[
-                    "actions"
-                ],
-        },
-    )
+        "actions":
+            result[
+                "actions"
+            ],
 
+        "bands":
+            result[
+                "bands"
+            ],
+    },
+)
 
 # ---------------------------------------------------------
 # Evaluation page
