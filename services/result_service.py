@@ -106,20 +106,21 @@ def map_result(
             actions,
     }
 
-
 def load_listing(
     evaluation,
 ):
-    """
-    Parse listing payload.
-    """
-
     payload = evaluation.get(
         "listing_json"
     )
 
     if not payload:
         return {}
+
+    if isinstance(
+        payload,
+        dict,
+    ):
+        return payload
 
     return json.loads(
         payload
@@ -129,17 +130,18 @@ def load_listing(
 def load_reasons(
     evaluation,
 ):
-    """
-    Parse recommendation
-    reasons.
-    """
-
     payload = evaluation.get(
         "reasons_json"
     )
 
     if not payload:
         return []
+
+    if isinstance(
+        payload,
+        list,
+    ):
+        return payload
 
     return json.loads(
         payload
@@ -149,17 +151,18 @@ def load_reasons(
 def load_actions(
     evaluation,
 ):
-    """
-    Parse recommended
-    actions.
-    """
-
     payload = evaluation.get(
         "actions_json"
     )
 
     if not payload:
         return []
+
+    if isinstance(
+        payload,
+        list,
+    ):
+        return payload
 
     return json.loads(
         payload
