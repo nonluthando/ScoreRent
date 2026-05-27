@@ -21,44 +21,38 @@ def get_result(
 
         with conn.cursor() as cur:
 
-            print(
+    cur.execute(
+        """
+        SELECT *
 
-                "LOOKUP",
+        FROM evaluations
 
-                evaluation_id,
+        WHERE
 
-                user_id,
-            )
+            id=%s
 
-            cur.execute(
-                """
-                SELECT *
+        AND
 
-                FROM evaluations
+            user_id=%s
+        """,
+        (
+            evaluation_id,
+            user_id,
+        ),
+    )
 
-                WHERE
+    row = cur.fetchone()
 
-                    id=%s
+    print(
+        "LOOKUP",
+        evaluation_id,
+        user_id,
+    )
 
-                AND
-
-                    user_id=%s
-                """,
-                (
-                    evaluation_id,
-
-                    user_id,
-                ),
-            )
-
-            row = (
-                cur.fetchone()
-            )
-
-            print(
-                "ROW",
-                row,
-            )
+    print(
+        "ROW",
+        row,
+    )
 
         if not row:
             return None
