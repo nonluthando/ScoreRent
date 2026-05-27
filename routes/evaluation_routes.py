@@ -1,5 +1,3 @@
-import json
-
 from fastapi import (
     APIRouter,
     Request,
@@ -56,9 +54,6 @@ templates = Jinja2Templates(
 def require_user(
     request: Request,
 ):
-    """
-    Require authenticated user.
-    """
 
     return get_current_user(
         request
@@ -77,9 +72,6 @@ def results_page(
 
     evaluation_id: int,
 ):
-    """
-    Display evaluation results.
-    """
 
     user = require_user(
         request
@@ -149,9 +141,6 @@ def results_page(
 def evaluate_page(
     request: Request,
 ):
-    """
-    Evaluation form.
-    """
 
     user = get_current_user(
         request
@@ -183,10 +172,10 @@ def evaluate_page(
                 ]
             )
 
-            renter_docs = json.loads(
+            renter_docs = (
                 profile[
                     "documents_json"
-                ]
+                ] or []
             )
 
             is_bursary_student = bool(
@@ -265,9 +254,6 @@ def evaluate_post(
     required_documents:
     list[str] = Form([]),
 ):
-    """
-    Execute evaluation.
-    """
 
     user = get_current_user(
         request
@@ -309,10 +295,10 @@ def evaluate_post(
                 ]
             )
 
-            renter_docs = json.loads(
+            renter_docs = (
                 profile[
                     "documents_json"
-                ]
+                ] or []
             )
 
     result, bands = evaluate(
