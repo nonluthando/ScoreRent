@@ -60,7 +60,6 @@ def normalize_profile(
         return {
 
             "docs_selected": [],
-
             "renter_type":
                 "worker",
 
@@ -75,11 +74,9 @@ def normalize_profile(
 
         "docs_selected":
 
-            json.loads(
-                profile[
-                    "documents_json"
-                ]
-            ),
+            profile[
+                "documents_json"
+            ] or [],
 
         "renter_type":
 
