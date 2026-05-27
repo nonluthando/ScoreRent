@@ -339,30 +339,32 @@ def evaluate_post(
         area_demand=
             area_demand,
     )
+listing = create_listing_payload(
 
-    listing = create_listing_payload(
+    listing_name=
+        listing_name,
 
-        listing_name=
-            listing_name,
+    rent=rent,
 
-        rent=rent,
+    deposit=deposit,
 
-        deposit=deposit,
+    application_fee=
+        application_fee,
 
-        application_fee=
-            application_fee,
+    required_documents=
+        required_documents,
 
-        required_documents=
-            required_documents,
+    area_demand=
+        area_demand,
 
-        area_demand=
-            area_demand,
+    guarantor_monthly_income=0,
 
-        guarantor_monthly_income=0,
+    breakdown=
+        result.breakdown,
 
-        breakdown=
-            result.breakdown,
-    )
+    budget_bands=
+        bands,
+)
 
     if not user:
 
