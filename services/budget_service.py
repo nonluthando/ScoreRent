@@ -6,8 +6,10 @@ from config import (
 
 
 def calculate_budget_guidance(
-    income: float,
+    income: float | None,
 ):
+
+    income = income or 0
 
     recommended = round(
         income *
