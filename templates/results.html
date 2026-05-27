@@ -55,7 +55,72 @@
       <li><strong>Demand:</strong> {{ listing.area_demand }}</li>
     </ul>
   </div>
+  <!-- Budget guidance -->
+  {% if bands %}
+  <div class="card">
+    <h3>Budget guidance</h3>
 
+    <ul class="list">
+
+      <li>
+
+        <strong>
+
+          Conservative:
+
+        </strong>
+
+        R{{ bands.conservative }}
+
+      </li>
+
+      <li>
+
+        <strong>
+
+          Recommended:
+
+        </strong>
+
+        R{{ bands.recommended }}
+
+      </li>
+
+      <li>
+
+        <strong>
+
+          Stretch:
+
+        </strong>
+
+        R{{ bands.stretch }}
+
+      </li>
+
+      <li>
+
+        <strong>
+
+          High risk:
+
+        </strong>
+
+        R{{ bands.high_risk }}+
+
+      </li>
+
+    </ul>
+
+    <div class="muted small">
+
+      These ranges help estimate safer rental targets
+      based on your income profile.
+
+    </div>
+
+  </div>
+  {% endif %}
   <!-- Reasons (pill look) -->
   <div class="card">
     <h3>Reasons</h3>
