@@ -7,23 +7,16 @@ from evaluator import evaluate, EvaluationResult
 # ------------------------------------------------------------
 
 def assert_score_range(result, low, high):
-    assert low <= result.score <= high, \
-        f"Score {result.score} not in range [{low},{high}]"
+    assert low <= result.score <= high, f"Score {result.score} not in range [{low},{high}]"
 
 
 def assert_reason_contains(result, text):
-    assert any(
-        text.lower() in r.lower()
-        for r in result.reasons
-    ), \
+    assert any(text.lower() in r.lower() for r in result.reasons), \
         f"Expected reason containing '{text}', got {result.reasons}"
 
 
 def assert_action_contains(result, text):
-    assert any(
-        text.lower() in a.lower()
-        for a in result.actions
-    ), \
+    assert any(text.lower() in a.lower() for a in result.actions), \
         f"Expected action containing '{text}', got {result.actions}"
 
 
@@ -36,10 +29,7 @@ def test_worker_safe_affordability():
     result, bands = evaluate(
         renter_type="worker",
         monthly_income=30000,
-        renter_docs=[
-            "bank statement",
-            "payslip",
-        ],
+        renter_docs=["bank statement", "payslip"],
         rent=8000,
         deposit=8000,
         application_fee=500,
@@ -49,11 +39,7 @@ def test_worker_safe_affordability():
 
     assert result.verdict == "WORTH_APPLYING"
     assert result.confidence == "HIGH"
-
-    assert_reason_contains(
-        result,
-        "recommended affordability",
-    )
+    assert_reason_contains(result, "within safe approval range")
 
 
 def test_worker_extreme_affordability_penalty():
@@ -61,10 +47,7 @@ def test_worker_extreme_affordability_penalty():
     result, _ = evaluate(
         renter_type="worker",
         monthly_income=15000,
-        renter_docs=[
-            "bank statement",
-            "payslip",
-        ],
+        renter_docs=["bank statement", "payslip"],
         rent=9000,
         deposit=9000,
         application_fee=500,
@@ -73,11 +56,7 @@ def test_worker_extreme_affordability_penalty():
     )
 
     assert result.verdict == "NOT_WORTH_IT"
-
-    assert_reason_contains(
-        result,
-        "recommended approval range",
-    )
+    assert_reason_contains(result, "far above typical approval range")
 
 
 # ------------------------------------------------------------
@@ -89,10 +68,7 @@ def test_high_demand_penalty_applies():
     result, _ = evaluate(
         renter_type="worker",
         monthly_income=30000,
-        renter_docs=[
-            "bank statement",
-            "payslip",
-        ],
+        renter_docs=["bank statement", "payslip"],
         rent=8000,
         deposit=8000,
         application_fee=0,
@@ -100,12 +76,7 @@ def test_high_demand_penalty_applies():
         area_demand="HIGH",
     )
 
-    assert any(
-        "High demand area"
-        in b["title"]
-
-        for b in result.breakdown
-    )
+    assert any("High demand area" in b["title"] for b in result.breakdown)
 
 
 def test_low_demand_bonus_applies():
@@ -113,10 +84,7 @@ def test_low_demand_bonus_applies():
     result, _ = evaluate(
         renter_type="worker",
         monthly_income=30000,
-        renter_docs=[
-            "bank statement",
-            "payslip",
-        ],
+        renter_docs=["bank statement", "payslip"],
         rent=8000,
         deposit=8000,
         application_fee=0,
@@ -124,12 +92,7 @@ def test_low_demand_bonus_applies():
         area_demand="LOW",
     )
 
-    assert any(
-        "Low demand area"
-        in b["title"]
-
-        for b in result.breakdown
-    )
+    assert any("Low demand area" in b["title"] for b in result.breakdown)
 
 
 # ------------------------------------------------------------
@@ -141,24 +104,15 @@ def test_missing_required_documents_penalty():
     result, _ = evaluate(
         renter_type="worker",
         monthly_income=30000,
-        renter_docs=[
-            "bank statement",
-        ],
+        renter_docs=["bank statement"],
         rent=8000,
         deposit=8000,
         application_fee=0,
-        required_documents=[
-            "payslip",
-        ],
+        required_documents=["payslip"],
         area_demand="MEDIUM",
     )
 
-    assert any(
-        "Missing required documents"
-        in b["title"]
-
-        for b in result.breakdown
-    )
+    assert any("Missing required documents" in b["title"] for b in result.breakdown)
 
 
 # ------------------------------------------------------------
@@ -170,9 +124,7 @@ def test_bursary_full_coverage_bonus():
     result, _ = evaluate(
         renter_type="student",
         monthly_income=9000,
-        renter_docs=[
-            "nsfas award letter",
-        ],
+        renter_docs=["nsfas award letter"],
         rent=7000,
         deposit=7000,
         application_fee=0,
@@ -181,10 +133,7 @@ def test_bursary_full_coverage_bonus():
         is_bursary_student=True,
     )
 
-    assert result.verdict in [
-        "WORTH_APPLYING",
-        "BORDERLINE",
-    ]
+    assert result.verdict in ["WORTH_APPLYING", "BORDERLINE"]
 
 
 def test_bursary_shortfall_requires_guarantor():
@@ -192,9 +141,7 @@ def test_bursary_shortfall_requires_guarantor():
     result, _ = evaluate(
         renter_type="student",
         monthly_income=5000,
-        renter_docs=[
-            "nsfas award letter",
-        ],
+        renter_docs=["nsfas award letter"],
         rent=8000,
         deposit=8000,
         application_fee=0,
@@ -203,10 +150,7 @@ def test_bursary_shortfall_requires_guarantor():
         is_bursary_student=True,
     )
 
-    assert_action_contains(
-        result,
-        "guarantor income",
-    )
+    assert_action_contains(result, "guarantor income")
 
 
 def test_missing_bursary_letter_penalty():
@@ -223,14 +167,11 @@ def test_missing_bursary_letter_penalty():
         is_bursary_student=True,
     )
 
-    assert_reason_contains(
-        result,
-        "bursary",
-    )
+    assert_reason_contains(result, "bursary award letter is missing")
 
 
 # ------------------------------------------------------------
-# Non-bursary student tests
+# Non-bursary student guarantor tests
 # ------------------------------------------------------------
 
 def test_non_bursary_student_with_strong_guarantor_has_no_penalty():
@@ -252,11 +193,7 @@ def test_non_bursary_student_with_strong_guarantor_has_no_penalty():
         is_bursary_student=False,
     )
 
-    assert_reason_contains(
-        result,
-        "financially qualified guarantor",
-    )
-
+    assert_reason_contains(result, "financially qualified guarantor")
     assert result.score >= 75
 
 
@@ -275,11 +212,7 @@ def test_non_bursary_student_missing_guarantor_penalty():
         is_bursary_student=False,
     )
 
-    assert_reason_contains(
-        result,
-        "guarantor support",
-    )
-
+    assert_reason_contains(result, "require full guarantor support")
     assert result.score <= 60
 
 
@@ -302,13 +235,76 @@ def test_non_bursary_student_guarantor_income_used_for_affordability():
         is_bursary_student=False,
     )
 
-    assert bands["recommended"] == int(
-        30000 * 0.33
-    )
+    assert bands["recommended"] == int(30000 * 0.33)
 
 
 # ------------------------------------------------------------
-# Zero income
+# Verdict threshold tests
+# ------------------------------------------------------------
+
+def test_high_score_returns_high_confidence():
+
+    result, _ = evaluate(
+        renter_type="worker",
+        monthly_income=40000,
+        renter_docs=["bank statement", "payslip"],
+        rent=8000,
+        deposit=8000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+    )
+
+    assert result.confidence == "HIGH"
+
+
+def test_low_score_returns_low_confidence():
+
+    result, _ = evaluate(
+        renter_type="worker",
+        monthly_income=10000,
+        renter_docs=["bank statement"],
+        rent=8000,
+        deposit=8000,
+        application_fee=0,
+        required_documents=["payslip"],
+        area_demand="HIGH",
+    )
+
+    assert result.confidence == "LOW"
+    # ------------------------------------------------------------
+# Proportional affordability behaviour
+# ------------------------------------------------------------
+
+def test_affordability_penalty_is_monotonic():
+
+    lower_rent, _ = evaluate(
+        renter_type="worker",
+        monthly_income=20000,
+        renter_docs=["bank statement", "payslip"],
+        rent=7000,   # 35%
+        deposit=0,
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+    )
+
+    higher_rent, _ = evaluate(
+        renter_type="worker",
+        monthly_income=20000,
+        renter_docs=["bank statement", "payslip"],
+        rent=8000,   # 40%
+        deposit=0,
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+    )
+
+    assert higher_rent.score < lower_rent.score
+
+
+# ------------------------------------------------------------
+# Zero income safety
 # ------------------------------------------------------------
 
 def test_zero_income_does_not_crash_and_penalises():
@@ -316,9 +312,7 @@ def test_zero_income_does_not_crash_and_penalises():
     result, _ = evaluate(
         renter_type="worker",
         monthly_income=0,
-        renter_docs=[
-            "bank statement",
-        ],
+        renter_docs=["bank statement"],
         rent=6000,
         deposit=0,
         application_fee=0,
@@ -327,10 +321,11 @@ def test_zero_income_does_not_crash_and_penalises():
     )
 
     assert result.score >= 0
+    assert result.verdict == "NOT_WORTH_IT"
 
 
 # ------------------------------------------------------------
-# Upfront burden
+# Upfront burden warnings (no penalty)
 # ------------------------------------------------------------
 
 def test_upfront_burden_adds_warning_not_penalty():
@@ -338,10 +333,7 @@ def test_upfront_burden_adds_warning_not_penalty():
     normal, _ = evaluate(
         renter_type="worker",
         monthly_income=30000,
-        renter_docs=[
-            "bank statement",
-            "payslip",
-        ],
+        renter_docs=["bank statement", "payslip"],
         rent=8000,
         deposit=8000,
         application_fee=0,
@@ -352,15 +344,56 @@ def test_upfront_burden_adds_warning_not_penalty():
     heavy_upfront, _ = evaluate(
         renter_type="worker",
         monthly_income=30000,
-        renter_docs=[
-            "bank statement",
-            "payslip",
-        ],
+        renter_docs=["bank statement", "payslip"],
         rent=8000,
-        deposit=90000,
+        deposit=90000,   # extreme upfront
         application_fee=0,
         required_documents=[],
         area_demand="MEDIUM",
     )
 
     assert heavy_upfront.score == normal.score
+    assert_reason_contains(heavy_upfront, "Upfront cost")
+
+
+# ------------------------------------------------------------
+# Score clamping
+# ------------------------------------------------------------
+
+def test_score_never_negative():
+
+    result, _ = evaluate(
+        renter_type="worker",
+        monthly_income=10000,
+        renter_docs=[],
+        rent=20000,
+        deposit=0,
+        application_fee=0,
+        required_documents=["payslip"],
+        area_demand="HIGH",
+    )
+
+    assert result.score >= 0
+
+
+def test_score_never_exceeds_100():
+
+    result, _ = evaluate(
+        renter_type="student",
+        monthly_income=20000,
+        renter_docs=[
+            "guarantor letter",
+            "guarantor payslip",
+            "guarantor bank statement",
+        ],
+        rent=2000,
+        deposit=0,
+        application_fee=0,
+        required_documents=[],
+        area_demand="LOW",
+        guarantor_monthly_income=50000,
+        is_bursary_student=False,
+    )
+
+    assert result.score <= 100
+       
