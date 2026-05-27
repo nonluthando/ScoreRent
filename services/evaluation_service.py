@@ -182,9 +182,21 @@ def create_listing_payload(
     guarantor_monthly_income: int,
 
     breakdown,
+
+    budget_bands,
 ):
     """
     Build evaluation payload.
+
+    Stores:
+
+    - listing inputs
+    - breakdown snapshot
+    - budget guidance snapshot
+
+    This keeps evaluations reproducible
+    and avoids recalculating guidance
+    later.
     """
 
     return {
@@ -193,10 +205,14 @@ def create_listing_payload(
             listing_name.strip(),
 
         "rent":
-            int(rent),
+            int(
+                rent
+            ),
 
         "deposit":
-            int(deposit),
+            int(
+                deposit
+            ),
 
         "application_fee":
             int(
@@ -216,6 +232,9 @@ def create_listing_payload(
 
         "breakdown":
             breakdown,
+
+        "budget_bands":
+            budget_bands,
     }
 
 
