@@ -13,22 +13,6 @@ def get_result(
     """
     Retrieve evaluation result
     owned by a user.
-
-    Ownership validation is
-    enforced.
-
-    Args:
-
-        evaluation_id:
-            Result identifier
-
-        user_id:
-            Current user
-
-    Returns:
-
-        mapped result
-        or None
     """
 
     conn = get_conn()
@@ -36,6 +20,15 @@ def get_result(
     try:
 
         with conn.cursor() as cur:
+
+            print(
+
+                "LOOKUP",
+
+                evaluation_id,
+
+                user_id,
+            )
 
             cur.execute(
                 """
@@ -62,6 +55,11 @@ def get_result(
                 cur.fetchone()
             )
 
+            print(
+                "ROW",
+                row,
+            )
+
         if not row:
             return None
 
@@ -72,7 +70,6 @@ def get_result(
     finally:
 
         conn.close()
-
 
 def map_result(
     evaluation,
