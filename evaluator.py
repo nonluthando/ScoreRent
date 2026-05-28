@@ -17,12 +17,6 @@ The evaluator returns:
 - actionable recommendations
 - transparent scoring breakdown
 
-Designed for:
-
-- prop-tech platforms
-- rental marketplaces
-- tenant pre-screening systems
-- affordability advisory tools
 """
 
 from dataclasses import dataclass
