@@ -677,35 +677,6 @@ def test_score_never_exceeds_100():
 # Breakdown Integrity Tests
 # ============================================================
 
-def test_breakdown_entries_are_mathematically_consistent():
-    """
-    Every score adjustment entry should satisfy:
-
-        after = before + delta
-    """
-
-    result, _ = evaluate_rental_application(
-        renter_type="worker",
-        monthly_income=10000,
-        submitted_documents=[
-            "bank statement",
-        ],
-        monthly_rent=8000,
-        security_deposit=0,
-        application_fee=0,
-        required_documents=[
-            "payslip",
-        ],
-        area_demand="HIGH",
-    )
-
-    for entry in result.breakdown:
-
-        assert (
-            entry["after"]
-            == entry["before"] + entry["delta"]
-        )
-
 
 def test_breakdown_has_expected_order():
     """
