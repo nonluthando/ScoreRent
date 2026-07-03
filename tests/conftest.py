@@ -8,10 +8,16 @@ from fastapi.testclient import TestClient
 # ------------------------------------------------------------------
 
 os.environ["DATABASE_URL"] = (
-    "postgresql://scorerent:scorerent@localhost:5432/scorerent_test"
+    os.getenv(
+        "TEST_DATABASE_URL",
+        "postgresql://scorerent:scorerent@test-db:5432/scorerent_test",
+    )
 )
 
-os.environ["SECRET_KEY"] = "test-secret-key"
+os.environ.setdefault(
+    "SECRET_KEY",
+    "test-secret-key",
+)
 
 from database import get_conn, init_db
 from main import app
@@ -70,10 +76,6 @@ def clean_database():
 
 @pytest.fixture
 def worker_payload():
-    """
-    Standard worker payload.
-    """
-
     return {
         "renter_type": "worker",
         "monthly_income": 30000,
@@ -91,10 +93,6 @@ def worker_payload():
 
 @pytest.fixture
 def student_payload():
-    """
-    Standard bursary student payload.
-    """
-
     return {
         "renter_type": "student",
         "monthly_income": 9000,
