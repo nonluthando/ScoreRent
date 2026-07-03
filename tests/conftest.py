@@ -8,10 +8,8 @@ from fastapi.testclient import TestClient
 # ------------------------------------------------------------------
 
 os.environ["DATABASE_URL"] = (
-    os.getenv(
-        "TEST_DATABASE_URL",
-        "postgresql://scorerent:scorerent@test-db:5432/scorerent_test",
-    )
+    "postgresql://scorerent:scorerent@db:5432/scorerent"
+)
 )
 
 os.environ.setdefault(
