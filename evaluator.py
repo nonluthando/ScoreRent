@@ -36,6 +36,32 @@ class RenterType(str, Enum):
     NEW_PROFESSIONAL = "new_professional"
     STUDENT = "student"
 
+# ============================================================
+# Required Document Clusters
+# ============================================================
+
+REQUIRED_DOCUMENT_CLUSTERS = {
+    RenterType.WORKER.value: [
+        "bank statement",
+        "payslip",
+        "employment letter",
+    ],
+    RenterType.NEW_PROFESSIONAL.value: [
+        "employment contract",
+        "offer letter",
+        "bank statement",
+        "guarantor letter",
+    ],
+    RenterType.STUDENT.value: [
+        "bursary award letter",
+        "nsfas award letter",
+        "bursary confirmation",
+        "proof of registration",
+        "student ID",
+        "guarantor letter",
+    ],
+}
+
 
 class DemandLevel(str, Enum):
     LOW = "LOW"

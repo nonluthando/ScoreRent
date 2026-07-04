@@ -8,6 +8,26 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: scorerent
+          POSTGRES_PASSWORD: scorerent
+          POSTGRES_DB: scorerent
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U scorerent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://scorerent:scorerent@localhost:5432/scorerent
+      SECRET_KEY: test-secret-key
+      PYTHONPATH: .
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,7 +44,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          PYTHONPATH=. pytest -q --cov=. --cov-report=term-missing --cov-report=xml
+          pytest -q --cov=. --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4

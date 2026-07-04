@@ -5,6 +5,7 @@ python-multipart==0.0.20
 itsdangerous==2.2.0
 pytest
 pytest-cov
+httpx
 psycopg[binary]==3.2.3
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
