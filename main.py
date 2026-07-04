@@ -39,15 +39,35 @@ app.include_router(api_router)
 
 
 # ============================================================
+# Utility Helpers
+# ============================================================
+
+def load_json_field(value, fallback=None):
+    """
+    Safely load JSON fields from PostgreSQL.
+
+    psycopg may return JSON/JSONB columns as Python dict/list already.
+    This helper prevents json.loads() from crashing when that happens.
+    """
+
+    if fallback is None:
+        fallback = {}
+
+    if value is None:
+        return fallback
+
+    if isinstance(value, (dict, list)):
+        return value
+
+    return json.loads(value)
+
+
+# ============================================================
 # Application Startup
 # ============================================================
 
 @app.on_event("startup")
 def initialize_application():
-    """
-    Initialize database tables during application startup.
-    """
-
     init_db()
 
 
@@ -56,10 +76,6 @@ def initialize_application():
 # ============================================================
 
 def require_authenticated_user(request: Request):
-    """
-    Retrieve currently authenticated user from session.
-    """
-
     return get_current_user(request)
 
 
@@ -69,10 +85,6 @@ def require_authenticated_user(request: Request):
 
 @app.get("/")
 def home_page(request: Request):
-    """
-    Render application landing page.
-    """
-
     current_user = get_current_user(request)
 
     return templates.TemplateResponse(
@@ -86,17 +98,10 @@ def home_page(request: Request):
 
 @app.get("/dashboard")
 def dashboard_page(request: Request):
-    """
-    Render authenticated user dashboard.
-    """
-
     current_user = require_authenticated_user(request)
 
     if not current_user:
-        return RedirectResponse(
-            "/login",
-            status_code=303,
-        )
+        return RedirectResponse("/login", status_code=303)
 
     db_connection = get_conn()
     db_cursor = db_connection.cursor()
@@ -133,17 +138,10 @@ def dashboard_page(request: Request):
 
 @app.get("/signup")
 def signup_page(request: Request):
-    """
-    Render signup page.
-    """
-
     current_user = get_current_user(request)
 
     if current_user:
-        return RedirectResponse(
-            "/dashboard",
-            status_code=303,
-        )
+        return RedirectResponse("/dashboard", status_code=303)
 
     return templates.TemplateResponse(
         "signup.html",
@@ -157,13 +155,9 @@ def create_account(
     email: str = Form(...),
     password: str = Form(...),
 ):
-    """
-    Create new user account.
-    """
+    email = email.strip().lower()
 
-    # bcrypt maximum supported length
     if len(password.encode("utf-8")) > 72:
-
         return templates.TemplateResponse(
             "signup.html",
             {
@@ -176,12 +170,11 @@ def create_account(
     existing_user = get_user_by_email(email)
 
     if existing_user:
-
         return templates.TemplateResponse(
             "signup.html",
             {
                 "request": request,
-                "error": "Email already registered.",
+                "error": "Email already registered. Please log in instead.",
             },
             status_code=400,
         )
@@ -190,10 +183,7 @@ def create_account(
 
     session_token = make_session_token(user_id)
 
-    response = RedirectResponse(
-        "/dashboard",
-        status_code=303,
-    )
+    response = RedirectResponse("/dashboard", status_code=303)
 
     response.set_cookie(
         "session",
@@ -211,17 +201,10 @@ def create_account(
 
 @app.get("/login")
 def login_page(request: Request):
-    """
-    Render login page.
-    """
-
     current_user = get_current_user(request)
 
     if current_user:
-        return RedirectResponse(
-            "/dashboard",
-            status_code=303,
-        )
+        return RedirectResponse("/dashboard", status_code=303)
 
     return templates.TemplateResponse(
         "login.html",
@@ -235,20 +218,14 @@ def authenticate_user(
     email: str = Form(...),
     password: str = Form(...),
 ):
-    """
-    Authenticate existing user.
-    """
+    email = email.strip().lower()
 
     existing_user = get_user_by_email(email)
 
     if (
         not existing_user
-        or not verify_password(
-            password,
-            existing_user["password_hash"],
-        )
+        or not verify_password(password, existing_user["password_hash"])
     ):
-
         return templates.TemplateResponse(
             "login.html",
             {
@@ -260,10 +237,7 @@ def authenticate_user(
 
     session_token = make_session_token(existing_user["id"])
 
-    response = RedirectResponse(
-        "/dashboard",
-        status_code=303,
-    )
+    response = RedirectResponse("/dashboard", status_code=303)
 
     response.set_cookie(
         "session",
@@ -277,17 +251,8 @@ def authenticate_user(
 
 @app.get("/logout")
 def logout_user(request: Request):
-    """
-    Logout authenticated user.
-    """
-
-    response = RedirectResponse(
-        "/",
-        status_code=303,
-    )
-
+    response = RedirectResponse("/", status_code=303)
     response.delete_cookie("session")
-
     return response
 
 
@@ -297,17 +262,10 @@ def logout_user(request: Request):
 
 @app.get("/profile")
 def profile_page(request: Request):
-    """
-    Render renter profile page.
-    """
-
     current_user = require_authenticated_user(request)
 
     if not current_user:
-        return RedirectResponse(
-            "/login",
-            status_code=303,
-        )
+        return RedirectResponse("/login", status_code=303)
 
     db_connection = get_conn()
     db_cursor = db_connection.cursor()
@@ -329,21 +287,17 @@ def profile_page(request: Request):
     db_connection.close()
 
     selected_documents = []
-
     renter_type = "worker"
-
     monthly_income = 0
-
     is_bursary_student = False
 
     if user_profile:
-
-        selected_documents = json.loads(
-            user_profile["documents_json"]
+        selected_documents = load_json_field(
+            user_profile["documents_json"],
+            [],
         )
 
         renter_type = user_profile["renter_type"]
-
         monthly_income = user_profile["monthly_income"]
 
         is_bursary_student = bool(
@@ -376,21 +330,12 @@ def save_profile(
     submitted_documents: list[str] = Form([]),
     is_bursary_student: str = Form("no"),
 ):
-    """
-    Save renter profile information.
-    """
-
     current_user = require_authenticated_user(request)
 
     if not current_user:
-        return RedirectResponse(
-            "/login",
-            status_code=303,
-        )
+        return RedirectResponse("/login", status_code=303)
 
-    renter_type = (
-        renter_type or "worker"
-    ).strip().lower()
+    renter_type = (renter_type or "worker").strip().lower()
 
     submitted_documents = [
         document.strip().lower()
@@ -398,9 +343,7 @@ def save_profile(
         if document and document.strip()
     ]
 
-    is_bursary_student = (
-        is_bursary_student == "yes"
-    )
+    is_bursary_student = is_bursary_student == "yes"
 
     db_connection = get_conn()
     db_cursor = db_connection.cursor()
@@ -432,10 +375,7 @@ def save_profile(
     db_cursor.close()
     db_connection.close()
 
-    return RedirectResponse(
-        "/evaluate",
-        status_code=303,
-    )
+    return RedirectResponse("/evaluate", status_code=303)
 
 
 # ============================================================
@@ -444,22 +384,14 @@ def save_profile(
 
 @app.get("/evaluate")
 def rental_evaluation_page(request: Request):
-    """
-    Render rental evaluation page.
-    """
-
     current_user = get_current_user(request)
 
     renter_type = "worker"
-
     monthly_income = 0
-
     submitted_documents: list[str] = []
-
     is_bursary_student = False
 
     if current_user:
-
         db_connection = get_conn()
         db_cursor = db_connection.cursor()
 
@@ -480,22 +412,16 @@ def rental_evaluation_page(request: Request):
         db_connection.close()
 
         if user_profile:
-
             renter_type = user_profile["renter_type"]
+            monthly_income = int(user_profile["monthly_income"])
 
-            monthly_income = int(
-                user_profile["monthly_income"]
-            )
-
-            submitted_documents = json.loads(
-                user_profile["documents_json"]
+            submitted_documents = load_json_field(
+                user_profile["documents_json"],
+                [],
             )
 
             is_bursary_student = bool(
-                user_profile.get(
-                    "is_bursary_student",
-                    False,
-                )
+                user_profile.get("is_bursary_student", False)
             )
 
     return templates.TemplateResponse(
@@ -522,56 +448,30 @@ def rental_evaluation_page(request: Request):
 @app.post("/evaluate")
 def evaluate_rental_listing(
     request: Request,
-
     listing_name: str = Form(""),
-
     rent: int = Form(...),
-
     deposit: int = Form(...),
-
     application_fee: int = Form(...),
-
     area_demand: str = Form("MEDIUM"),
-
     required_documents: list[str] = Form([]),
-
-    # Guest evaluation fields
     guest_renter_type: str = Form("worker"),
-
     guest_monthly_income: int = Form(0),
-
     guest_submitted_documents: list[str] = Form([]),
-
     guest_guarantor_monthly_income: int = Form(0),
-
     student_is_bursary: str = Form("no"),
 ):
-    """
-    Evaluate rental listing affordability and approval likelihood.
-    """
-
     current_user = get_current_user(request)
 
     renter_type = "worker"
-
     monthly_income = 0
-
     submitted_documents: list[str] = []
-
     guarantor_monthly_income = 0
-
     is_bursary_student = False
 
     profile_id = None
-
     user_id = None
 
-    # ========================================================
-    # Authenticated User Flow
-    # ========================================================
-
     if current_user:
-
         user_id = current_user["id"]
 
         db_connection = get_conn()
@@ -591,42 +491,25 @@ def evaluate_rental_listing(
         user_profile = db_cursor.fetchone()
 
         if user_profile:
-
             profile_id = user_profile["id"]
-
             renter_type = user_profile["renter_type"]
+            monthly_income = int(user_profile["monthly_income"])
 
-            monthly_income = int(
-                user_profile["monthly_income"]
-            )
-
-            submitted_documents = json.loads(
-                user_profile["documents_json"]
+            submitted_documents = load_json_field(
+                user_profile["documents_json"],
+                [],
             )
 
             is_bursary_student = bool(
-                user_profile.get(
-                    "is_bursary_student",
-                    False,
-                )
+                user_profile.get("is_bursary_student", False)
             )
 
         db_cursor.close()
         db_connection.close()
 
-    # ========================================================
-    # Guest Evaluation Flow
-    # ========================================================
-
     else:
-
-        renter_type = (
-            guest_renter_type or "worker"
-        ).strip().lower()
-
-        monthly_income = int(
-            guest_monthly_income or 0
-        )
+        renter_type = (guest_renter_type or "worker").strip().lower()
+        monthly_income = int(guest_monthly_income or 0)
 
         submitted_documents = [
             document.strip().lower()
@@ -638,9 +521,7 @@ def evaluate_rental_listing(
             guest_guarantor_monthly_income or 0
         )
 
-        is_bursary_student = (
-            student_is_bursary == "yes"
-        )
+        is_bursary_student = student_is_bursary == "yes"
 
     required_documents = [
         document.strip().lower()
@@ -648,14 +529,7 @@ def evaluate_rental_listing(
         if document and document.strip()
     ]
 
-    # ========================================================
-    # Run Evaluation Engine
-    # ========================================================
-
-    (
-        evaluation_result,
-        recommended_budget_bands,
-    ) = evaluate_rental_application(
+    evaluation_result, recommended_budget_bands = evaluate_rental_application(
         renter_type=renter_type,
         monthly_income=int(monthly_income),
         submitted_documents=submitted_documents,
@@ -664,9 +538,7 @@ def evaluate_rental_listing(
         application_fee=int(application_fee),
         required_documents=required_documents,
         area_demand=area_demand,
-        guarantor_monthly_income=int(
-            guarantor_monthly_income
-        ),
+        guarantor_monthly_income=int(guarantor_monthly_income),
         is_bursary_student=is_bursary_student,
     )
 
@@ -677,18 +549,11 @@ def evaluate_rental_listing(
         "application_fee": int(application_fee),
         "required_documents": required_documents,
         "area_demand": area_demand,
-        "guarantor_monthly_income": int(
-            guarantor_monthly_income
-        ),
+        "guarantor_monthly_income": int(guarantor_monthly_income),
         "breakdown": evaluation_result.breakdown,
     }
 
-    # ========================================================
-    # Guest Results
-    # ========================================================
-
     if not current_user:
-
         return templates.TemplateResponse(
             "guest_results.html",
             {
@@ -700,10 +565,6 @@ def evaluate_rental_listing(
                 "guest": True,
             },
         )
-
-    # ========================================================
-    # Persist Evaluation
-    # ========================================================
 
     if not listing_name.strip():
         listing_name = f"Listing (R{rent})"
@@ -775,17 +636,10 @@ def evaluation_results_page(
     request: Request,
     evaluation_id: int,
 ):
-    """
-    Render evaluation results page.
-    """
-
     current_user = require_authenticated_user(request)
 
     if not current_user:
-        return RedirectResponse(
-            "/login",
-            status_code=303,
-        )
+        return RedirectResponse("/login", status_code=303)
 
     db_connection = get_conn()
     db_cursor = db_connection.cursor()
@@ -809,21 +663,21 @@ def evaluation_results_page(
     db_connection.close()
 
     if not evaluation_record:
-        return RedirectResponse(
-            "/history",
-            status_code=303,
-        )
+        return RedirectResponse("/history", status_code=303)
 
-    listing_snapshot = json.loads(
-        evaluation_record["listing_json"]
+    listing_snapshot = load_json_field(
+        evaluation_record["listing_json"],
+        {},
     )
 
-    evaluation_reasons = json.loads(
-        evaluation_record["reasons_json"]
+    evaluation_reasons = load_json_field(
+        evaluation_record["reasons_json"],
+        [],
     )
 
-    evaluation_actions = json.loads(
-        evaluation_record["actions_json"]
+    evaluation_actions = load_json_field(
+        evaluation_record["actions_json"],
+        [],
     )
 
     return templates.TemplateResponse(
@@ -840,72 +694,15 @@ def evaluation_results_page(
 
 
 # ============================================================
-# History Routes
-# ============================================================
-
-@app.get("/history")
-def evaluation_history_page(request: Request):
-    """
-    Render authenticated user's evaluation history.
-    """
-
-    current_user = require_authenticated_user(request)
-
-    if not current_user:
-        return RedirectResponse(
-            "/login",
-            status_code=303,
-        )
-
-    db_connection = get_conn()
-    db_cursor = db_connection.cursor()
-
-    db_cursor.execute(
-        """
-        SELECT
-            id,
-            listing_name,
-            score,
-            verdict,
-            confidence,
-            created_at
-        FROM evaluations
-        WHERE user_id = %s
-        ORDER BY created_at DESC
-        """,
-        (current_user["id"],),
-    )
-
-    evaluation_history = db_cursor.fetchall()
-
-    db_cursor.close()
-    db_connection.close()
-
-    return templates.TemplateResponse(
-        "history.html",
-        {
-            "request": request,
-            "user": current_user,
-            "evaluations": evaluation_history,
-        },
-    )
-    # ============================================================
 # Compare Routes
 # ============================================================
 
 @app.get("/compare")
 def compare_evaluations_page(request: Request):
-    """
-    Render comparison page for the user's latest evaluations.
-    """
-
     current_user = require_authenticated_user(request)
 
     if not current_user:
-        return RedirectResponse(
-            "/login",
-            status_code=303,
-        )
+        return RedirectResponse("/login", status_code=303)
 
     db_connection = get_conn()
     db_cursor = db_connection.cursor()
@@ -937,8 +734,8 @@ def compare_evaluations_page(request: Request):
     items = []
 
     for row in evaluation_rows:
-        listing = json.loads(row["listing_json"])
-        reasons = json.loads(row["reasons_json"])
+        listing = load_json_field(row["listing_json"], {})
+        reasons = load_json_field(row["reasons_json"], [])
 
         items.append(
             {
@@ -962,5 +759,50 @@ def compare_evaluations_page(request: Request):
             "request": request,
             "user": current_user,
             "items": items,
+        },
+    )
+
+
+# ============================================================
+# History Routes
+# ============================================================
+
+@app.get("/history")
+def evaluation_history_page(request: Request):
+    current_user = require_authenticated_user(request)
+
+    if not current_user:
+        return RedirectResponse("/login", status_code=303)
+
+    db_connection = get_conn()
+    db_cursor = db_connection.cursor()
+
+    db_cursor.execute(
+        """
+        SELECT
+            id,
+            listing_name,
+            score,
+            verdict,
+            confidence,
+            created_at
+        FROM evaluations
+        WHERE user_id = %s
+        ORDER BY created_at DESC
+        """,
+        (current_user["id"],),
+    )
+
+    evaluation_history = db_cursor.fetchall()
+
+    db_cursor.close()
+    db_connection.close()
+
+    return templates.TemplateResponse(
+        "history.html",
+        {
+            "request": request,
+            "user": current_user,
+            "evaluations": evaluation_history,
         },
     )
