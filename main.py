@@ -889,3 +889,78 @@ def evaluation_history_page(request: Request):
             "evaluations": evaluation_history,
         },
     )
+    # ============================================================
+# Compare Routes
+# ============================================================
+
+@app.get("/compare")
+def compare_evaluations_page(request: Request):
+    """
+    Render comparison page for the user's latest evaluations.
+    """
+
+    current_user = require_authenticated_user(request)
+
+    if not current_user:
+        return RedirectResponse(
+            "/login",
+            status_code=303,
+        )
+
+    db_connection = get_conn()
+    db_cursor = db_connection.cursor()
+
+    db_cursor.execute(
+        """
+        SELECT
+            id,
+            listing_name,
+            score,
+            verdict,
+            confidence,
+            listing_json,
+            reasons_json,
+            created_at
+        FROM evaluations
+        WHERE user_id = %s
+        ORDER BY created_at DESC
+        LIMIT 3
+        """,
+        (current_user["id"],),
+    )
+
+    evaluation_rows = db_cursor.fetchall()
+
+    db_cursor.close()
+    db_connection.close()
+
+    items = []
+
+    for row in evaluation_rows:
+        listing = json.loads(row["listing_json"])
+        reasons = json.loads(row["reasons_json"])
+
+        items.append(
+            {
+                "id": row["id"],
+                "listing_name": row["listing_name"] or "Unnamed listing",
+                "score": row["score"],
+                "verdict": row["verdict"],
+                "confidence": row["confidence"],
+                "rent": listing.get("rent", 0),
+                "deposit": listing.get("deposit", 0),
+                "application_fee": listing.get("application_fee", 0),
+                "demand": listing.get("area_demand", "MEDIUM"),
+                "top_reason": reasons[0] if reasons else "No reason available",
+                "created_at": row["created_at"],
+            }
+        )
+
+    return templates.TemplateResponse(
+        "compare.html",
+        {
+            "request": request,
+            "user": current_user,
+            "items": items,
+        },
+    )
