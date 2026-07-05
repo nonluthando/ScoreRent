@@ -1,67 +1,68 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2>Dashboard</h2>
-
-<p class="muted">
-    Welcome back, {{ user.email }}.
-</p>
+<section class="page-header">
+  <h2>Dashboard</h2>
+  <p class="muted">Welcome back, {{ user.email }}.</p>
+</section>
 
 {% if last_eval %}
 
-<div class="card">
+<div class="card dashboard-card">
 
-    <h3>Latest Evaluation</h3>
-
-    <ul class="list">
-        <li><strong>Listing:</strong> {{ last_eval.listing_name or "Unnamed listing" }}</li>
-        <li><strong>Score:</strong> {{ last_eval.score }}/100</li>
-        <li><strong>Verdict:</strong> {{ last_eval.verdict }}</li>
-        <li><strong>Confidence:</strong> {{ last_eval.confidence }}</li>
-        <li><strong>Date:</strong> {{ last_eval.created_at }}</li>
-    </ul>
-
-    <div class="actionsRow">
-
-        <a class="btn" href="/results/{{ last_eval.id }}">
-            View Results
-        </a>
-
-        <a class="btn ghost" href="/evaluate">
-            New Evaluation
-        </a>
-
-        <a class="btn ghost" href="/history">
-            History
-        </a>
-
-        <a class="btn ghost" href="/compare">
-            Compare Listings
-        </a>
-
+  <div class="card-header-row">
+    <div>
+      <p class="eyebrow">Latest evaluation</p>
+      <h3>{{ last_eval.listing_name or "Unnamed listing" }}</h3>
     </div>
+
+    <div class="score-badge">
+      {{ last_eval.score }}/100
+    </div>
+  </div>
+
+  <div class="eval-summary">
+    <div>
+      <span class="label">Verdict</span>
+      <strong>{{ last_eval.verdict }}</strong>
+    </div>
+
+    <div>
+      <span class="label">Confidence</span>
+      <strong>{{ last_eval.confidence }}</strong>
+    </div>
+
+    <div>
+      <span class="label">Date</span>
+      <strong>{{ last_eval.created_at }}</strong>
+    </div>
+  </div>
+
+  <div class="actionsRow compact">
+    <a class="btn" href="/results/{{ last_eval.id }}">View results</a>
+    <a class="btn ghost" href="/evaluate">New evaluation</a>
+    <a class="btn ghost" href="/history">History</a>
+    <a class="btn ghost" href="/compare">Compare</a>
+  </div>
 
 </div>
 
 {% else %}
 
-<div class="card">
+<div class="card dashboard-card">
 
-    <h3>Welcome to ScoreRent</h3>
+  <p class="eyebrow">Get started</p>
 
-    <p class="muted">
-        You haven't evaluated any rental listings yet.
-        Start your first evaluation to receive a score, personalised recommendations,
-        and save your results for future comparison.
-    </p>
+  <h3>Welcome to ScoreRent</h3>
 
-    <div class="actionsRow">
+  <p class="muted">
+    You have not evaluated any rental listings yet. Start your first evaluation
+    to get a score, verdict, reasons, and recommended next steps.
+  </p>
 
-        <a class="btn" href="/evaluate">
-            Start Evaluation
-        </a>
-
-    </div>
+  <div class="actionsRow compact single">
+    <a class="btn" href="/evaluate">Start evaluation</a>
+  </div>
 
 </div>
 
