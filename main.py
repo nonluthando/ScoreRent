@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from api import router as api_router
 from database import init_db
-from web import router as web_router
+from routers.api import router as api_router
+from routers.web import router as web_router
 
 
 app = FastAPI(title="ScoreRent")
