@@ -43,13 +43,6 @@ app.include_router(api_router)
 # ============================================================
 
 def load_json_field(value, fallback=None):
-    """
-    Safely load JSON fields from PostgreSQL.
-
-    psycopg may return JSON/JSONB columns as Python dict/list already.
-    This helper prevents json.loads() from crashing when that happens.
-    """
-
     if fallback is None:
         fallback = {}
 
@@ -62,6 +55,57 @@ def load_json_field(value, fallback=None):
     return json.loads(value)
 
 
+def get_latest_profile_for_user(user_id: int):
+    db_connection = get_conn()
+    db_cursor = db_connection.cursor()
+
+    db_cursor.execute(
+        """
+        SELECT *
+        FROM profiles
+        WHERE user_id = %s
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (user_id,),
+    )
+
+    profile = db_cursor.fetchone()
+
+    db_cursor.close()
+    db_connection.close()
+
+    return profile
+
+
+def profile_to_defaults(profile):
+    defaults = {
+        "renter_type": "worker",
+        "monthly_income": 0,
+        "submitted_documents": [],
+        "is_bursary_student": False,
+    }
+
+    if not profile:
+        return defaults
+
+    defaults["renter_type"] = profile["renter_type"]
+    defaults["monthly_income"] = int(profile["monthly_income"])
+    defaults["submitted_documents"] = load_json_field(
+        profile["documents_json"],
+        [],
+    )
+    defaults["is_bursary_student"] = bool(
+        profile.get("is_bursary_student", False)
+    )
+
+    return defaults
+
+
+def require_authenticated_user(request: Request):
+    return get_current_user(request)
+
+
 # ============================================================
 # Application Startup
 # ============================================================
@@ -69,14 +113,6 @@ def load_json_field(value, fallback=None):
 @app.on_event("startup")
 def initialize_application():
     init_db()
-
-
-# ============================================================
-# Authentication Helpers
-# ============================================================
-
-def require_authenticated_user(request: Request):
-    return get_current_user(request)
 
 
 # ============================================================
@@ -180,7 +216,6 @@ def create_account(
         )
 
     user_id = create_user(email, password)
-
     session_token = make_session_token(user_id)
 
     response = RedirectResponse("/dashboard", status_code=303)
@@ -267,42 +302,8 @@ def profile_page(request: Request):
     if not current_user:
         return RedirectResponse("/login", status_code=303)
 
-    db_connection = get_conn()
-    db_cursor = db_connection.cursor()
-
-    db_cursor.execute(
-        """
-        SELECT *
-        FROM profiles
-        WHERE user_id = %s
-        ORDER BY created_at DESC
-        LIMIT 1
-        """,
-        (current_user["id"],),
-    )
-
-    user_profile = db_cursor.fetchone()
-
-    db_cursor.close()
-    db_connection.close()
-
-    selected_documents = []
-    renter_type = "worker"
-    monthly_income = 0
-    is_bursary_student = False
-
-    if user_profile:
-        selected_documents = load_json_field(
-            user_profile["documents_json"],
-            [],
-        )
-
-        renter_type = user_profile["renter_type"]
-        monthly_income = user_profile["monthly_income"]
-
-        is_bursary_student = bool(
-            user_profile.get("is_bursary_student", False)
-        )
+    user_profile = get_latest_profile_for_user(current_user["id"])
+    profile_defaults = profile_to_defaults(user_profile)
 
     return templates.TemplateResponse(
         "profile.html",
@@ -310,10 +311,10 @@ def profile_page(request: Request):
             "request": request,
             "user": current_user,
             "profile": user_profile,
-            "renter_type": renter_type,
-            "monthly_income": monthly_income,
-            "is_bursary_student": is_bursary_student,
-            "docs_selected": selected_documents,
+            "renter_type": profile_defaults["renter_type"],
+            "monthly_income": profile_defaults["monthly_income"],
+            "is_bursary_student": profile_defaults["is_bursary_student"],
+            "docs_selected": profile_defaults["submitted_documents"],
             "doc_clusters": {
                 key: sorted(list(value))
                 for key, value in REQUIRED_DOCUMENT_CLUSTERS.items()
@@ -386,53 +387,26 @@ def save_profile(
 def rental_evaluation_page(request: Request):
     current_user = get_current_user(request)
 
-    renter_type = "worker"
-    monthly_income = 0
-    submitted_documents: list[str] = []
-    is_bursary_student = False
+    profile_defaults = {
+        "renter_type": "worker",
+        "monthly_income": 0,
+        "submitted_documents": [],
+        "is_bursary_student": False,
+    }
 
     if current_user:
-        db_connection = get_conn()
-        db_cursor = db_connection.cursor()
-
-        db_cursor.execute(
-            """
-            SELECT *
-            FROM profiles
-            WHERE user_id = %s
-            ORDER BY created_at DESC
-            LIMIT 1
-            """,
-            (current_user["id"],),
-        )
-
-        user_profile = db_cursor.fetchone()
-
-        db_cursor.close()
-        db_connection.close()
-
-        if user_profile:
-            renter_type = user_profile["renter_type"]
-            monthly_income = int(user_profile["monthly_income"])
-
-            submitted_documents = load_json_field(
-                user_profile["documents_json"],
-                [],
-            )
-
-            is_bursary_student = bool(
-                user_profile.get("is_bursary_student", False)
-            )
+        user_profile = get_latest_profile_for_user(current_user["id"])
+        profile_defaults = profile_to_defaults(user_profile)
 
     return templates.TemplateResponse(
         "evaluate.html",
         {
             "request": request,
             "user": current_user,
-            "renter_type": renter_type,
-            "monthly_income": monthly_income,
-            "renter_docs": submitted_documents,
-            "is_bursary_student": is_bursary_student,
+            "renter_type": profile_defaults["renter_type"],
+            "monthly_income": profile_defaults["monthly_income"],
+            "renter_docs": profile_defaults["submitted_documents"],
+            "is_bursary_student": profile_defaults["is_bursary_student"],
             "doc_clusters": {
                 key: sorted(list(value))
                 for key, value in REQUIRED_DOCUMENT_CLUSTERS.items()
@@ -474,38 +448,16 @@ def evaluate_rental_listing(
     if current_user:
         user_id = current_user["id"]
 
-        db_connection = get_conn()
-        db_cursor = db_connection.cursor()
-
-        db_cursor.execute(
-            """
-            SELECT *
-            FROM profiles
-            WHERE user_id = %s
-            ORDER BY created_at DESC
-            LIMIT 1
-            """,
-            (current_user["id"],),
-        )
-
-        user_profile = db_cursor.fetchone()
+        user_profile = get_latest_profile_for_user(current_user["id"])
+        profile_defaults = profile_to_defaults(user_profile)
 
         if user_profile:
             profile_id = user_profile["id"]
-            renter_type = user_profile["renter_type"]
-            monthly_income = int(user_profile["monthly_income"])
 
-            submitted_documents = load_json_field(
-                user_profile["documents_json"],
-                [],
-            )
-
-            is_bursary_student = bool(
-                user_profile.get("is_bursary_student", False)
-            )
-
-        db_cursor.close()
-        db_connection.close()
+        renter_type = profile_defaults["renter_type"]
+        monthly_income = profile_defaults["monthly_income"]
+        submitted_documents = profile_defaults["submitted_documents"]
+        is_bursary_student = profile_defaults["is_bursary_student"]
 
     else:
         renter_type = (guest_renter_type or "worker").strip().lower()
