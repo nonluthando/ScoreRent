@@ -36,6 +36,25 @@ class RenterType(str, Enum):
     NEW_PROFESSIONAL = "new_professional"
     STUDENT = "student"
 
+
+class DemandLevel(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+
+
+class ApplicationVerdict(str, Enum):
+    STRONG_MATCH = "STRONG_MATCH"
+    BORDERLINE = "BORDERLINE"
+    HIGH_RISK = "HIGH_RISK"
+
+
+class ConfidenceLevel(str, Enum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+
 # ============================================================
 # Required Document Clusters
 # ============================================================
@@ -57,28 +76,82 @@ REQUIRED_DOCUMENT_CLUSTERS = {
         "nsfas award letter",
         "bursary confirmation",
         "proof of registration",
-        "student ID",
+        "student id",
         "guarantor letter",
     ],
 }
 
 
-class DemandLevel(str, Enum):
-    LOW = "LOW"
-    MEDIUM = "MEDIUM"
-    HIGH = "HIGH"
-
-
-class ApplicationVerdict(str, Enum):
-    STRONG_MATCH = "STRONG_MATCH"
-    BORDERLINE = "BORDERLINE"
-    HIGH_RISK = "HIGH_RISK"
-
-
-class ConfidenceLevel(str, Enum):
-    HIGH = "HIGH"
-    MEDIUM = "MEDIUM"
-    LOW = "LOW"
+DOCUMENT_ALIASES = {
+    "bank statement": [
+        "bank statement",
+        "bank statements",
+        "3 months bank statement",
+        "3 months bank statements",
+        "three months bank statement",
+        "three months bank statements",
+        "banking statement",
+    ],
+    "payslip": [
+        "payslip",
+        "pay slip",
+        "latest payslip",
+        "salary slip",
+        "proof of income",
+    ],
+    "employment letter": [
+        "employment letter",
+        "letter of employment",
+        "employer letter",
+        "confirmation of employment",
+    ],
+    "employment contract": [
+        "employment contract",
+        "work contract",
+        "contract of employment",
+    ],
+    "offer letter": [
+        "offer letter",
+        "job offer",
+        "employment offer",
+    ],
+    "guarantor letter": [
+        "guarantor letter",
+        "surety letter",
+        "sponsor letter",
+    ],
+    "guarantor payslip": [
+        "guarantor payslip",
+        "guarantor pay slip",
+        "guarantor salary slip",
+    ],
+    "guarantor bank statement": [
+        "guarantor bank statement",
+        "guarantor bank statements",
+    ],
+    "bursary award letter": [
+        "bursary award letter",
+        "bursary letter",
+        "bursary confirmation",
+        "funding letter",
+        "funding confirmation",
+    ],
+    "nsfas award letter": [
+        "nsfas award letter",
+        "nsfas confirmation",
+        "nsfas funding letter",
+    ],
+    "proof of registration": [
+        "proof of registration",
+        "registration proof",
+        "student registration",
+    ],
+    "student id": [
+        "student id",
+        "student card",
+        "student number",
+    ],
+}
 
 
 # ============================================================
@@ -152,7 +225,7 @@ def normalize_renter_type(renter_type: str) -> str:
 
 
 def normalize_area_demand(area_demand: str) -> str:
-    area_demand = (area_demand or "MEDIUM").upper()
+    area_demand = (area_demand or "MEDIUM").strip().upper()
     valid_levels = [member.value for member in DemandLevel]
 
     if area_demand not in valid_levels:
@@ -161,10 +234,15 @@ def normalize_area_demand(area_demand: str) -> str:
     return area_demand
 
 
+def normalize_document_text(document: str) -> str:
+    return " ".join((document or "").strip().lower().split())
+
+
 def normalize_document_set(documents: List[str]) -> Set[str]:
     return {
-        document.strip().lower()
+        normalize_document_text(document)
         for document in documents or []
+        if normalize_document_text(document)
     }
 
 
@@ -190,7 +268,7 @@ def build_evaluation_input(
         required_documents=normalize_document_set(required_documents),
         area_demand=normalize_area_demand(area_demand),
         guarantor_monthly_income=normalize_currency(guarantor_monthly_income),
-        is_bursary_student=is_bursary_student,
+        is_bursary_student=bool(is_bursary_student),
     )
 
 
@@ -224,12 +302,16 @@ def calculate_ratio_percentage(numerator: int, denominator: int) -> float:
 
 
 def contains_text(items: List[str], text: str) -> bool:
-    target = text.strip().lower()
+    target = normalize_document_text(text)
 
     return any(
-        item.strip().lower() == target
+        normalize_document_text(item) == target
         for item in items
     )
+
+
+def clamp_score(score: int) -> int:
+    return max(0, min(100, score))
 
 
 def append_score_breakdown(
@@ -259,7 +341,7 @@ def apply_score_adjustment(
     details: str = "",
 ) -> int:
     score_before = current_score
-    score_after = current_score + int(score_delta)
+    score_after = clamp_score(current_score + int(score_delta))
 
     append_score_breakdown(
         score_breakdown=score_breakdown,
@@ -287,14 +369,74 @@ def trim_output_lists(
     reasons: List[str],
     actions: List[str],
 ) -> Tuple[List[str], List[str]]:
-    reasons = deduplicate_preserve_order(reasons)[:5]
-    actions = deduplicate_preserve_order(actions)[:4]
+    reasons = deduplicate_preserve_order(reasons)[:6]
+    actions = deduplicate_preserve_order(actions)[:5]
 
     return reasons, actions
 
 
-def clamp_score(score: int) -> int:
-    return max(0, min(100, score))
+# ============================================================
+# Document Matching Logic
+# ============================================================
+
+def get_document_aliases(document: str) -> List[str]:
+    document = normalize_document_text(document)
+
+    aliases = DOCUMENT_ALIASES.get(document, [document])
+
+    return [
+        normalize_document_text(alias)
+        for alias in aliases
+    ]
+
+
+def document_matches(required_document: str, submitted_document: str) -> bool:
+    required_document = normalize_document_text(required_document)
+    submitted_document = normalize_document_text(submitted_document)
+
+    required_aliases = get_document_aliases(required_document)
+    submitted_aliases = get_document_aliases(submitted_document)
+
+    for required_alias in required_aliases:
+        for submitted_alias in submitted_aliases:
+            if required_alias == submitted_alias:
+                return True
+
+            if required_alias in submitted_alias:
+                return True
+
+            if submitted_alias in required_alias:
+                return True
+
+    return False
+
+
+def find_missing_documents(
+    required_documents: Set[str],
+    submitted_documents: Set[str],
+) -> Set[str]:
+    missing_documents = set()
+
+    for required_document in required_documents:
+        has_match = any(
+            document_matches(required_document, submitted_document)
+            for submitted_document in submitted_documents
+        )
+
+        if not has_match:
+            missing_documents.add(required_document)
+
+    return missing_documents
+
+
+def has_document(
+    submitted_documents: Set[str],
+    required_document: str,
+) -> bool:
+    return any(
+        document_matches(required_document, submitted_document)
+        for submitted_document in submitted_documents
+    )
 
 
 # ============================================================
@@ -302,19 +444,19 @@ def clamp_score(score: int) -> int:
 # ============================================================
 
 def has_complete_guarantor_documents(submitted_documents: Set[str]) -> bool:
-    has_guarantor_letter = any(
-        "letter" in document and "guarantor" in document
-        for document in submitted_documents
+    has_guarantor_letter = has_document(
+        submitted_documents,
+        "guarantor letter",
     )
 
-    has_guarantor_payslip = any(
-        "payslip" in document and "guarantor" in document
-        for document in submitted_documents
+    has_guarantor_payslip = has_document(
+        submitted_documents,
+        "guarantor payslip",
     )
 
-    has_guarantor_bank_statement = any(
-        "bank" in document and "guarantor" in document
-        for document in submitted_documents
+    has_guarantor_bank_statement = has_document(
+        submitted_documents,
+        "guarantor bank statement",
     )
 
     return all([
@@ -352,7 +494,12 @@ def evaluate_non_bursary_student_guarantor(
 
         add_reason(
             reasons,
-            "Application supported by a financially qualified guarantor.",
+            "Your application is stronger because it includes guarantor income and supporting guarantor documents.",
+        )
+
+        add_action(
+            actions,
+            "Make sure the guarantor documents are recent, clearly labelled, and match the guarantor’s name.",
         )
 
         return score, qualifying_income
@@ -366,12 +513,12 @@ def evaluate_non_bursary_student_guarantor(
 
     add_reason(
         reasons,
-        "Non-bursary students typically require full guarantor support.",
+        "As a non-bursary student, your application is weaker without a complete guarantor file.",
     )
 
     add_action(
         actions,
-        "Provide guarantor letter, payslip, and bank statements.",
+        "Add a guarantor letter, guarantor payslip, guarantor bank statements, and guarantor income before applying.",
     )
 
     return score, qualifying_income
@@ -383,9 +530,12 @@ def evaluate_non_bursary_student_guarantor(
 
 def has_bursary_proof(submitted_documents: Set[str]) -> bool:
     return any(
-        keyword in document
-        for document in submitted_documents
-        for keyword in ["bursary", "nsfas", "award"]
+        has_document(submitted_documents, document)
+        for document in [
+            "bursary award letter",
+            "nsfas award letter",
+            "bursary confirmation",
+        ]
     )
 
 
@@ -408,7 +558,12 @@ def evaluate_bursary_student(
 
         add_reason(
             reasons,
-            "Official bursary award documentation is missing.",
+            "You marked yourself as a bursary student, but no clear bursary, NSFAS, or funding confirmation was provided.",
+        )
+
+        add_action(
+            actions,
+            "Attach your bursary award letter, NSFAS confirmation, or official funding confirmation before applying.",
         )
 
     monthly_rent_shortfall = inputs.monthly_rent - inputs.monthly_income
@@ -427,12 +582,12 @@ def evaluate_bursary_student(
 
         add_reason(
             reasons,
-            "Bursary funding does not fully cover monthly rent.",
+            "Your listed funding does not fully cover the monthly rent.",
         )
 
         add_action(
             actions,
-            "Add guarantor income to strengthen the application.",
+            "Add a guarantor or choose a listing where the rent is fully covered by your funding.",
         )
 
         return score, skip_affordability_evaluation
@@ -442,6 +597,16 @@ def evaluate_bursary_student(
         score_breakdown=score_breakdown,
         title="Bursary fully covers rent",
         score_delta=20,
+    )
+
+    add_reason(
+        reasons,
+        "Your funding appears to cover the monthly rent, which strengthens your application.",
+    )
+
+    add_action(
+        actions,
+        "Include the full funding letter and proof of registration so the landlord can verify your student funding quickly.",
     )
 
     return score, skip_affordability_evaluation
@@ -456,8 +621,27 @@ def evaluate_affordability(
     monthly_rent: int,
     qualifying_income: int,
     reasons: List[str],
+    actions: List[str],
     score_breakdown: List[Dict[str, Any]],
 ) -> int:
+    if qualifying_income <= 0:
+        add_reason(
+            reasons,
+            "No qualifying monthly income was provided, so affordability cannot be verified.",
+        )
+
+        add_action(
+            actions,
+            "Add monthly income, guarantor income, or funding proof before applying.",
+        )
+
+        return apply_score_adjustment(
+            current_score=score,
+            score_breakdown=score_breakdown,
+            title="Missing income information",
+            score_delta=-70,
+        )
+
     rent_to_income_ratio = (
         calculate_ratio_percentage(monthly_rent, qualifying_income) / 100.0
     )
@@ -465,8 +649,14 @@ def evaluate_affordability(
     if rent_to_income_ratio <= RECOMMENDED_RENT_TO_INCOME_CAP:
         add_reason(
             reasons,
-            "Rent falls within recommended Cape Town affordability guidelines.",
+            "The rent is within a healthy affordability range for the income provided.",
         )
+
+        add_action(
+            actions,
+            "Keep your payslip, bank statements, and proof of income ready to support this affordability position.",
+        )
+
         return score
 
     affordability_risk_range = (
@@ -494,7 +684,34 @@ def evaluate_affordability(
     if rent_to_income_ratio >= EXTREME_RENT_TO_INCOME_CAP:
         add_reason(
             reasons,
-            "Rent is significantly above typical approval thresholds for Cape Town.",
+            "The rent is very high compared with the income provided, which may reduce approval chances.",
+        )
+
+        add_action(
+            actions,
+            "Look for a lower-rent listing, add a guarantor, or provide stronger proof of stable income.",
+        )
+
+    elif rent_to_income_ratio > UPPER_RENT_TO_INCOME_CAP:
+        add_reason(
+            reasons,
+            "The rent is above the safer affordability range and may concern landlords or agents.",
+        )
+
+        add_action(
+            actions,
+            "Consider listings closer to your recommended rent range or strengthen the application with a guarantor.",
+        )
+
+    else:
+        add_reason(
+            reasons,
+            "The rent is slightly above the recommended affordability range.",
+        )
+
+        add_action(
+            actions,
+            "Apply only if your supporting documents clearly show stable income and manageable monthly expenses.",
         )
 
     return score
@@ -504,24 +721,108 @@ def evaluate_affordability(
 # Document Logic
 # ============================================================
 
+def evaluate_renter_type_documents(
+    score: int,
+    inputs: EvaluationInput,
+    reasons: List[str],
+    actions: List[str],
+    score_breakdown: List[Dict[str, Any]],
+) -> int:
+    expected_documents = set(
+        REQUIRED_DOCUMENT_CLUSTERS.get(inputs.renter_type, [])
+    )
+
+    missing_documents = find_missing_documents(
+        required_documents=expected_documents,
+        submitted_documents=inputs.submitted_documents,
+    )
+
+    if not missing_documents:
+        add_reason(
+            reasons,
+            "Your core supporting documents match what is usually expected for this renter type.",
+        )
+
+        return score
+
+    missing_documents_text = ", ".join(sorted(missing_documents))
+
+    score = apply_score_adjustment(
+        current_score=score,
+        score_breakdown=score_breakdown,
+        title="Missing renter profile documents",
+        score_delta=-15,
+        details=missing_documents_text,
+    )
+
+    add_reason(
+        reasons,
+        f"Your application may be weaker because these standard documents are missing: {missing_documents_text}.",
+    )
+
+    add_action(
+        actions,
+        f"Prepare these standard documents before applying: {missing_documents_text}.",
+    )
+
+    return score
+
+
 def evaluate_required_documents(
     score: int,
     required_documents: Set[str],
     submitted_documents: Set[str],
+    reasons: List[str],
+    actions: List[str],
     score_breakdown: List[Dict[str, Any]],
 ) -> int:
-    missing_required_documents = required_documents - submitted_documents
+    if not required_documents:
+        add_reason(
+            reasons,
+            "No listing-specific document requirements were entered.",
+        )
 
-    if not missing_required_documents:
+        add_action(
+            actions,
+            "Check the listing carefully and add any required documents before submitting an application.",
+        )
+
         return score
 
-    return apply_score_adjustment(
+    missing_required_documents = find_missing_documents(
+        required_documents=required_documents,
+        submitted_documents=submitted_documents,
+    )
+
+    if not missing_required_documents:
+        add_reason(
+            reasons,
+            "You appear to have the documents requested by the listing.",
+        )
+
+        return score
+
+    missing_documents_text = ", ".join(sorted(missing_required_documents))
+
+    score = apply_score_adjustment(
         current_score=score,
         score_breakdown=score_breakdown,
         title="Missing required documents",
         score_delta=-20,
-        details=", ".join(sorted(missing_required_documents)),
+        details=missing_documents_text,
     )
+
+    add_reason(
+        reasons,
+        f"The listing asks for documents that are not currently covered: {missing_documents_text}.",
+    )
+
+    add_action(
+        actions,
+        f"Do not apply yet unless you can add: {missing_documents_text}.",
+    )
+
+    return score
 
 
 # ============================================================
@@ -531,23 +832,54 @@ def evaluate_required_documents(
 def evaluate_area_demand(
     score: int,
     area_demand: str,
+    reasons: List[str],
+    actions: List[str],
     score_breakdown: List[Dict[str, Any]],
 ) -> int:
     if area_demand == DemandLevel.HIGH.value:
-        return apply_score_adjustment(
+        score = apply_score_adjustment(
             current_score=score,
             score_breakdown=score_breakdown,
             title="High-demand rental area",
             score_delta=-10,
         )
 
+        add_reason(
+            reasons,
+            "This is marked as a high-demand area, so competition may be stronger.",
+        )
+
+        add_action(
+            actions,
+            "Apply quickly with a complete document pack and avoid sending an incomplete application.",
+        )
+
+        return score
+
     if area_demand == DemandLevel.LOW.value:
-        return apply_score_adjustment(
+        score = apply_score_adjustment(
             current_score=score,
             score_breakdown=score_breakdown,
             title="Lower competition rental area",
             score_delta=5,
         )
+
+        add_reason(
+            reasons,
+            "Lower area demand may improve your chances compared with more competitive listings.",
+        )
+
+        add_action(
+            actions,
+            "Use this advantage by applying early and keeping your documents complete.",
+        )
+
+        return score
+
+    add_reason(
+        reasons,
+        "Area demand is moderate, so application strength will mostly depend on affordability and documents.",
+    )
 
     return score
 
@@ -575,24 +907,34 @@ def add_upfront_cost_warnings(
     if upfront_cost_ratio > SEVERE_UPFRONT_COST_RATIO:
         add_reason(
             reasons,
-            "Upfront rental costs are extremely high relative to income.",
+            "The upfront cost is extremely high compared with monthly income.",
         )
 
         add_action(
             actions,
-            "Ensure sufficient savings are available before applying.",
+            "Confirm you have enough savings for rent, deposit, fees, transport, and basic living costs before applying.",
         )
 
     elif upfront_cost_ratio > MODERATE_UPFRONT_COST_RATIO:
         add_reason(
             reasons,
-            "Upfront rental costs may be difficult to mobilize quickly.",
+            "The upfront cost may be difficult to cover quickly.",
+        )
+
+        add_action(
+            actions,
+            "Ask whether the deposit can be split or consider listings with lower upfront costs.",
         )
 
     elif upfront_cost_ratio > ELEVATED_UPFRONT_COST_RATIO:
         add_reason(
             reasons,
-            "Upfront rental costs are moderately high relative to income.",
+            "The upfront cost is moderately high compared with monthly income.",
+        )
+
+        add_action(
+            actions,
+            "Budget for the first month carefully before committing to the application.",
         )
 
 
@@ -617,6 +959,29 @@ def determine_verdict(score: int) -> Tuple[str, str]:
         ApplicationVerdict.HIGH_RISK.value,
         ConfidenceLevel.LOW.value,
     )
+
+
+def add_verdict_action(
+    verdict: str,
+    actions: List[str],
+) -> None:
+    if verdict == ApplicationVerdict.STRONG_MATCH.value:
+        add_action(
+            actions,
+            "This looks worth applying for if the listing is legitimate and the lease terms are acceptable.",
+        )
+
+    elif verdict == ApplicationVerdict.BORDERLINE.value:
+        add_action(
+            actions,
+            "Improve the weak points first, especially affordability, missing documents, or guarantor support.",
+        )
+
+    else:
+        add_action(
+            actions,
+            "Consider skipping this listing unless you can materially improve income proof, documents, or guarantor support.",
+        )
 
 
 # ============================================================
@@ -664,7 +1029,7 @@ def evaluate_rental_application(
         score_after=score,
         details=(
             f"Evaluation calibrated for "
-            f"{APP_MARKET} rental market (2026)."
+            f"{APP_MARKET} rental market."
         ),
     )
 
@@ -693,19 +1058,32 @@ def evaluate_rental_application(
             monthly_rent=inputs.monthly_rent,
             qualifying_income=qualifying_income,
             reasons=reasons,
+            actions=actions,
             score_breakdown=score_breakdown,
         )
+
+    score = evaluate_renter_type_documents(
+        score=score,
+        inputs=inputs,
+        reasons=reasons,
+        actions=actions,
+        score_breakdown=score_breakdown,
+    )
 
     score = evaluate_required_documents(
         score=score,
         required_documents=inputs.required_documents,
         submitted_documents=inputs.submitted_documents,
+        reasons=reasons,
+        actions=actions,
         score_breakdown=score_breakdown,
     )
 
     score = evaluate_area_demand(
         score=score,
         area_demand=inputs.area_demand,
+        reasons=reasons,
+        actions=actions,
         score_breakdown=score_breakdown,
     )
 
@@ -718,6 +1096,11 @@ def evaluate_rental_application(
     score = clamp_score(score)
 
     verdict, confidence = determine_verdict(score)
+
+    add_verdict_action(
+        verdict=verdict,
+        actions=actions,
+    )
 
     append_score_breakdown(
         score_breakdown=score_breakdown,
