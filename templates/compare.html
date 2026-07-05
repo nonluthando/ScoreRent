@@ -1,32 +1,39 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Compare (latest 3)</h2>
+
+<h2>Compare Listings</h2>
 <p class="muted">Quick comparison of your most recent evaluations.</p>
 
 <div class="card">
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Score</th>
-        <th>Verdict</th>
-        <th>Rent</th>
-        <th>Fee</th>
-        <th>Demand</th>
-        <th>Top reason</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for it in items %}
+  {% if items %}
+    <table class="table">
+      <thead>
         <tr>
-          <td><a href="/results/{{ it.id }}">{{ it.score }}</a></td>
-          <td>{{ it.verdict }}</td>
-          <td>R{{ it.rent }}</td>
-          <td>R{{ it.application_fee }}</td>
-          <td>{{ it.demand }}</td>
-          <td class="muted">{{ it.top_reason }}</td>
+          <th>Score</th>
+          <th>Verdict</th>
+          <th>Rent</th>
+          <th>Fee</th>
+          <th>Demand</th>
+          <th>Top reason</th>
         </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {% for it in items %}
+          <tr>
+            <td><a href="/results/{{ it.id }}">{{ it.score }}</a></td>
+            <td>{{ it.verdict }}</td>
+            <td>R{{ it.rent }}</td>
+            <td>R{{ it.application_fee }}</td>
+            <td>{{ it.demand }}</td>
+            <td class="muted">{{ it.top_reason }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">You need at least one saved evaluation before comparing listings.</p>
+    <a class="btn" href="/evaluate">Run evaluation</a>
+  {% endif %}
 </div>
+
 {% endblock %}
