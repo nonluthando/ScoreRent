@@ -423,7 +423,7 @@ def test_zero_income_does_not_crash():
 
     assert_reason_contains(
         result,
-        "income cannot be verified",
+        "affordability cannot be verified",
     )
 
     assert_action_contains(
