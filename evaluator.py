@@ -7,10 +7,6 @@ from enum import Enum
 from typing import Any, Dict, List, Set, Tuple
 
 
-# ============================================================
-# Market Configuration
-# ============================================================
-
 APP_MARKET = "Cape Town"
 
 CURRENCY_CODE = "ZAR"
@@ -26,10 +22,6 @@ SEVERE_UPFRONT_COST_RATIO = 3.0
 MODERATE_UPFRONT_COST_RATIO = 2.0
 ELEVATED_UPFRONT_COST_RATIO = 1.2
 
-
-# ============================================================
-# Enums
-# ============================================================
 
 class RenterType(str, Enum):
     WORKER = "worker"
@@ -54,10 +46,6 @@ class ConfidenceLevel(str, Enum):
     MEDIUM = "MEDIUM"
     LOW = "LOW"
 
-
-# ============================================================
-# Required Document Clusters
-# ============================================================
 
 REQUIRED_DOCUMENT_CLUSTERS = {
     RenterType.WORKER.value: [
@@ -154,10 +142,6 @@ DOCUMENT_ALIASES = {
 }
 
 
-# ============================================================
-# Result Models
-# ============================================================
-
 @dataclass
 class EvaluationResult:
     score: int
@@ -194,10 +178,6 @@ class EvaluationInput:
         return self.is_student and not self.is_bursary_student
 
 
-# ============================================================
-# Currency Helpers
-# ============================================================
-
 def normalize_currency(value: Any) -> int:
     try:
         return max(0, int(round(float(value))))
@@ -209,10 +189,6 @@ def format_currency_zar(value: int) -> str:
     value = normalize_currency(value)
     return f"{CURRENCY_SYMBOL}{value:,}".replace(",", " ")
 
-
-# ============================================================
-# Normalization Helpers
-# ============================================================
 
 def normalize_renter_type(renter_type: str) -> str:
     renter_type = (renter_type or "").strip().lower()
@@ -272,10 +248,6 @@ def build_evaluation_input(
     )
 
 
-# ============================================================
-# Budget Guidance
-# ============================================================
-
 def calculate_budget_bands(monthly_income: int) -> Dict[str, int]:
     monthly_income = normalize_currency(monthly_income)
 
@@ -285,10 +257,6 @@ def calculate_budget_bands(monthly_income: int) -> Dict[str, int]:
         "upper_limit": int(monthly_income * UPPER_RENT_TO_INCOME_CAP),
     }
 
-
-# ============================================================
-# Utility Helpers
-# ============================================================
 
 def deduplicate_preserve_order(items: List[str]) -> List[str]:
     return list(dict.fromkeys(items))
@@ -365,6 +333,11 @@ def add_action(actions: List[str], message: str) -> None:
         actions.append(message)
 
 
+def add_priority_action(actions: List[str], message: str) -> None:
+    if not contains_text(actions, message):
+        actions.insert(0, message)
+
+
 def trim_output_lists(
     reasons: List[str],
     actions: List[str],
@@ -375,13 +348,8 @@ def trim_output_lists(
     return reasons, actions
 
 
-# ============================================================
-# Document Matching Logic
-# ============================================================
-
 def get_document_aliases(document: str) -> List[str]:
     document = normalize_document_text(document)
-
     aliases = DOCUMENT_ALIASES.get(document, [document])
 
     return [
@@ -438,10 +406,6 @@ def has_document(
         for submitted_document in submitted_documents
     )
 
-
-# ============================================================
-# Guarantor Helpers
-# ============================================================
 
 def has_complete_guarantor_documents(submitted_documents: Set[str]) -> bool:
     has_guarantor_letter = has_document(
@@ -523,10 +487,6 @@ def evaluate_non_bursary_student_guarantor(
 
     return score, qualifying_income
 
-
-# ============================================================
-# Bursary Student Logic
-# ============================================================
 
 def has_bursary_proof(submitted_documents: Set[str]) -> bool:
     return any(
@@ -611,10 +571,6 @@ def evaluate_bursary_student(
 
     return score, skip_affordability_evaluation
 
-
-# ============================================================
-# Affordability Logic
-# ============================================================
 
 def evaluate_affordability(
     score: int,
@@ -716,10 +672,6 @@ def evaluate_affordability(
 
     return score
 
-
-# ============================================================
-# Document Logic
-# ============================================================
 
 def evaluate_renter_type_documents(
     score: int,
@@ -825,10 +777,6 @@ def evaluate_required_documents(
     return score
 
 
-# ============================================================
-# Area Demand Logic
-# ============================================================
-
 def evaluate_area_demand(
     score: int,
     area_demand: str,
@@ -884,10 +832,6 @@ def evaluate_area_demand(
     return score
 
 
-# ============================================================
-# Upfront Cost Logic
-# ============================================================
-
 def add_upfront_cost_warnings(
     inputs: EvaluationInput,
     reasons: List[str],
@@ -938,10 +882,6 @@ def add_upfront_cost_warnings(
         )
 
 
-# ============================================================
-# Verdict Logic
-# ============================================================
-
 def determine_verdict(score: int) -> Tuple[str, str]:
     if score >= 75:
         return (
@@ -966,27 +906,23 @@ def add_verdict_action(
     actions: List[str],
 ) -> None:
     if verdict == ApplicationVerdict.STRONG_MATCH.value:
-        add_action(
+        add_priority_action(
             actions,
             "This looks worth applying for if the listing is legitimate and the lease terms are acceptable.",
         )
 
     elif verdict == ApplicationVerdict.BORDERLINE.value:
-        add_action(
+        add_priority_action(
             actions,
             "Improve the weak points first, especially affordability, missing documents, or guarantor support.",
         )
 
     else:
-        add_action(
+        add_priority_action(
             actions,
             "Consider skipping this listing unless you can materially improve income proof, documents, or guarantor support.",
         )
 
-
-# ============================================================
-# Main Evaluation Engine
-# ============================================================
 
 def evaluate_rental_application(
     renter_type: str,
@@ -1027,10 +963,7 @@ def evaluate_rental_application(
         score_delta=0,
         score_before=0,
         score_after=score,
-        details=(
-            f"Evaluation calibrated for "
-            f"{APP_MARKET} rental market."
-        ),
+        details=f"Evaluation calibrated for {APP_MARKET} rental market.",
     )
 
     if inputs.non_bursary_student:
@@ -1094,7 +1027,6 @@ def evaluate_rental_application(
     )
 
     score = clamp_score(score)
-
     verdict, confidence = determine_verdict(score)
 
     add_verdict_action(
