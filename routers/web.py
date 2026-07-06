@@ -652,3 +652,56 @@ def evaluation_history_page(request: Request):
             "evaluations": evaluation_history,
         },
     )
+    @router.get("/learn")
+def learn_page(request: Request):
+    return templates.TemplateResponse(
+        "learn.html",
+        {
+            "request": request,
+            "user": get_current_user(request),
+        },
+    )
+
+
+@router.get("/learn/rent-affordability")
+def learn_affordability_page(request: Request):
+    return templates.TemplateResponse(
+        "learn_affordability.html",
+        {
+            "request": request,
+            "user": get_current_user(request),
+        },
+    )
+
+
+@router.get("/learn/documents-landlords-ask-for")
+def learn_documents_page(request: Request):
+    return templates.TemplateResponse(
+        "learn_documents.html",
+        {
+            "request": request,
+            "user": get_current_user(request),
+        },
+    )
+
+
+@router.get("/learn/improve-application")
+def learn_improve_application_page(request: Request):
+    return templates.TemplateResponse(
+        "learn_improve.html",
+        {
+            "request": request,
+            "user": get_current_user(request),
+        },
+    )
+
+
+@router.get("/learn/rental-red-flags")
+def learn_red_flags_page(request: Request):
+    return templates.TemplateResponse(
+        "learn_red_flags.html",
+        {
+            "request": request,
+            "user": get_current_user(request),
+        },
+    )
