@@ -1247,3 +1247,37 @@ nav .links a.active {
     grid-template-columns: 1fr;
   }
 }
+.actionList {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.actionItem {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.actionItem:last-child {
+  border-bottom: 0;
+}
+
+.actionNumber {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 900;
+}
