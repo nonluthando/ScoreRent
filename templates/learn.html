@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Learn | ScoreRent{% endblock %}
+
+{% block content %}
+<section class="learnHero">
+  <span class="badge bad">Learn</span>
+  <h1>Rental application guide</h1>
+  <p>
+    Practical guides to help you understand rental applications,
+    improve your ScoreRent result, and avoid wasting money on weak applications.
+  </p>
+</section>
+
+<section class="learnGrid">
+  <a class="learnCard" href="/learn/rent-affordability">
+    <div class="learnIcon">💰</div>
+    <h3>How much rent you can realistically afford</h3>
+    <p>Understand rent-to-income bands, deposits, and budgeting before you apply.</p>
+  </a>
+
+  <a class="learnCard" href="/learn/documents-landlords-ask-for">
+    <div class="learnIcon">📄</div>
+    <h3>What documents landlords usually ask for</h3>
+    <p>Worker, student, new professional, and guarantor document checklists.</p>
+  </a>
+
+  <a class="learnCard" href="/learn/improve-application">
+    <div class="learnIcon">✅</div>
+    <h3>How to improve a weak rental application</h3>
+    <p>What to fix first when your result is borderline or high risk.</p>
+  </a>
+
+  <a class="learnCard" href="/learn/rental-red-flags">
+    <div class="learnIcon">🛡</div>
+    <h3>Rental red flags before paying an application fee</h3>
+    <p>Warning signs to check before sending money or personal documents.</p>
+  </a>
+</section>
+{% endblock %}
