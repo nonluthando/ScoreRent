@@ -652,7 +652,7 @@ def evaluation_history_page(request: Request):
             "evaluations": evaluation_history,
         },
     )
-    @router.get("/learn")
+@router.get("/learn")
 def learn_page(request: Request):
     return templates.TemplateResponse(
         "learn.html",
