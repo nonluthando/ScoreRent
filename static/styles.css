@@ -1281,3 +1281,14 @@ nav .links a.active {
   font-size: 13px;
   font-weight: 900;
 }
+.hero-good{
+    background:linear-gradient(135deg,#16a34a,#15803d);
+}
+
+.hero-borderline{
+    background:linear-gradient(135deg,#f59e0b,#d97706);
+}
+
+.hero-bad{
+    background:linear-gradient(135deg,#ef4444,#b91c1c);
+}
