@@ -91,16 +91,20 @@
     </div>
   </div>
 
-  {% if result.actions %}
-  <div class="card">
-    <h3>Recommended actions</h3>
-    <div class="pillList">
-      {% for action in result.actions %}
-        <div class="pill pillAction">{{ action }}</div>
-      {% endfor %}
-    </div>
+{% if result.actions %}
+<div class="card">
+  <h3>Recommended actions</h3>
+
+  <div class="actionList">
+    {% for action in result.actions %}
+      <div class="actionItem">
+        <span class="actionNumber">{{ loop.index }}</span>
+        <span>{{ action }}</span>
+      </div>
+    {% endfor %}
   </div>
-  {% endif %}
+</div>
+{% endif %}
 
   <div class="card">
     <h3>Listing summary</h3>
