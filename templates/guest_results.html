@@ -1,103 +1,148 @@
 {% extends "base.html" %}
 {% block content %}
 
-<section class="stack" style="gap:16px;">
+{% set learn_links = {
+  "Affordability risk": {
+    "text": "Learn how rent affordability works",
+    "url": "/learn/rent-affordability"
+  },
+  "Missing income information": {
+    "text": "Learn how to improve a weak application",
+    "url": "/learn/improve-application"
+  },
+  "Missing renter profile documents": {
+    "text": "Learn what documents landlords ask for",
+    "url": "/learn/documents-landlords-ask-for"
+  },
+  "Missing required documents": {
+    "text": "Learn what documents landlords ask for",
+    "url": "/learn/documents-landlords-ask-for"
+  },
+  "Qualified guarantor support": {
+    "text": "Learn how to strengthen an application",
+    "url": "/learn/improve-application"
+  },
+  "Missing guarantor support": {
+    "text": "Learn how to strengthen an application",
+    "url": "/learn/improve-application"
+  },
+  "Bursary funding shortfall": {
+    "text": "Learn how to improve a weak application",
+    "url": "/learn/improve-application"
+  },
+  "Missing bursary confirmation": {
+    "text": "Learn what student applicants need",
+    "url": "/learn/documents-landlords-ask-for"
+  },
+  "High-demand rental area": {
+    "text": "Learn what weakens an application",
+    "url": "/learn/improve-application"
+  },
+  "Lower competition rental area": {
+    "text": "Learn how ScoreRent calculates your result",
+    "url": "/learn/how-scoring-works"
+  }
+} %}
 
-  <header class="stack" style="gap:6px;">
-    <h2 style="margin:0;">Evaluation result</h2>
-    <p class="muted" style="margin:0;">
-      This shows how strong your application looks based on affordability, documents, and area demand.
+<section class="stack">
+
+  <header>
+    <h2>Evaluation result</h2>
+    <p class="muted">
+      This shows how strong your rental application looks based on affordability,
+      documents, demand, and upfront costs.
     </p>
   </header>
 
-  <!-- Verdict formatting -->
-  {% set verdict_label = "Borderline" %}
   {% set verdict_class = "warn" %}
-
-  {% if result.verdict == "WORTH_APPLYING" %}
-    {% set verdict_label = "Worth applying" %}
+  {% if result.verdict == "STRONG_MATCH" or result.verdict == "WORTH_APPLYING" %}
     {% set verdict_class = "good" %}
-  {% elif result.verdict == "NOT_WORTH_IT" %}
-    {% set verdict_label = "Not worth it" %}
+  {% elif result.verdict == "HIGH_RISK" or result.verdict == "NOT_WORTH_IT" %}
     {% set verdict_class = "bad" %}
   {% endif %}
 
-  {% set confidence_label = "Medium confidence" %}
-  {% if result.confidence == "HIGH" %}
-    {% set confidence_label = "High confidence" %}
-  {% elif result.confidence == "LOW" %}
-    {% set confidence_label = "Low confidence" %}
+  {% set verdict_label = result.verdict %}
+  {% if result.verdict == "STRONG_MATCH" or result.verdict == "WORTH_APPLYING" %}
+    {% set verdict_label = "Strong match" %}
+  {% elif result.verdict == "BORDERLINE" %}
+    {% set verdict_label = "Borderline" %}
+  {% elif result.verdict == "HIGH_RISK" or result.verdict == "NOT_WORTH_IT" %}
+    {% set verdict_label = "High risk" %}
   {% endif %}
 
-  <!-- Score -->
   <div class="scoreBox">
     <div class="scoreHeader">
-      <div class="stack" style="gap:6px;">
+      <div>
         <div class="scoreTitle">Match score</div>
         <div class="score">{{ result.score }}</div>
-
         <div class="verdict {{ verdict_class }}">{{ verdict_label }}</div>
-        <div class="muted small">{{ confidence_label }}</div>
+        <div class="muted small">Confidence: {{ result.confidence }}</div>
       </div>
 
       <div class="tipBubble">
         <span class="tip">What is this?</span>
         <div class="tipContent">
-          <p style="margin:0;">
-            The score is a practical guide, not a guarantee. A high score means your affordability and documents look strong.
+          <p>
+            This score is a practical guide, not a guarantee. It estimates how
+            strong your application looks for this listing.
           </p>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Listing summary -->
+{% if result.actions %}
+<div class="card">
+  <h3>Recommended actions</h3>
+
+  <div class="actionList">
+    {% for action in result.actions %}
+      <div class="actionItem">
+        <span class="actionNumber">{{ loop.index }}</span>
+        <span>{{ action }}</span>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
   <div class="card">
     <h3>Listing summary</h3>
-    <ul class="list">
-      <li><strong>Name:</strong> {{ listing.listing_name or "Unnamed listing" }}</li>
-      <li><strong>Rent:</strong> R{{ listing.rent }}</li>
-      <li><strong>Deposit:</strong> R{{ listing.deposit }}</li>
-      <li><strong>Application fee:</strong> R{{ listing.application_fee }}</li>
-      <li><strong>Demand:</strong> {{ listing.area_demand }}</li>
-    </ul>
-  </div>
-
-  <!-- Reasons -->
-  {% if result.reasons %}
-  <div class="card">
-    <h3>Why this recommendation?</h3>
-    <div class="pillList">
-      {% for r in result.reasons %}
-        <div class="pill pillReason">{{ r }}</div>
-      {% endfor %}
+    <div class="summary-grid">
+      <div>
+        <span class="label">Name</span>
+        {{ listing.listing_name or "Unnamed listing" }}
+      </div>
+      <div>
+        <span class="label">Rent</span>
+        R{{ listing.rent }}
+      </div>
+      <div>
+        <span class="label">Deposit</span>
+        R{{ listing.deposit }}
+      </div>
+      <div>
+        <span class="label">Application fee</span>
+        R{{ listing.application_fee }}
+      </div>
+      <div>
+        <span class="label">Demand</span>
+        {{ listing.area_demand }}
+      </div>
     </div>
   </div>
-  {% endif %}
 
-  <!-- Actions -->
-  {% if result.actions %}
-  <div class="card">
-    <h3>What you should do next</h3>
-    <div class="pillList">
-      {% for a in result.actions %}
-        <div class="pill pillAction">{{ a }}</div>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
-
-  <!-- Breakdown (collapsible) -->
   {% if result.breakdown %}
   <div class="card breakdownCard">
-    <details class="breakdownDetails">
-      <summary class="breakdownSummary">Show how ScoreRent calculated this score</summary>
+    <details class="breakdownDetails" open>
+      <summary class="breakdownSummary">Why you got this score</summary>
 
       <div class="breakdownList">
         {% for b in result.breakdown %}
           {% set delta = b.delta %}
           {% set before = b.before %}
           {% set after = b.after %}
+          {% set learn = learn_links.get(b.title) %}
 
           {% set badge_class = "zero" %}
           {% if delta > 0 %}{% set badge_class = "pos" %}{% endif %}
@@ -111,8 +156,15 @@
             <div class="breakTop">
               <div>
                 <div class="breakTitle">{{ b.title }}</div>
+
                 {% if b.details %}
                   <div class="breakDetailsText">{{ b.details }}</div>
+                {% endif %}
+
+                {% if learn %}
+                  <a class="learnInlineLink" href="{{ learn.url }}">
+                    {{ learn.text }} →
+                  </a>
                 {% endif %}
               </div>
 
@@ -120,7 +172,7 @@
                 <div class="deltaBadge {{ badge_class }}">
                   {% if delta > 0 %}+{% endif %}{{ delta }}
                 </div>
-                <div class="arrowNums">{{ before }} to {{ after }}</div>
+                <div class="arrowNums">{{ before }} → {{ after }}</div>
               </div>
             </div>
 
@@ -136,11 +188,20 @@
 
   <div class="actions">
     <a class="btn" href="/evaluate">Evaluate another</a>
-    {% if not user %}
-      <a class="btn secondary" href="/signup">Sign up to save history</a>
-    {% endif %}
+    <a class="btn secondary" href="/signup">Sign up to save history</a>
   </div>
 
 </section>
 
 {% endblock %}
+.hero-good{
+    background:linear-gradient(135deg,#16a34a,#15803d);
+}
+
+.hero-borderline{
+    background:linear-gradient(135deg,#f59e0b,#d97706);
+}
+
+.hero-bad{
+    background:linear-gradient(135deg,#ef4444,#b91c1c);
+}

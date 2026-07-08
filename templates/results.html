@@ -1,11 +1,53 @@
 {% extends "base.html" %}
 {% block content %}
 
+{% set learn_links = {
+  "Affordability risk": {
+    "text": "Learn how rent affordability works",
+    "url": "/learn/rent-affordability"
+  },
+  "Missing income information": {
+    "text": "Learn how to improve a weak application",
+    "url": "/learn/improve-application"
+  },
+  "Missing renter profile documents": {
+    "text": "Learn what documents landlords ask for",
+    "url": "/learn/documents-landlords-ask-for"
+  },
+  "Missing required documents": {
+    "text": "Learn what documents landlords ask for",
+    "url": "/learn/documents-landlords-ask-for"
+  },
+  "Qualified guarantor support": {
+    "text": "Learn how to strengthen an application",
+    "url": "/learn/improve-application"
+  },
+  "Missing guarantor support": {
+    "text": "Learn how to strengthen an application",
+    "url": "/learn/improve-application"
+  },
+  "Bursary funding shortfall": {
+    "text": "Learn how to improve a weak application",
+    "url": "/learn/improve-application"
+  },
+  "Missing bursary confirmation": {
+    "text": "Learn what student applicants need",
+    "url": "/learn/documents-landlords-ask-for"
+  },
+  "High-demand rental area": {
+    "text": "Learn what weakens an application",
+    "url": "/learn/improve-application"
+  },
+  "Lower competition rental area": {
+    "text": "Learn how ScoreRent calculates your result",
+    "url": "/learn/how-scoring-works"
+  }
+} %}
+
 <h2>Evaluation result</h2>
 
 <div class="stack">
 
-  <!-- Score -->
   <div class="scoreBox">
     <div class="scoreHeader">
       <div>
@@ -13,19 +55,19 @@
         <div class="score">{{ evaluation.score }}</div>
 
         {% set verdict_class = "warn" %}
-        {% if evaluation.verdict == "WORTH_APPLYING" %}
+        {% if evaluation.verdict == "STRONG_MATCH" or evaluation.verdict == "WORTH_APPLYING" %}
           {% set verdict_class = "good" %}
-        {% elif evaluation.verdict == "NOT_WORTH_IT" %}
+        {% elif evaluation.verdict == "HIGH_RISK" or evaluation.verdict == "NOT_WORTH_IT" %}
           {% set verdict_class = "bad" %}
         {% endif %}
 
         {% set verdict_label = evaluation.verdict %}
-        {% if evaluation.verdict == "WORTH_APPLYING" %}
-          {% set verdict_label = "Worth applying" %}
+        {% if evaluation.verdict == "STRONG_MATCH" or evaluation.verdict == "WORTH_APPLYING" %}
+          {% set verdict_label = "Strong match" %}
         {% elif evaluation.verdict == "BORDERLINE" %}
           {% set verdict_label = "Borderline" %}
-        {% elif evaluation.verdict == "NOT_WORTH_IT" %}
-          {% set verdict_label = "Not worth it" %}
+        {% elif evaluation.verdict == "HIGH_RISK" or evaluation.verdict == "NOT_WORTH_IT" %}
+          {% set verdict_label = "High risk" %}
         {% endif %}
 
         <div class="verdict {{ verdict_class }}">{{ verdict_label }}</div>
@@ -36,37 +78,15 @@
         <span class="tip">What is this?</span>
         <div class="tipContent">
           <p>
-            This score shows how strong your application looks based on affordability, document fit, and demand.
-            It is <strong>not</strong> the probability of acceptance.
+            This score shows how strong your application looks based on affordability,
+            document fit, demand, and upfront costs. It is <strong>not</strong> a
+            guarantee of approval.
           </p>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Listing summary -->
-  <div class="card">
-    <h3>Listing summary</h3>
-    <ul class="list">
-      <li><strong>Name:</strong> {{ listing.listing_name or evaluation.listing_name or "Unnamed listing" }}</li>
-      <li><strong>Rent:</strong> R{{ listing.rent }}</li>
-      <li><strong>Deposit:</strong> R{{ listing.deposit }}</li>
-      <li><strong>Application fee:</strong> R{{ listing.application_fee }}</li>
-      <li><strong>Demand:</strong> {{ listing.area_demand }}</li>
-    </ul>
-  </div>
-
-  <!-- Reasons (pill look) -->
-  <div class="card">
-    <h3>Reasons</h3>
-    <div class="pillList">
-      {% for r in reasons %}
-        <div class="pill pillReason">{{ r }}</div>
-      {% endfor %}
-    </div>
-  </div>
-
-  <!-- Actions (pill look) -->
   <div class="card">
     <h3>Recommended actions</h3>
     <div class="pillList">
@@ -76,17 +96,43 @@
     </div>
   </div>
 
-  <!-- Breakdown (bars version, collapsible) -->
+  <div class="card">
+    <h3>Listing summary</h3>
+    <div class="summary-grid">
+      <div>
+        <span class="label">Name</span>
+        {{ listing.listing_name or evaluation.listing_name or "Unnamed listing" }}
+      </div>
+      <div>
+        <span class="label">Rent</span>
+        R{{ listing.rent }}
+      </div>
+      <div>
+        <span class="label">Deposit</span>
+        R{{ listing.deposit }}
+      </div>
+      <div>
+        <span class="label">Application fee</span>
+        R{{ listing.application_fee }}
+      </div>
+      <div>
+        <span class="label">Demand</span>
+        {{ listing.area_demand }}
+      </div>
+    </div>
+  </div>
+
   {% if listing.breakdown %}
   <div class="card breakdownCard">
-    <details class="breakdownDetails">
-      <summary class="breakdownSummary">Show how ScoreRent calculated this score</summary>
+    <details class="breakdownDetails" open>
+      <summary class="breakdownSummary">Why you got this score</summary>
 
       <div class="breakdownList">
         {% for b in listing.breakdown %}
           {% set delta = b.delta %}
           {% set before = b.before %}
           {% set after = b.after %}
+          {% set learn = learn_links.get(b.title) %}
 
           {% set badge_class = "zero" %}
           {% if delta > 0 %}{% set badge_class = "pos" %}{% endif %}
@@ -102,6 +148,12 @@
                 <div class="breakTitle">{{ b.title }}</div>
                 {% if b.details %}
                   <div class="breakDetailsText">{{ b.details }}</div>
+                {% endif %}
+
+                {% if learn %}
+                  <a class="learnInlineLink" href="{{ learn.url }}">
+                    {{ learn.text }} →
+                  </a>
                 {% endif %}
               </div>
 
@@ -124,8 +176,8 @@
   {% endif %}
 
   <div class="actions">
-    <a class="btn" href="/history">View history</a>
-    <a class="btn secondary" href="/evaluate">Evaluate another</a>
+    <a class="btn" href="/evaluate">Evaluate another</a>
+    <a class="btn secondary" href="/history">View history</a>
   </div>
 </div>
 

@@ -1,0 +1,23 @@
+{% set path = request.url.path %}
+{% set logged_in = user is defined and user %}
+
+<nav class="topNav">
+  <div class="navLeft">
+    <a class="brand" href="/">ScoreRent</a>
+  </div>
+
+  <div class="navLinks">
+    {% if logged_in %}
+      <a class="navLink navCta {% if path == '/evaluate' %}active{% endif %}" href="/evaluate">Evaluate</a>
+      <a class="navLink {% if path == '/profile' %}active{% endif %}" href="/profile">Profile</a>
+      <a class="navLink {% if path == '/history' %}active{% endif %}" href="/history">History</a>
+      <a class="navLink {% if path.startswith('/learn') %}active{% endif %}" href="/learn">Learn</a>
+      <a class="navLink dangerLink" href="/logout">Logout</a>
+    {% else %}
+      <a class="navLink navCta {% if path == '/evaluate' %}active{% endif %}" href="/evaluate">Evaluate</a>
+      <a class="navLink {% if path.startswith('/learn') %}active{% endif %}" href="/learn">Learn</a>
+      <a class="navLink {% if path == '/login' %}active{% endif %}" href="/login">Login</a>
+      <a class="navLink {% if path == '/signup' %}active{% endif %}" href="/signup">Sign up</a>
+    {% endif %}
+  </div>
+</nav>
