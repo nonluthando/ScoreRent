@@ -50,7 +50,7 @@ class ConfidenceLevel(str, Enum):
     LOW = "LOW"
 
 
-REQUIRED_DOCUMENT_GROUPS = {
+REQUIRED_DOCUMENT_CLUSTERS = {
     RenterType.WORKER.value: [
         ["bank statement"],
         ["payslip"],
@@ -729,7 +729,7 @@ def evaluate_renter_type_documents(
     actions: List[str],
     score_breakdown: List[Dict[str, Any]],
 ) -> int:
-    expected_document_groups = REQUIRED_DOCUMENT_GROUPS.get(
+    expected_document_groups = REQUIRED_DOCUMENT_CLUSTERS.get(
         inputs.renter_type,
         [],
     )
