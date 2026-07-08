@@ -24,6 +24,13 @@ def load_json_field(value, fallback=None):
     return json.loads(value)
 
 
+def serialize_created_at(value):
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+
+    return value
+
+
 @router.get("/evaluations", response_model=EvaluationListResponse)
 def list_evaluations(
     request: Request,
@@ -65,11 +72,23 @@ def list_evaluations(
 
             rows = cur.fetchall()
 
+        evaluations = [
+            {
+                "id": row["id"],
+                "listing_name": row["listing_name"],
+                "score": row["score"],
+                "verdict": row["verdict"],
+                "confidence": row["confidence"],
+                "created_at": serialize_created_at(row["created_at"]),
+            }
+            for row in rows
+        ]
+
         return {
             "total": total,
             "limit": limit,
             "offset": offset,
-            "evaluations": rows,
+            "evaluations": evaluations,
         }
 
     finally:
@@ -107,7 +126,7 @@ def get_evaluation(request: Request, evaluation_id: int):
             "score": evaluation["score"],
             "verdict": evaluation["verdict"],
             "confidence": evaluation["confidence"],
-            "created_at": evaluation["created_at"],
+            "created_at": serialize_created_at(evaluation["created_at"]),
         }
 
     finally:
