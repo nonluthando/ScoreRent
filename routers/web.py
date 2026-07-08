@@ -37,6 +37,18 @@ def load_json_field(value, fallback=None):
     return json.loads(value)
 
 
+def flatten_document_clusters(document_clusters):
+    documents = []
+
+    for cluster in document_clusters:
+        if isinstance(cluster, list):
+            documents.extend(cluster)
+        else:
+            documents.append(cluster)
+
+    return sorted(set(documents))
+
+
 def get_latest_profile_for_user(user_id: int):
     db_connection = get_conn()
     db_cursor = db_connection.cursor()
@@ -265,7 +277,7 @@ def profile_page(request: Request):
             "is_bursary_student": profile_defaults["is_bursary_student"],
             "docs_selected": profile_defaults["submitted_documents"],
             "doc_clusters": {
-                key: sorted(list(value))
+                key: flatten_document_clusters(value)
                 for key, value in REQUIRED_DOCUMENT_CLUSTERS.items()
             },
         },
@@ -353,7 +365,7 @@ def rental_evaluation_page(request: Request):
             "renter_docs": profile_defaults["submitted_documents"],
             "is_bursary_student": profile_defaults["is_bursary_student"],
             "doc_clusters": {
-                key: sorted(list(value))
+                key: flatten_document_clusters(value)
                 for key, value in REQUIRED_DOCUMENT_CLUSTERS.items()
             },
             "demand_levels": [level.value for level in DemandLevel],
@@ -652,6 +664,8 @@ def evaluation_history_page(request: Request):
             "evaluations": evaluation_history,
         },
     )
+
+
 @router.get("/learn")
 def learn_page(request: Request):
     return templates.TemplateResponse(
