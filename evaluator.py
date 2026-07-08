@@ -22,6 +22,9 @@ SEVERE_UPFRONT_COST_RATIO = 3.0
 MODERATE_UPFRONT_COST_RATIO = 2.0
 ELEVATED_UPFRONT_COST_RATIO = 1.2
 
+MODERATE_UPFRONT_COST_PENALTY = 8
+SEVERE_UPFRONT_COST_PENALTY = 15
+
 
 class RenterType(str, Enum):
     WORKER = "worker"
@@ -47,25 +50,17 @@ class ConfidenceLevel(str, Enum):
     LOW = "LOW"
 
 
-REQUIRED_DOCUMENT_CLUSTERS = {
+REQUIRED_DOCUMENT_GROUPS = {
     RenterType.WORKER.value: [
-        "bank statement",
-        "payslip",
-        "employment letter",
+        ["bank statement"],
+        ["payslip"],
     ],
     RenterType.NEW_PROFESSIONAL.value: [
-        "employment contract",
-        "offer letter",
-        "bank statement",
-        "guarantor letter",
+        ["employment contract", "offer letter"],
+        ["bank statement"],
     ],
     RenterType.STUDENT.value: [
-        "bursary award letter",
-        "nsfas award letter",
-        "bursary confirmation",
-        "proof of registration",
-        "student id",
-        "guarantor letter",
+        ["proof of registration", "student id"],
     ],
 }
 
@@ -407,6 +402,38 @@ def has_document(
     )
 
 
+def find_missing_document_groups(
+    required_document_groups: List[List[str]],
+    submitted_documents: Set[str],
+) -> List[List[str]]:
+    missing_groups = []
+
+    for group in required_document_groups:
+        has_group_match = any(
+            has_document(submitted_documents, document)
+            for document in group
+        )
+
+        if not has_group_match:
+            missing_groups.append(group)
+
+    return missing_groups
+
+
+def format_missing_document_groups(
+    missing_groups: List[List[str]],
+) -> str:
+    formatted_groups = []
+
+    for group in missing_groups:
+        if len(group) == 1:
+            formatted_groups.append(group[0])
+        else:
+            formatted_groups.append(" or ".join(group))
+
+    return ", ".join(formatted_groups)
+
+
 def has_complete_guarantor_documents(submitted_documents: Set[str]) -> bool:
     has_guarantor_letter = has_document(
         submitted_documents,
@@ -442,8 +469,14 @@ def evaluate_non_bursary_student_guarantor(
         inputs.submitted_documents
     )
 
-    if guarantor_documents_complete and inputs.guarantor_monthly_income > 0:
-        qualifying_income = inputs.guarantor_monthly_income
+    has_guarantor_income = inputs.guarantor_monthly_income > 0
+    own_income_can_be_checked = inputs.monthly_income > 0
+
+    if guarantor_documents_complete and has_guarantor_income:
+        qualifying_income = max(
+            inputs.monthly_income,
+            inputs.guarantor_monthly_income,
+        )
 
         score = apply_score_adjustment(
             current_score=score,
@@ -468,6 +501,19 @@ def evaluate_non_bursary_student_guarantor(
 
         return score, qualifying_income
 
+    if own_income_can_be_checked:
+        add_reason(
+            reasons,
+            "No complete guarantor file was provided, so the application is assessed mainly on your own income.",
+        )
+
+        add_action(
+            actions,
+            "If the listing prefers students with guarantors, add a guarantor letter, guarantor payslip, and guarantor bank statements.",
+        )
+
+        return score, qualifying_income
+
     score = apply_score_adjustment(
         current_score=score,
         score_breakdown=score_breakdown,
@@ -477,7 +523,7 @@ def evaluate_non_bursary_student_guarantor(
 
     add_reason(
         reasons,
-        "As a non-bursary student, your application is weaker without a complete guarantor file.",
+        "As a non-bursary student with no qualifying income, your application is weaker without a complete guarantor file.",
     )
 
     add_action(
@@ -506,9 +552,10 @@ def evaluate_bursary_student(
     actions: List[str],
     score_breakdown: List[Dict[str, Any]],
 ) -> Tuple[int, bool]:
-    skip_affordability_evaluation = True
+    has_clear_bursary_proof = has_bursary_proof(inputs.submitted_documents)
+    skip_affordability_evaluation = has_clear_bursary_proof
 
-    if not has_bursary_proof(inputs.submitted_documents):
+    if not has_clear_bursary_proof:
         score = apply_score_adjustment(
             current_score=score,
             score_breakdown=score_breakdown,
@@ -525,6 +572,8 @@ def evaluate_bursary_student(
             actions,
             "Attach your bursary award letter, NSFAS confirmation, or official funding confirmation before applying.",
         )
+
+        return score, skip_affordability_evaluation
 
     monthly_rent_shortfall = inputs.monthly_rent - inputs.monthly_income
 
@@ -680,16 +729,17 @@ def evaluate_renter_type_documents(
     actions: List[str],
     score_breakdown: List[Dict[str, Any]],
 ) -> int:
-    expected_documents = set(
-        REQUIRED_DOCUMENT_CLUSTERS.get(inputs.renter_type, [])
+    expected_document_groups = REQUIRED_DOCUMENT_GROUPS.get(
+        inputs.renter_type,
+        [],
     )
 
-    missing_documents = find_missing_documents(
-        required_documents=expected_documents,
+    missing_groups = find_missing_document_groups(
+        required_document_groups=expected_document_groups,
         submitted_documents=inputs.submitted_documents,
     )
 
-    if not missing_documents:
+    if not missing_groups:
         add_reason(
             reasons,
             "Your core supporting documents match what is usually expected for this renter type.",
@@ -697,7 +747,7 @@ def evaluate_renter_type_documents(
 
         return score
 
-    missing_documents_text = ", ".join(sorted(missing_documents))
+    missing_documents_text = format_missing_document_groups(missing_groups)
 
     score = apply_score_adjustment(
         current_score=score,
@@ -832,13 +882,16 @@ def evaluate_area_demand(
     return score
 
 
-def add_upfront_cost_warnings(
+def evaluate_upfront_costs(
+    score: int,
+    upfront_income_basis: int,
     inputs: EvaluationInput,
     reasons: List[str],
     actions: List[str],
-) -> None:
-    if inputs.monthly_income <= 0:
-        return
+    score_breakdown: List[Dict[str, Any]],
+) -> int:
+    if upfront_income_basis <= 0:
+        return score
 
     total_upfront_cost = (
         inputs.monthly_rent
@@ -846,12 +899,23 @@ def add_upfront_cost_warnings(
         + inputs.application_fee
     )
 
-    upfront_cost_ratio = total_upfront_cost / inputs.monthly_income
+    upfront_cost_ratio = total_upfront_cost / upfront_income_basis
 
     if upfront_cost_ratio > SEVERE_UPFRONT_COST_RATIO:
+        score = apply_score_adjustment(
+            current_score=score,
+            score_breakdown=score_breakdown,
+            title="Severe upfront cost pressure",
+            score_delta=-SEVERE_UPFRONT_COST_PENALTY,
+            details=(
+                "Upfront cost: "
+                f"{format_currency_zar(total_upfront_cost)}"
+            ),
+        )
+
         add_reason(
             reasons,
-            "The upfront cost is extremely high compared with monthly income.",
+            "The upfront cost is extremely high compared with the income or funding provided.",
         )
 
         add_action(
@@ -860,6 +924,17 @@ def add_upfront_cost_warnings(
         )
 
     elif upfront_cost_ratio > MODERATE_UPFRONT_COST_RATIO:
+        score = apply_score_adjustment(
+            current_score=score,
+            score_breakdown=score_breakdown,
+            title="High upfront cost pressure",
+            score_delta=-MODERATE_UPFRONT_COST_PENALTY,
+            details=(
+                "Upfront cost: "
+                f"{format_currency_zar(total_upfront_cost)}"
+            ),
+        )
+
         add_reason(
             reasons,
             "The upfront cost may be difficult to cover quickly.",
@@ -873,7 +948,7 @@ def add_upfront_cost_warnings(
     elif upfront_cost_ratio > ELEVATED_UPFRONT_COST_RATIO:
         add_reason(
             reasons,
-            "The upfront cost is moderately high compared with monthly income.",
+            "The upfront cost is moderately high compared with the income or funding provided.",
         )
 
         add_action(
@@ -881,24 +956,58 @@ def add_upfront_cost_warnings(
             "Budget for the first month carefully before committing to the application.",
         )
 
+    return score
 
-def determine_verdict(score: int) -> Tuple[str, str]:
+
+def determine_verdict(score: int) -> str:
     if score >= 75:
-        return (
-            ApplicationVerdict.STRONG_MATCH.value,
-            ConfidenceLevel.HIGH.value,
-        )
+        return ApplicationVerdict.STRONG_MATCH.value
 
     if score >= 55:
-        return (
-            ApplicationVerdict.BORDERLINE.value,
-            ConfidenceLevel.MEDIUM.value,
-        )
+        return ApplicationVerdict.BORDERLINE.value
 
-    return (
-        ApplicationVerdict.HIGH_RISK.value,
-        ConfidenceLevel.LOW.value,
-    )
+    return ApplicationVerdict.HIGH_RISK.value
+
+
+def determine_confidence(inputs: EvaluationInput) -> str:
+    confidence_points = 0
+
+    if inputs.monthly_rent > 0:
+        confidence_points += 1
+
+    if inputs.monthly_income > 0:
+        confidence_points += 1
+
+    if inputs.submitted_documents:
+        confidence_points += 1
+
+    if inputs.required_documents:
+        confidence_points += 1
+
+    if inputs.area_demand in [
+        DemandLevel.LOW.value,
+        DemandLevel.MEDIUM.value,
+        DemandLevel.HIGH.value,
+    ]:
+        confidence_points += 1
+
+    if inputs.is_student:
+        if inputs.bursary_student and has_bursary_proof(inputs.submitted_documents):
+            confidence_points += 1
+
+        if inputs.non_bursary_student and (
+            inputs.monthly_income > 0
+            or inputs.guarantor_monthly_income > 0
+        ):
+            confidence_points += 1
+
+    if confidence_points >= 5:
+        return ConfidenceLevel.HIGH.value
+
+    if confidence_points >= 3:
+        return ConfidenceLevel.MEDIUM.value
+
+    return ConfidenceLevel.LOW.value
 
 
 def add_verdict_action(
@@ -1020,14 +1129,18 @@ def evaluate_rental_application(
         score_breakdown=score_breakdown,
     )
 
-    add_upfront_cost_warnings(
+    score = evaluate_upfront_costs(
+        score=score,
+        upfront_income_basis=qualifying_income,
         inputs=inputs,
         reasons=reasons,
         actions=actions,
+        score_breakdown=score_breakdown,
     )
 
     score = clamp_score(score)
-    verdict, confidence = determine_verdict(score)
+    verdict = determine_verdict(score)
+    confidence = determine_confidence(inputs)
 
     add_verdict_action(
         verdict=verdict,
