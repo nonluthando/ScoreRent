@@ -1,9 +1,12 @@
 import json
 from datetime import datetime, timedelta
 
-import pytest
-
 import routers.api as api_router
+from auth import create_user
+
+
+def create_test_user(email="api-test@example.com"):
+    return create_user(email, "password123")
 
 
 def test_api_load_json_field_none_returns_fallback():
@@ -32,15 +35,16 @@ def test_list_evaluations_returns_authenticated_user_evaluations(
     client,
     monkeypatch,
 ):
+    user_id = create_test_user("api-list@example.com")
+
     monkeypatch.setattr(
         api_router,
         "get_current_user",
-        lambda request: {"id": 1, "email": "test@example.com"},
+        lambda request: {"id": user_id, "email": "api-list@example.com"},
     )
 
-    created_at = datetime.utcnow().isoformat()
-
     conn = api_router.get_conn()
+
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -59,7 +63,7 @@ def test_list_evaluations_returns_authenticated_user_evaluations(
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
-                1,
+                user_id,
                 None,
                 "Test Listing",
                 json.dumps({"rent": 8500}),
@@ -68,10 +72,12 @@ def test_list_evaluations_returns_authenticated_user_evaluations(
                 "HIGH",
                 json.dumps(["Affordability risk"]),
                 json.dumps(["Add documents"]),
-                created_at,
+                datetime.utcnow().isoformat(),
             ),
         )
+
         conn.commit()
+
     conn.close()
 
     response = client.get("/api/evaluations")
@@ -79,6 +85,7 @@ def test_list_evaluations_returns_authenticated_user_evaluations(
     assert response.status_code == 200
 
     body = response.json()
+
     assert body["total"] >= 1
     assert body["limit"] == 10
     assert body["offset"] == 0
@@ -87,13 +94,16 @@ def test_list_evaluations_returns_authenticated_user_evaluations(
 
 
 def test_list_evaluations_filters_by_verdict(client, monkeypatch):
+    user_id = create_test_user("api-filter@example.com")
+
     monkeypatch.setattr(
         api_router,
         "get_current_user",
-        lambda request: {"id": 1, "email": "test@example.com"},
+        lambda request: {"id": user_id, "email": "api-filter@example.com"},
     )
 
     conn = api_router.get_conn()
+
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -114,7 +124,7 @@ def test_list_evaluations_filters_by_verdict(client, monkeypatch):
             (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
-                1,
+                user_id,
                 None,
                 "Worth Listing",
                 json.dumps({"rent": 7000}),
@@ -124,7 +134,7 @@ def test_list_evaluations_filters_by_verdict(client, monkeypatch):
                 json.dumps([]),
                 json.dumps([]),
                 datetime.utcnow().isoformat(),
-                1,
+                user_id,
                 None,
                 "Risky Listing",
                 json.dumps({"rent": 15000}),
@@ -136,7 +146,9 @@ def test_list_evaluations_filters_by_verdict(client, monkeypatch):
                 (datetime.utcnow() + timedelta(seconds=1)).isoformat(),
             ),
         )
+
         conn.commit()
+
     conn.close()
 
     response = client.get("/api/evaluations?verdict=NOT_WORTH_IT")
@@ -144,6 +156,7 @@ def test_list_evaluations_filters_by_verdict(client, monkeypatch):
     assert response.status_code == 200
 
     body = response.json()
+
     assert body["total"] >= 1
     assert all(
         evaluation["verdict"] == "NOT_WORTH_IT"
@@ -152,13 +165,16 @@ def test_list_evaluations_filters_by_verdict(client, monkeypatch):
 
 
 def test_get_evaluation_returns_detail_for_owner(client, monkeypatch):
+    user_id = create_test_user("api-detail@example.com")
+
     monkeypatch.setattr(
         api_router,
         "get_current_user",
-        lambda request: {"id": 1, "email": "test@example.com"},
+        lambda request: {"id": user_id, "email": "api-detail@example.com"},
     )
 
     conn = api_router.get_conn()
+
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -178,7 +194,7 @@ def test_get_evaluation_returns_detail_for_owner(client, monkeypatch):
             RETURNING id
             """,
             (
-                1,
+                user_id,
                 None,
                 "Detail Listing",
                 json.dumps({"rent": 9000, "area_demand": "HIGH"}),
@@ -192,7 +208,9 @@ def test_get_evaluation_returns_detail_for_owner(client, monkeypatch):
         )
 
         evaluation_id = cur.fetchone()["id"]
+
         conn.commit()
+
     conn.close()
 
     response = client.get(f"/api/evaluations/{evaluation_id}")
@@ -200,6 +218,7 @@ def test_get_evaluation_returns_detail_for_owner(client, monkeypatch):
     assert response.status_code == 200
 
     body = response.json()
+
     assert body["id"] == evaluation_id
     assert body["listing"]["rent"] == 9000
     assert body["score"] == 65
@@ -210,10 +229,12 @@ def test_get_evaluation_returns_404_for_missing_or_other_user(
     client,
     monkeypatch,
 ):
+    user_id = create_test_user("api-missing@example.com")
+
     monkeypatch.setattr(
         api_router,
         "get_current_user",
-        lambda request: {"id": 1, "email": "test@example.com"},
+        lambda request: {"id": user_id, "email": "api-missing@example.com"},
     )
 
     response = client.get("/api/evaluations/999999")
