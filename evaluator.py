@@ -206,7 +206,14 @@ def normalize_area_demand(area_demand: str) -> str:
 
 
 def normalize_document_text(document: str) -> str:
-    return " ".join((document or "").strip().lower().split())
+    normalized = str(document or "").strip().lower()
+
+    # Form checkbox values may use snake_case or kebab-case.
+    normalized = normalized.replace("_", " ")
+    normalized = normalized.replace("-", " ")
+
+    # Collapse repeated whitespace.
+    return " ".join(normalized.split())
 
 
 def normalize_document_set(documents: List[str]) -> Set[str]:
