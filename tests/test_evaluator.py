@@ -822,3 +822,36 @@ def test_breakdown_contains_final_verdict_details():
     assert final_entry["title"] == "Final verdict"
     assert result.verdict in final_entry["details"]
     assert result.confidence in final_entry["details"]
+
+def test_snake_case_document_values_are_normalized():
+    result, _ = evaluate_rental_application(
+        renter_type="worker",
+        monthly_income=30000,
+        submitted_documents=[
+            "bank_statement",
+            "payslip",
+        ],
+        monthly_rent=7000,
+        security_deposit=7000,
+        application_fee=0,
+        required_documents=[
+            "bank_statement",
+            "payslip",
+        ],
+        area_demand="MEDIUM",
+    )
+
+    missing_profile_entries = [
+        item
+        for item in result.breakdown
+        if item["title"] == "Missing renter profile documents"
+    ]
+
+    missing_required_entries = [
+        item
+        for item in result.breakdown
+        if item["title"] == "Missing required documents"
+    ]
+
+    assert missing_profile_entries == []
+    assert missing_required_entries == []
