@@ -374,7 +374,7 @@ def test_non_bursary_student_with_own_income_is_not_auto_penalised():
 
     assert_reason_contains(
         result,
-        "assessed mainly on your own income",
+        "own declared monthly income or support",
     )
 
 
@@ -751,7 +751,7 @@ def test_borderline_gets_improvement_recommendation():
 
     assert_action_contains(
         result,
-        "Improve the weak points",
+        "affordability",
     )
 
 
