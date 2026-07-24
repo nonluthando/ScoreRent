@@ -1292,3 +1292,39 @@ nav .links a.active {
 .hero-bad{
     background:linear-gradient(135deg,#ef4444,#b91c1c);
 }
+.scoreBox.hero-good,
+.scoreBox.hero-borderline,
+.scoreBox.hero-bad {
+    color: white;
+}
+
+.scoreBox.hero-good .scoreTitle,
+.scoreBox.hero-borderline .scoreTitle,
+.scoreBox.hero-bad .scoreTitle,
+.scoreBox.hero-good .score,
+.scoreBox.hero-borderline .score,
+.scoreBox.hero-bad .score,
+.scoreBox.hero-good .verdict,
+.scoreBox.hero-borderline .verdict,
+.scoreBox.hero-bad .verdict {
+    color: white;
+}
+.resultWarning {
+    margin-top: 16px;
+    max-width: 520px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.16);
+    color: white;
+    font-size: 0.92rem;
+    font-weight: 650;
+    line-height: 1.45;
+}
+.scoreBox .tip {
+    color: white;
+}
+
+.scoreBox .tipContent {
+    color: #111827;
+}
