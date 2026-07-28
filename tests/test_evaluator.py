@@ -10,6 +10,11 @@ from conftest import (
 # ============================================================
 
 def test_worker_safe_affordability(worker_payload):
+    worker_payload["required_documents"] = [
+        "bank statement",
+        "payslip",
+    ]
+
     result, budget = evaluate_rental_application(**worker_payload)
 
     assert result.verdict == "STRONG_MATCH"
@@ -218,6 +223,30 @@ def test_document_alias_matching_detects_bank_statement_and_payslip():
     assert missing_required_entries == []
 
 
+def test_new_professional_accepts_contract_or_offer_letter():
+    result, _ = evaluate_rental_application(
+        renter_type="new_professional",
+        monthly_income=30000,
+        submitted_documents=[
+            "offer letter",
+            "bank statement",
+        ],
+        monthly_rent=8000,
+        security_deposit=8000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+    )
+
+    missing_profile_entries = [
+        item
+        for item in result.breakdown
+        if item["title"] == "Missing renter profile documents"
+    ]
+
+    assert missing_profile_entries == []
+
+
 # ============================================================
 # Bursary Student Tests
 # ============================================================
@@ -259,10 +288,10 @@ def test_bursary_shortfall_requires_guarantor():
     )
 
 
-def test_missing_bursary_letter_penalty():
+def test_missing_bursary_letter_penalty_and_affordability_runs():
     result, _ = evaluate_rental_application(
         renter_type="student",
-        monthly_income=8000,
+        monthly_income=0,
         submitted_documents=[
             "proof of registration",
             "student id",
@@ -278,6 +307,11 @@ def test_missing_bursary_letter_penalty():
     assert_reason_contains(
         result,
         "bursary",
+    )
+
+    assert_reason_contains(
+        result,
+        "affordability cannot be verified",
     )
 
 
@@ -311,6 +345,37 @@ def test_non_bursary_student_with_strong_guarantor():
     )
 
     assert result.score >= 75
+
+
+def test_non_bursary_student_with_own_income_is_not_auto_penalised():
+    result, _ = evaluate_rental_application(
+        renter_type="student",
+        monthly_income=30000,
+        submitted_documents=[
+            "proof of registration",
+            "student id",
+        ],
+        monthly_rent=6000,
+        security_deposit=6000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+        guarantor_monthly_income=0,
+        is_bursary_student=False,
+    )
+
+    missing_guarantor_entries = [
+        item
+        for item in result.breakdown
+        if item["title"] == "Missing guarantor support"
+    ]
+
+    assert missing_guarantor_entries == []
+
+    assert_reason_contains(
+        result,
+        "own declared monthly income or support",
+    )
 
 
 def test_non_bursary_student_missing_guarantor():
@@ -362,7 +427,29 @@ def test_guarantor_income_used_for_budget_bands():
 # Confidence Tests
 # ============================================================
 
-def test_high_score_returns_high_confidence():
+def test_complete_inputs_return_high_confidence():
+    result, _ = evaluate_rental_application(
+        renter_type="worker",
+        monthly_income=40000,
+        submitted_documents=[
+            "bank statement",
+            "payslip",
+            "employment letter",
+        ],
+        monthly_rent=8000,
+        security_deposit=8000,
+        application_fee=0,
+        required_documents=[
+            "bank statement",
+            "payslip",
+        ],
+        area_demand="MEDIUM",
+    )
+
+    assert result.confidence == "HIGH"
+
+
+def test_missing_listing_requirements_reduce_confidence():
     result, _ = evaluate_rental_application(
         renter_type="worker",
         monthly_income=40000,
@@ -378,23 +465,25 @@ def test_high_score_returns_high_confidence():
         area_demand="MEDIUM",
     )
 
-    assert result.confidence == "HIGH"
+    assert result.verdict == "STRONG_MATCH"
+    assert result.confidence == "MEDIUM"
+
+    assert_reason_contains(
+        result,
+        "No listing-specific document requirements were entered",
+    )
 
 
-def test_low_score_returns_low_confidence():
+def test_incomplete_inputs_return_low_confidence():
     result, _ = evaluate_rental_application(
         renter_type="worker",
-        monthly_income=10000,
-        submitted_documents=[
-            "bank statement",
-        ],
-        monthly_rent=8000,
-        security_deposit=8000,
+        monthly_income=0,
+        submitted_documents=[],
+        monthly_rent=0,
+        security_deposit=0,
         application_fee=0,
-        required_documents=[
-            "payslip",
-        ],
-        area_demand="HIGH",
+        required_documents=[],
+        area_demand="MEDIUM",
     )
 
     assert result.confidence == "LOW"
@@ -479,7 +568,46 @@ def test_invalid_demand_level_defaults_to_medium():
 # Upfront Cost Tests
 # ============================================================
 
-def test_upfront_burden_adds_warning_not_penalty():
+def test_moderate_upfront_burden_adds_warning_not_penalty():
+    normal_result, _ = evaluate_rental_application(
+        renter_type="worker",
+        monthly_income=30000,
+        submitted_documents=[
+            "bank statement",
+            "payslip",
+            "employment letter",
+        ],
+        monthly_rent=8000,
+        security_deposit=8000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+    )
+
+    moderate_result, _ = evaluate_rental_application(
+        renter_type="worker",
+        monthly_income=30000,
+        submitted_documents=[
+            "bank statement",
+            "payslip",
+            "employment letter",
+        ],
+        monthly_rent=8000,
+        security_deposit=30000,
+        application_fee=0,
+        required_documents=[],
+        area_demand="MEDIUM",
+    )
+
+    assert moderate_result.score == normal_result.score
+
+    assert_reason_contains(
+        moderate_result,
+        "moderately high",
+    )
+
+
+def test_severe_upfront_burden_adds_penalty():
     normal_result, _ = evaluate_rental_application(
         renter_type="worker",
         monthly_income=30000,
@@ -510,7 +638,15 @@ def test_upfront_burden_adds_warning_not_penalty():
         area_demand="MEDIUM",
     )
 
-    assert heavy_result.score == normal_result.score
+    assert heavy_result.score < normal_result.score
+
+    entry = next(
+        item
+        for item in heavy_result.breakdown
+        if item["title"] == "Severe upfront cost pressure"
+    )
+
+    assert entry["delta"] == -15
 
     assert_reason_contains(
         heavy_result,
@@ -615,7 +751,7 @@ def test_borderline_gets_improvement_recommendation():
 
     assert_action_contains(
         result,
-        "improve the weak points",
+        "affordability",
     )
 
 
@@ -686,3 +822,36 @@ def test_breakdown_contains_final_verdict_details():
     assert final_entry["title"] == "Final verdict"
     assert result.verdict in final_entry["details"]
     assert result.confidence in final_entry["details"]
+
+def test_snake_case_document_values_are_normalized():
+    result, _ = evaluate_rental_application(
+        renter_type="worker",
+        monthly_income=30000,
+        submitted_documents=[
+            "bank_statement",
+            "payslip",
+        ],
+        monthly_rent=7000,
+        security_deposit=7000,
+        application_fee=0,
+        required_documents=[
+            "bank_statement",
+            "payslip",
+        ],
+        area_demand="MEDIUM",
+    )
+
+    missing_profile_entries = [
+        item
+        for item in result.breakdown
+        if item["title"] == "Missing renter profile documents"
+    ]
+
+    missing_required_entries = [
+        item
+        for item in result.breakdown
+        if item["title"] == "Missing required documents"
+    ]
+
+    assert missing_profile_entries == []
+    assert missing_required_entries == []

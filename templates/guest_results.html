@@ -48,39 +48,58 @@
 
   <header>
     <h2>Evaluation result</h2>
+
     <p class="muted">
       This shows how strong your rental application looks based on affordability,
       documents, demand, and upfront costs.
     </p>
   </header>
 
+  {# Default presentation for a borderline result #}
   {% set verdict_class = "warn" %}
-  {% if result.verdict == "STRONG_MATCH" or result.verdict == "WORTH_APPLYING" %}
+  {% set hero_class = "hero-borderline" %}
+  {% set verdict_label = "Borderline" %}
+
+  {% if result.verdict == "STRONG_MATCH"
+        or result.verdict == "WORTH_APPLYING" %}
+
     {% set verdict_class = "good" %}
-  {% elif result.verdict == "HIGH_RISK" or result.verdict == "NOT_WORTH_IT" %}
-    {% set verdict_class = "bad" %}
-  {% endif %}
-
-  {% set verdict_label = result.verdict %}
-  {% if result.verdict == "STRONG_MATCH" or result.verdict == "WORTH_APPLYING" %}
+    {% set hero_class = "hero-good" %}
     {% set verdict_label = "Strong match" %}
-  {% elif result.verdict == "BORDERLINE" %}
-    {% set verdict_label = "Borderline" %}
-  {% elif result.verdict == "HIGH_RISK" or result.verdict == "NOT_WORTH_IT" %}
+
+  {% elif result.verdict == "HIGH_RISK"
+          or result.verdict == "NOT_WORTH_IT" %}
+
+    {% set verdict_class = "bad" %}
+    {% set hero_class = "hero-bad" %}
     {% set verdict_label = "High risk" %}
+
   {% endif %}
 
-  <div class="scoreBox">
+  <div class="scoreBox {{ hero_class }}">
     <div class="scoreHeader">
+
       <div>
         <div class="scoreTitle">Match score</div>
-        <div class="score">{{ result.score }}</div>
-        <div class="verdict {{ verdict_class }}">{{ verdict_label }}</div>
-        <div class="muted small">Confidence: {{ result.confidence }}</div>
+
+        <div class="score">
+          {{ result.score }}
+        </div>
+
+        <div class="verdict {{ verdict_class }}">
+          {{ verdict_label }}
+        </div>
+
+        {% if result.confidence == "LOW" %}
+          <div class="resultWarning">
+            Some important information is missing, so treat this result as an estimate.
+          </div>
+        {% endif %}
       </div>
 
       <div class="tipBubble">
         <span class="tip">What is this?</span>
+
         <div class="tipContent">
           <p>
             This score is a practical guide, not a guarantee. It estimates how
@@ -88,43 +107,54 @@
           </p>
         </div>
       </div>
+
     </div>
   </div>
 
-{% if result.actions %}
-<div class="card">
-  <h3>Recommended actions</h3>
+  {% if result.actions %}
+    <div class="card">
+      <h3>Recommended actions</h3>
 
-  <div class="actionList">
-    {% for action in result.actions %}
-      <div class="actionItem">
-        <span class="actionNumber">{{ loop.index }}</span>
-        <span>{{ action }}</span>
+      <div class="actionList">
+        {% for action in result.actions %}
+          <div class="actionItem">
+            <span class="actionNumber">
+              {{ loop.index }}
+            </span>
+
+            <span>
+              {{ action }}
+            </span>
+          </div>
+        {% endfor %}
       </div>
-    {% endfor %}
-  </div>
-</div>
-{% endif %}
+    </div>
+  {% endif %}
 
   <div class="card">
     <h3>Listing summary</h3>
+
     <div class="summary-grid">
       <div>
         <span class="label">Name</span>
         {{ listing.listing_name or "Unnamed listing" }}
       </div>
+
       <div>
         <span class="label">Rent</span>
         R{{ listing.rent }}
       </div>
+
       <div>
         <span class="label">Deposit</span>
         R{{ listing.deposit }}
       </div>
+
       <div>
         <span class="label">Application fee</span>
         R{{ listing.application_fee }}
       </div>
+
       <div>
         <span class="label">Demand</span>
         {{ listing.area_demand }}
@@ -133,75 +163,97 @@
   </div>
 
   {% if result.breakdown %}
-  <div class="card breakdownCard">
-    <details class="breakdownDetails" open>
-      <summary class="breakdownSummary">Why you got this score</summary>
+    <div class="card breakdownCard">
+      <details class="breakdownDetails" open>
 
-      <div class="breakdownList">
-        {% for b in result.breakdown %}
-          {% set delta = b.delta %}
-          {% set before = b.before %}
-          {% set after = b.after %}
-          {% set learn = learn_links.get(b.title) %}
+        <summary class="breakdownSummary">
+          Why you got this score
+        </summary>
 
-          {% set badge_class = "zero" %}
-          {% if delta > 0 %}{% set badge_class = "pos" %}{% endif %}
-          {% if delta < 0 %}{% set badge_class = "neg" %}{% endif %}
+        <div class="breakdownList">
+          {% for b in result.breakdown %}
 
-          {% set clamped = after %}
-          {% if clamped < 0 %}{% set clamped = 0 %}{% endif %}
-          {% if clamped > 100 %}{% set clamped = 100 %}{% endif %}
+            {% set delta = b.delta %}
+            {% set before = b.before %}
+            {% set after = b.after %}
+            {% set learn = learn_links.get(b.title) %}
 
-          <div class="breakItem">
-            <div class="breakTop">
-              <div>
-                <div class="breakTitle">{{ b.title }}</div>
+            {% set badge_class = "zero" %}
 
-                {% if b.details %}
-                  <div class="breakDetailsText">{{ b.details }}</div>
-                {% endif %}
+            {% if delta > 0 %}
+              {% set badge_class = "pos" %}
+            {% elif delta < 0 %}
+              {% set badge_class = "neg" %}
+            {% endif %}
 
-                {% if learn %}
-                  <a class="learnInlineLink" href="{{ learn.url }}">
-                    {{ learn.text }} →
-                  </a>
-                {% endif %}
-              </div>
+            {% set clamped = after %}
 
-              <div class="breakRight">
-                <div class="deltaBadge {{ badge_class }}">
-                  {% if delta > 0 %}+{% endif %}{{ delta }}
+            {% if clamped < 0 %}
+              {% set clamped = 0 %}
+            {% elif clamped > 100 %}
+              {% set clamped = 100 %}
+            {% endif %}
+
+            <div class="breakItem">
+
+              <div class="breakTop">
+                <div>
+                  <div class="breakTitle">
+                    {{ b.title }}
+                  </div>
+
+                  {% if b.details %}
+                    <div class="breakDetailsText">
+                      {{ b.details }}
+                    </div>
+                  {% endif %}
+
+                  {% if learn %}
+                    <a
+                      class="learnInlineLink"
+                      href="{{ learn.url }}"
+                    >
+                      {{ learn.text }} →
+                    </a>
+                  {% endif %}
                 </div>
-                <div class="arrowNums">{{ before }} → {{ after }}</div>
-              </div>
-            </div>
 
-            <div class="miniBar">
-              <div class="miniBarFill" style="width: {{ clamped }}%;"></div>
+                <div class="breakRight">
+                  <div class="deltaBadge {{ badge_class }}">
+                    {% if delta > 0 %}+{% endif %}{{ delta }}
+                  </div>
+
+                  <div class="arrowNums">
+                    {{ before }} → {{ after }}
+                  </div>
+                </div>
+              </div>
+
+              <div class="miniBar">
+                <div
+                  class="miniBarFill"
+                  style="width: {{ clamped }}%;"
+                ></div>
+              </div>
+
             </div>
-          </div>
-        {% endfor %}
-      </div>
-    </details>
-  </div>
+          {% endfor %}
+        </div>
+
+      </details>
+    </div>
   {% endif %}
 
   <div class="actions">
-    <a class="btn" href="/evaluate">Evaluate another</a>
-    <a class="btn secondary" href="/signup">Sign up to save history</a>
+    <a class="btn" href="/evaluate">
+      Evaluate another
+    </a>
+
+    <a class="btn secondary" href="/signup">
+      Sign up to save history
+    </a>
   </div>
 
 </section>
 
 {% endblock %}
-.hero-good{
-    background:linear-gradient(135deg,#16a34a,#15803d);
-}
-
-.hero-borderline{
-    background:linear-gradient(135deg,#f59e0b,#d97706);
-}
-
-.hero-bad{
-    background:linear-gradient(135deg,#ef4444,#b91c1c);
-}
