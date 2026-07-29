@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import logging
 import os
 from dataclasses import asdict
 from typing import Literal
@@ -21,6 +22,8 @@ MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_IMAGE_EDGE = 1800
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
+
+logger = logging.getLogger(__name__)
 
 
 class ListingImportError(Exception):
@@ -129,11 +132,15 @@ def _call_gemini(images: list[tuple[str, bytes, str]]) -> GeminiListingExtractio
         raise ListingImportError("Screenshot extraction is not configured yet.")
 
     client = genai.Client(api_key=api_key)
-    contents: list[object] = [EXTRACTION_PROMPT]
-    contents.extend(
+
+    # Put the image parts first and the extraction instruction last. This mirrors
+    # Google's documented inline-image request shape and keeps all screenshots in
+    # a single multimodal request.
+    contents: list[object] = [
         types.Part.from_bytes(data=content, mime_type=content_type)
         for _, content, content_type in images
-    )
+    ]
+    contents.append(EXTRACTION_PROMPT)
 
     try:
         response = client.models.generate_content(
@@ -141,22 +148,53 @@ def _call_gemini(images: list[tuple[str, bytes, str]]) -> GeminiListingExtractio
             contents=contents,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
-                response_json_schema=GeminiListingExtraction.model_json_schema(),
+                response_schema=GeminiListingExtraction,
                 temperature=0,
             ),
         )
     except Exception as exc:
+        logger.exception("Gemini listing extraction failed with model %s", model)
+        message = str(exc).lower()
+
+        if "api key" in message or "api_key" in message or "401" in message or "403" in message:
+            raise ListingImportError(
+                "The image-reading service is not configured correctly. Check the API key in Render and redeploy."
+            ) from exc
+        if "429" in message or "quota" in message or "resource_exhausted" in message:
+            raise ListingImportError(
+                "The image-reading service has reached its temporary usage limit. Please try again later."
+            ) from exc
+        if "model" in message and ("not found" in message or "unsupported" in message):
+            raise ListingImportError(
+                f"The configured image-reading model is unavailable. Check the model setting in Render."
+            ) from exc
+        if "mime" in message or "image" in message or "inline" in message:
+            raise ListingImportError(
+                "One of the images could not be processed. Try a clear JPEG or PNG screenshot."
+            ) from exc
+
         raise ListingImportError(
-            "Gemini could not read the screenshots. Please try again or enter the listing manually."
+            "The screenshots could not be processed. Check the Render logs for the detailed provider error."
         ) from exc
 
+    # The SDK can parse directly into the Pydantic response schema. Prefer that
+    # over reparsing response.text when available.
+    if isinstance(response.parsed, GeminiListingExtraction):
+        return response.parsed
+
     if not response.text:
-        raise ListingImportError("Gemini did not return any listing information.")
+        logger.error("Gemini returned no text or parsed extraction: %r", response)
+        raise ListingImportError(
+            "No listing information was found. Try a clearer or less-cropped screenshot."
+        )
 
     try:
         return GeminiListingExtraction.model_validate_json(response.text)
     except Exception as exc:
-        raise ListingImportError("Gemini returned an invalid extraction response.") from exc
+        logger.exception("Gemini returned invalid structured output: %s", response.text)
+        raise ListingImportError(
+            "The image was read, but the extracted information was invalid. Please try again."
+        ) from exc
 
 
 def _field(field: GeminiMoneyField | GeminiTextField) -> ExtractedField:
