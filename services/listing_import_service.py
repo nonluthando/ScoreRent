@@ -12,6 +12,7 @@ from google.genai import types
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, Field
 
+from evaluator import DOCUMENT_ALIASES, document_matches, normalize_document_text
 from schemas.listing_import import ExtractedField, ListingExtraction
 
 
@@ -166,6 +167,30 @@ def _field(field: GeminiMoneyField | GeminiTextField) -> ExtractedField:
     )
 
 
+
+def normalize_required_documents(documents: list[str]) -> list[str]:
+    """Map model wording to the evaluator's canonical document names."""
+    canonical_documents: list[str] = []
+
+    for document in documents:
+        cleaned = normalize_document_text(document)
+        if not cleaned:
+            continue
+
+        matched = next(
+            (
+                canonical
+                for canonical in DOCUMENT_ALIASES
+                if document_matches(canonical, cleaned)
+            ),
+            None,
+        )
+
+        if matched and matched not in canonical_documents:
+            canonical_documents.append(matched)
+
+    return canonical_documents
+
 def _to_listing_extraction(result: GeminiListingExtraction) -> ListingExtraction:
     warnings = list(result.warnings)
     if result.rent.value is None:
@@ -177,7 +202,7 @@ def _to_listing_extraction(result: GeminiListingExtraction) -> ListingExtraction
 
     # Preserve order while removing repeated model-generated warnings/documents.
     warnings = list(dict.fromkeys(warnings))
-    required_documents = list(dict.fromkeys(result.required_documents))
+    required_documents = normalize_required_documents(result.required_documents)
 
     return ListingExtraction(
         listing_name=_field(result.listing_name),
