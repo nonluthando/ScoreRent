@@ -21,7 +21,7 @@ MAX_IMAGES = 4
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_IMAGE_EDGE = 1800
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
+DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
 
 logger = logging.getLogger(__name__)
 
