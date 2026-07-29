@@ -47,7 +47,7 @@
       <div class="checkbox-group">
         {% for doc in (doc_clusters["worker"] | sort) %}
           <label class="checkbox">
-            <input type="checkbox" name="renter_docs" value="{{ doc }}"
+            <input type="checkbox" name="submitted_documents" value="{{ doc }}"
               {% if doc in docs_selected %}checked{% endif %}/>
             <span>{{ doc.replace("_", " ").title() }}</span>
           </label>
@@ -55,7 +55,7 @@
 
         {% for doc in (doc_clusters["new_professional"] | sort) %}
           <label class="checkbox">
-            <input type="checkbox" name="renter_docs" value="{{ doc }}"
+            <input type="checkbox" name="submitted_documents" value="{{ doc }}"
               {% if doc in docs_selected %}checked{% endif %}/>
             <span>{{ doc.replace("_", " ").title() }}</span>
           </label>
@@ -63,7 +63,7 @@
 
         {% for doc in (doc_clusters["student"] | sort) %}
           <label class="checkbox">
-            <input type="checkbox" name="renter_docs" value="{{ doc }}"
+            <input type="checkbox" name="submitted_documents" value="{{ doc }}"
               {% if doc in docs_selected %}checked{% endif %}/>
             <span>{{ doc.replace("_", " ").title() }}</span>
           </label>

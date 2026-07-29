@@ -10,6 +10,14 @@
     </p>
   </div>
 
+  {% if user %}
+    <div class="card">
+      <strong>Have listing screenshots?</strong>
+      <p class="muted">Let ScoreRent read them, then confirm the extracted details before evaluation.</p>
+      <a class="button" href="/import-listing">Import screenshots</a>
+    </div>
+  {% endif %}
+
   <form method="post" class="card stack">
 
     {% if not user %}
@@ -86,7 +94,7 @@
               <label class="checkbox">
                 <input
                   type="checkbox"
-                  name="guest_renter_docs"
+                  name="guest_submitted_documents"
                   value="{{ doc }}"
                 />
 
@@ -107,7 +115,7 @@
               <label class="checkbox">
                 <input
                   type="checkbox"
-                  name="guest_renter_docs"
+                  name="guest_submitted_documents"
                   value="{{ doc }}"
                 />
 
@@ -128,7 +136,7 @@
               <label class="checkbox">
                 <input
                   type="checkbox"
-                  name="guest_renter_docs"
+                  name="guest_submitted_documents"
                   value="{{ doc }}"
                 />
 
@@ -141,7 +149,7 @@
             <label class="checkbox">
               <input
                 type="checkbox"
-                name="guest_renter_docs"
+                name="guest_submitted_documents"
                 value="guarantor_letter"
               />
 
@@ -151,7 +159,7 @@
             <label class="checkbox">
               <input
                 type="checkbox"
-                name="guest_renter_docs"
+                name="guest_submitted_documents"
                 value="guarantor_payslip"
               />
 
@@ -161,7 +169,7 @@
             <label class="checkbox">
               <input
                 type="checkbox"
-                name="guest_renter_docs"
+                name="guest_submitted_documents"
                 value="guarantor_bank_statement"
               />
 
