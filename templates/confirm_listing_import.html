@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Confirm imported listing · ScoreRent{% endblock %}
+{% block content %}
+<section class="stack" style="padding-top:26px;">
+  <div class="stack" style="gap:10px;">
+    <p class="eyebrow">Review required</p>
+    <h2>Confirm imported listing</h2>
+    <p>Correct anything the image reader misread. Blank fields were not confidently found.</p>
+  </div>
+
+  {% if extraction.warnings %}
+    <div class="card stack">
+      <h3>Check these fields</h3>
+      {% for warning in extraction.warnings %}<p class="muted">{{ warning }}</p>{% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" action="/evaluate" class="card stack">
+    <div class="grid-2">
+      <div class="stack">
+        <label for="listing_name">Listing name</label>
+        <input id="listing_name" name="listing_name" value="{{ extraction.listing_name.value or '' }}">
+        {% if extraction.listing_name.evidence %}<small class="muted">Read from: {{ extraction.listing_name.evidence }}</small>{% endif %}
+      </div>
+      <div class="stack">
+        <label for="location">Location (reference only)</label>
+        <input id="location" value="{{ extraction.location.value or '' }}" disabled>
+        <small class="muted">Area demand still needs your judgement.</small>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="stack">
+        <label for="rent">Monthly rent (R)</label>
+        <input id="rent" name="rent" type="number" min="1" required value="{{ extraction.rent.value or '' }}">
+        {% if extraction.rent.evidence %}<small class="muted">Read from: {{ extraction.rent.evidence }}</small>{% endif %}
+      </div>
+      <div class="stack">
+        <label for="deposit">Deposit (R)</label>
+        <input id="deposit" name="deposit" type="number" min="0" required value="{{ extraction.deposit.value if extraction.deposit.value is not none else '' }}">
+        {% if extraction.deposit.evidence %}<small class="muted">Read from: {{ extraction.deposit.evidence }}</small>{% endif %}
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="stack">
+        <label for="application_fee">Application fee (R)</label>
+        <input id="application_fee" name="application_fee" type="number" min="0" required value="{{ extraction.application_fee.value if extraction.application_fee.value is not none else '' }}">
+        {% if extraction.application_fee.evidence %}<small class="muted">Read from: {{ extraction.application_fee.evidence }}</small>{% endif %}
+      </div>
+      <div class="stack">
+        <label for="area_demand">Area demand</label>
+        <select id="area_demand" name="area_demand">
+          {% for demand in demand_levels %}<option value="{{ demand }}" {% if demand == 'MEDIUM' %}selected{% endif %}>{{ demand }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="stack">
+      <label><strong>Documents required by the listing</strong></label>
+      <p class="muted small">Only select documents the listing actually requests.</p>
+      <div class="checkbox-group">
+        {% for document in available_documents %}
+          <label class="checkbox">
+            <input type="checkbox" name="required_documents" value="{{ document }}" {% if document in extraction.required_documents %}checked{% endif %}>
+            <span>{{ document.replace('_', ' ').title() }}</span>
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <button type="submit" class="button primary">Confirm and evaluate</button>
+  </form>
+
+  <details class="card">
+    <summary>View extracted listing text</summary>
+    <pre style="white-space:pre-wrap; overflow-wrap:anywhere;">{{ extraction.raw_text }}</pre>
+  </details>
+</section>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Import listing screenshots · ScoreRent{% endblock %}
+{% block content %}
+<section class="stack" style="padding-top:26px; max-width:760px;">
+  <div class="stack" style="gap:10px;">
+    <p class="eyebrow">AI-assisted import</p>
+    <h2>Import listing screenshots</h2>
+    <p>Upload up to four screenshots. ScoreRent will read the listing text, then ask you to confirm every field before evaluating it.</p>
+  </div>
+
+  {% if error %}
+    <div class="card" role="alert"><strong>Could not read the screenshots.</strong><p>{{ error }}</p></div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="card stack">
+    <label for="images"><strong>Listing screenshots</strong></label>
+    <input id="images" name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple required>
+    <p class="muted small">JPEG, PNG or WebP. Maximum four images and 5 MB each.</p>
+    <button type="submit" class="button primary">Read screenshots</button>
+  </form>
+
+  <div class="card stack">
+    <h3>What happens next</h3>
+    <p class="muted">Gemini extracts visible listing details only. It does not calculate your score. You review the rent, deposit, fees and documents before ScoreRent’s existing rules run.</p>
+  </div>
+</section>
+{% endblock %}
