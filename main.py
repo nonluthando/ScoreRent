@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from database import init_db
 from routers.api import router as api_router
 from routers.web import router as web_router
+from routers.listing_imports import router as listing_import_router
 
 
 app = FastAPI(title="ScoreRent")
@@ -16,6 +17,7 @@ app.mount(
 
 app.include_router(web_router)
 app.include_router(api_router)
+app.include_router(listing_import_router)
 
 
 @app.on_event("startup")
