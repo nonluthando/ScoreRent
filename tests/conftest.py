@@ -1,45 +1,65 @@
 import os
+from urllib.parse import urlparse
 
 import pytest
-from fastapi.testclient import TestClient
 
+# Ensure imports never default to the development database during test collection.
 os.environ.setdefault(
     "DATABASE_URL",
-    "postgresql://scorerent:scorerent@localhost:5432/scorerent",
+    os.getenv(
+        "TEST_DATABASE_URL",
+        "postgresql://scorerent:scorerent@localhost:5432/scorerent_test_unconfigured",
+    ),
 )
+os.environ.setdefault("SECRET_KEY", "test-secret-key")
 
-os.environ.setdefault(
-    "SECRET_KEY",
-    "test-secret-key",
-)
 
-from database import get_conn, init_db
-from main import app
+def _configured_test_database_url() -> str:
+    database_url = os.getenv("TEST_DATABASE_URL", "").strip()
+    if not database_url:
+        pytest.skip("Set TEST_DATABASE_URL to run database-backed tests.")
+
+    database_name = urlparse(database_url).path.lstrip("/").lower()
+    if "test" not in database_name:
+        raise RuntimeError(
+            "Refusing destructive tests: the TEST_DATABASE_URL database name must contain 'test'."
+        )
+
+    return database_url
 
 
 @pytest.fixture(scope="session")
 def client():
+    database_url = _configured_test_database_url()
+    os.environ["DATABASE_URL"] = database_url
+
+    # Imports are delayed until the safe test URL is verified.
+    import database
+    database.DATABASE_URL = database_url
+    from fastapi.testclient import TestClient
+    from main import app
+
+    database.init_db()
     return TestClient(app)
 
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_database():
-    init_db()
-    yield
-
-
 @pytest.fixture(autouse=True)
-def clean_database():
-    conn = get_conn()
+def clean_database(request):
+    if "client" not in request.fixturenames:
+        yield
+        return
 
+    database_url = _configured_test_database_url()
+    import database
+    database.DATABASE_URL = database_url
+
+    conn = database.get_conn()
     try:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM evaluations")
             cur.execute("DELETE FROM profiles")
             cur.execute("DELETE FROM users")
-
         conn.commit()
-
     finally:
         conn.close()
 
@@ -76,18 +96,12 @@ def student_payload():
 
 
 def assert_reason_contains(result, text):
-    assert any(text.lower() in reason.lower() for reason in result.reasons), (
-        f"Expected reason containing '{text}'. Got {result.reasons}"
-    )
+    assert any(text.lower() in reason.lower() for reason in result.reasons)
 
 
 def assert_action_contains(result, text):
-    assert any(text.lower() in action.lower() for action in result.actions), (
-        f"Expected action containing '{text}'. Got {result.actions}"
-    )
+    assert any(text.lower() in action.lower() for action in result.actions)
 
 
 def assert_score_range(result, minimum, maximum):
-    assert minimum <= result.score <= maximum, (
-        f"Expected score between {minimum} and {maximum}. Got {result.score}."
-    )
+    assert minimum <= result.score <= maximum
