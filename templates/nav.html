@@ -9,6 +9,7 @@
   <div class="navLinks">
     {% if logged_in %}
       <a class="navLink navCta {% if path == '/evaluate' %}active{% endif %}" href="/evaluate">Evaluate</a>
+      <a class="navLink {% if path == '/import-listing' %}active{% endif %}" href="/import-listing">Import</a>
       <a class="navLink {% if path == '/profile' %}active{% endif %}" href="/profile">Profile</a>
       <a class="navLink {% if path == '/history' %}active{% endif %}" href="/history">History</a>
       <a class="navLink {% if path.startswith('/learn') %}active{% endif %}" href="/learn">Learn</a>
