@@ -371,3 +371,22 @@ GitHub: https://github.com/nonluthando
 Portfolio: https://nonluthando.github.io/portfolio-v2
 
 Live Demo: https://scorerent.onrender.com
+
+## Listing screenshot import
+
+ScoreRent can send up to four rental-listing screenshots directly to the Gemini API and show an editable confirmation page before running the normal rules-based evaluator. Gemini extracts listing facts only; it never calculates the ScoreRent score or verdict.
+
+### Configure Gemini
+
+1. Create an API key in Google AI Studio.
+2. Add `GEMINI_API_KEY` to the ScoreRent service environment variables.
+3. Optionally set `GEMINI_MODEL`; the default is `gemini-2.5-flash-lite`.
+4. Redeploy ScoreRent.
+
+The import feature is available to authenticated users at `/import-listing`.
+
+### Privacy boundary
+
+Images are validated and resized in memory, sent directly from the ScoreRent backend to Gemini, and not written to ScoreRent's database. The prompt excludes contact details from the returned data. Users must review all extracted values before the existing deterministic evaluator runs.
+
+For free-tier Gemini API usage, submitted content may be used by Google to improve its products. Use synthetic or non-sensitive screenshots during portfolio testing, and clearly disclose this before accepting public uploads.
