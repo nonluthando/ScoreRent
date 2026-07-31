@@ -23,9 +23,9 @@
         {% if extraction.listing_name.evidence %}<small class="muted">Read from: {{ extraction.listing_name.evidence }}</small>{% endif %}
       </div>
       <div class="stack">
-        <label for="location">Location (reference only)</label>
-        <input id="location" value="{{ extraction.location.value or '' }}" disabled>
-        <small class="muted">Area demand still needs your judgement.</small>
+        <label for="location">Location</label>
+        <input id="location" name="location" value="{{ extraction.location.value or '' }}">
+        <small class="muted">Used for reference only. ScoreRent does not infer safety or demand.</small>
       </div>
     </div>
 
@@ -69,7 +69,35 @@
       </div>
     </div>
 
-    <button type="submit" class="button primary">Confirm and evaluate</button>
+    <div class="grid-2">
+      <div class="stack">
+        <label for="amenities_text">Amenities</label>
+        <textarea id="amenities_text" name="amenities_text" rows="7" placeholder="One amenity per line">{{ extraction.amenities | join('\n') }}</textarea>
+        <small class="muted">Examples: Wi-Fi included, furnished, parking, laundry.</small>
+      </div>
+      <div class="stack">
+        <label for="source_url">Listing link</label>
+        <input id="source_url" name="source_url" type="url" placeholder="https://...">
+        <label for="notes">Your notes</label>
+        <textarea id="notes" name="notes" rows="4" placeholder="Questions to ask, viewing notes, commute details..."></textarea>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="stack">
+        <label for="pros_text">Factual pros</label>
+        <textarea id="pros_text" name="pros_text" rows="6" placeholder="One supported benefit per line">{{ extraction.pros | join('\n') }}</textarea>
+      </div>
+      <div class="stack">
+        <label for="cons_text">Factual cons</label>
+        <textarea id="cons_text" name="cons_text" rows="6" placeholder="One supported limitation per line">{{ extraction.cons | join('\n') }}</textarea>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <button type="submit" class="button primary">Evaluate now</button>
+      <button type="submit" formaction="/listings" class="button">Save listing</button>
+    </div>
   </form>
 
   <details class="card">

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Saved listings · ScoreRent{% endblock %}
+{% block content %}
+<section class="stack" style="padding-top:26px;">
+  <div class="pageHeader">
+    <div>
+      <p class="eyebrow">Rental shortlist</p>
+      <h2>Saved listings</h2>
+      <p class="muted">Keep the costs, amenities and practical trade-offs in one place.</p>
+    </div>
+    <a class="button primary" href="/import-listing">Import listing</a>
+  </div>
+
+  {% if not listings %}
+    <div class="card stack">
+      <h3>No saved listings yet</h3>
+      <p class="muted">Import a screenshot and choose “Save listing” after reviewing the details.</p>
+      <a class="button primary" href="/import-listing">Import your first listing</a>
+    </div>
+  {% else %}
+    <div class="grid-2">
+      {% for listing in listings %}
+        <article class="card stack">
+          <div>
+            <p class="eyebrow">{{ listing.location or 'Location not added' }}</p>
+            <h3>{{ listing.title }}</h3>
+          </div>
+          <div class="metricGrid">
+            <div><span class="muted small">Rent</span><strong>R{{ '{:,}'.format(listing.monthly_rent) }}</strong></div>
+            <div><span class="muted small">Upfront</span><strong>R{{ '{:,}'.format(listing.upfront_cost) }}</strong></div>
+          </div>
+          {% if listing.amenities %}
+            <div class="tagList">
+              {% for amenity in listing.amenities[:5] %}<span class="tag">{{ amenity }}</span>{% endfor %}
+            </div>
+          {% endif %}
+          <a class="button" href="/listings/{{ listing.id }}">View details</a>
+        </article>
+      {% endfor %}
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

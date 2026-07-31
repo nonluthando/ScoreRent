@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ listing.title }} · ScoreRent{% endblock %}
+{% block content %}
+<section class="stack" style="padding-top:26px;">
+  <div class="pageHeader">
+    <div>
+      <p class="eyebrow">Saved listing</p>
+      <h2>{{ listing.title }}</h2>
+      <p class="muted">{{ listing.location or 'Location not added' }}</p>
+    </div>
+    <a class="button" href="/listings">Back to listings</a>
+  </div>
+
+  <div class="grid-2">
+    <article class="card stack">
+      <h3>Costs</h3>
+      <div class="detailRow"><span>Monthly rent</span><strong>R{{ '{:,}'.format(listing.monthly_rent) }}</strong></div>
+      <div class="detailRow"><span>Deposit</span><strong>R{{ '{:,}'.format(listing.deposit) }}</strong></div>
+      <div class="detailRow"><span>Application fee</span><strong>R{{ '{:,}'.format(listing.application_fee) }}</strong></div>
+      <div class="detailRow"><span>Initial cost</span><strong>R{{ '{:,}'.format(listing.upfront_cost) }}</strong></div>
+      <p class="muted small">Initial cost = first month’s rent + deposit + application fee.</p>
+    </article>
+
+    <article class="card stack">
+      <h3>Amenities</h3>
+      {% if listing.amenities %}
+        <div class="tagList">{% for item in listing.amenities %}<span class="tag">{{ item }}</span>{% endfor %}</div>
+      {% else %}<p class="muted">No amenities recorded.</p>{% endif %}
+    </article>
+  </div>
+
+  <div class="grid-2">
+    <article class="card stack">
+      <h3>Pros</h3>
+      {% if listing.pros %}<ul>{% for item in listing.pros %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p class="muted">No pros recorded.</p>{% endif %}
+    </article>
+    <article class="card stack">
+      <h3>Cons</h3>
+      {% if listing.cons %}<ul>{% for item in listing.cons %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p class="muted">No cons recorded.</p>{% endif %}
+    </article>
+  </div>
+
+  <article class="card stack">
+    <h3>Notes and source</h3>
+    <p>{{ listing.notes or 'No personal notes added.' }}</p>
+    {% if listing.source_url %}<a href="{{ listing.source_url }}" target="_blank" rel="noopener noreferrer">Open original listing</a>{% endif %}
+  </article>
+</section>
+{% endblock %}
