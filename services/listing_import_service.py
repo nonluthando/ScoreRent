@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import io
-import logging
 import os
 from dataclasses import asdict
 from typing import Literal
@@ -21,9 +20,7 @@ MAX_IMAGES = 4
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_IMAGE_EDGE = 1800
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
-DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
-
-logger = logging.getLogger(__name__)
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 
 class ListingImportError(Exception):
@@ -58,6 +55,18 @@ class GeminiListingExtraction(BaseModel):
     deposit: GeminiMoneyField
     application_fee: GeminiMoneyField
     required_documents: list[str] = Field(default_factory=list)
+    amenities: list[str] = Field(
+        default_factory=list,
+        description="Amenities explicitly stated or clearly visible in the listing.",
+    )
+    pros: list[str] = Field(
+        default_factory=list,
+        description="Short factual advantages supported by the listing, not recommendations.",
+    )
+    cons: list[str] = Field(
+        default_factory=list,
+        description="Short factual limitations or extra costs explicitly shown in the listing.",
+    )
     warnings: list[str] = Field(default_factory=list)
     visible_text_summary: str = Field(
         default="",
@@ -82,6 +91,10 @@ Rules:
   set confidence to medium and quote the wording as evidence.
 - Application fee includes an explicitly labelled application, admin, or screening fee only.
 - Extract required documents only when the landlord or agent explicitly requests them.
+- Extract amenities only when explicitly stated or clearly visible, such as Wi-Fi, parking, furnished, laundry, security, backup power, utilities included, pet friendly, pool, gym, or proximity to transport/campus.
+- Pros must be short factual benefits supported by the screenshots, such as "Wi-Fi included" or "No deposit required".
+- Cons must be short factual limitations or extra costs supported by the screenshots, such as "Electricity excluded" or "No parking".
+- Never invent subjective claims such as safe, beautiful, ideal, spacious, affordable, or good value unless the listing explicitly states the underlying fact.
 - Exclude phone numbers, email addresses, names of private individuals, and other contact details.
 - Location is reference information only; never infer market demand, safety, affordability, or a ScoreRent verdict.
 - Do not score the property and do not recommend whether the user should apply.
@@ -132,15 +145,11 @@ def _call_gemini(images: list[tuple[str, bytes, str]]) -> GeminiListingExtractio
         raise ListingImportError("Screenshot extraction is not configured yet.")
 
     client = genai.Client(api_key=api_key)
-
-    # Put the image parts first and the extraction instruction last. This mirrors
-    # Google's documented inline-image request shape and keeps all screenshots in
-    # a single multimodal request.
-    contents: list[object] = [
+    contents: list[object] = [EXTRACTION_PROMPT]
+    contents.extend(
         types.Part.from_bytes(data=content, mime_type=content_type)
         for _, content, content_type in images
-    ]
-    contents.append(EXTRACTION_PROMPT)
+    )
 
     try:
         response = client.models.generate_content(
@@ -148,53 +157,22 @@ def _call_gemini(images: list[tuple[str, bytes, str]]) -> GeminiListingExtractio
             contents=contents,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
-                response_schema=GeminiListingExtraction,
+                response_json_schema=GeminiListingExtraction.model_json_schema(),
                 temperature=0,
             ),
         )
     except Exception as exc:
-        logger.exception("Gemini listing extraction failed with model %s", model)
-        message = str(exc).lower()
-
-        if "api key" in message or "api_key" in message or "401" in message or "403" in message:
-            raise ListingImportError(
-                "The image-reading service is not configured correctly. Check the API key in Render and redeploy."
-            ) from exc
-        if "429" in message or "quota" in message or "resource_exhausted" in message:
-            raise ListingImportError(
-                "The image-reading service has reached its temporary usage limit. Please try again later."
-            ) from exc
-        if "model" in message and ("not found" in message or "unsupported" in message):
-            raise ListingImportError(
-                f"The configured image-reading model is unavailable. Check the model setting in Render."
-            ) from exc
-        if "mime" in message or "image" in message or "inline" in message:
-            raise ListingImportError(
-                "One of the images could not be processed. Try a clear JPEG or PNG screenshot."
-            ) from exc
-
         raise ListingImportError(
-            "The screenshots could not be processed. Check the Render logs for the detailed provider error."
+            "The image-reading service could not process the screenshots. Please try again or enter the listing manually."
         ) from exc
 
-    # The SDK can parse directly into the Pydantic response schema. Prefer that
-    # over reparsing response.text when available.
-    if isinstance(response.parsed, GeminiListingExtraction):
-        return response.parsed
-
     if not response.text:
-        logger.error("Gemini returned no text or parsed extraction: %r", response)
-        raise ListingImportError(
-            "No listing information was found. Try a clearer or less-cropped screenshot."
-        )
+        raise ListingImportError("The image-reading service did not return any listing information.")
 
     try:
         return GeminiListingExtraction.model_validate_json(response.text)
     except Exception as exc:
-        logger.exception("Gemini returned invalid structured output: %s", response.text)
-        raise ListingImportError(
-            "The image was read, but the extracted information was invalid. Please try again."
-        ) from exc
+        raise ListingImportError("The image-reading service returned an invalid extraction response.") from exc
 
 
 def _field(field: GeminiMoneyField | GeminiTextField) -> ExtractedField:
@@ -249,6 +227,9 @@ def _to_listing_extraction(result: GeminiListingExtraction) -> ListingExtraction
         deposit=_field(result.deposit),
         application_fee=_field(result.application_fee),
         required_documents=required_documents,
+        amenities=list(dict.fromkeys(item.strip() for item in result.amenities if item.strip())),
+        pros=list(dict.fromkeys(item.strip() for item in result.pros if item.strip())),
+        cons=list(dict.fromkeys(item.strip() for item in result.cons if item.strip())),
         warnings=warnings,
         raw_text=result.visible_text_summary,
     )
