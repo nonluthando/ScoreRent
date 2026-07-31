@@ -390,3 +390,31 @@ The import feature is available to authenticated users at `/import-listing`.
 Images are validated and resized in memory, sent directly from the ScoreRent backend to Gemini, and not written to ScoreRent's database. The prompt excludes contact details from the returned data. Users must review all extracted values before the existing deterministic evaluator runs.
 
 For free-tier Gemini API usage, submitted content may be used by Google to improve its products. Use synthetic or non-sensitive screenshots during portfolio testing, and clearly disclose this before accepting public uploads.
+
+## Screenshot import configuration
+
+Set these environment variables on Render:
+
+```text
+GEMINI_API_KEY=your-key
+GEMINI_MODEL=gemini-2.5-flash-lite
+```
+
+Screenshot imports are limited to five attempts per signed-in user per hour per app instance. Users should crop out personal information before upload because screenshots are sent to Google Gemini.
+
+## Safe test database
+
+Database-backed tests require a dedicated database whose name contains `test`:
+
+```bash
+export TEST_DATABASE_URL=postgresql://user:password@localhost:5432/scorerent_test
+pytest
+```
+
+Without `TEST_DATABASE_URL`, pure unit tests still run and database-backed tests are skipped. The test suite will refuse to clean a database whose name does not contain `test`.
+
+## Saved listings
+
+Authenticated users can now save imported listings with costs, location, required documents,
+amenities, factual pros and cons, source links, and personal notes. The database table is created
+on application startup. Imported information must still be reviewed before it is saved.

@@ -67,6 +67,31 @@ def init_db():
                 """
             )
 
+            # Saved listings
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS listings (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    title TEXT NOT NULL,
+                    location TEXT,
+                    monthly_rent INTEGER NOT NULL,
+                    deposit INTEGER NOT NULL DEFAULT 0,
+                    application_fee INTEGER NOT NULL DEFAULT 0,
+                    upfront_cost INTEGER NOT NULL,
+                    area_demand TEXT NOT NULL DEFAULT 'MEDIUM',
+                    required_documents_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    amenities_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    pros_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    cons_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    source_url TEXT,
+                    notes TEXT,
+                    created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL
+                )
+                """
+            )
+
             # Indexes for performance
             cur.execute(
                 "CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON profiles(user_id)"
@@ -74,6 +99,10 @@ def init_db():
 
             cur.execute(
                 "CREATE INDEX IF NOT EXISTS idx_evaluations_user_id ON evaluations(user_id)"
+            )
+
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_listings_user_id ON listings(user_id)"
             )
 
         conn.commit()
