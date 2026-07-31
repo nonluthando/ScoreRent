@@ -19,5 +19,8 @@ class ListingExtraction:
     deposit: ExtractedField = field(default_factory=ExtractedField)
     application_fee: ExtractedField = field(default_factory=ExtractedField)
     required_documents: list[str] = field(default_factory=list)
+    amenities: list[str] = field(default_factory=list)
+    pros: list[str] = field(default_factory=list)
+    cons: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     raw_text: str = ""
