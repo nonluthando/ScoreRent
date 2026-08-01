@@ -418,3 +418,14 @@ Without `TEST_DATABASE_URL`, pure unit tests still run and database-backed tests
 Authenticated users can now save imported listings with costs, location, required documents,
 amenities, factual pros and cons, source links, and personal notes. The database table is created
 on application startup. Imported information must still be reviewed before it is saved.
+
+## Distance and travel-time calculations
+
+ScoreRent can save personal destinations such as work or campus and calculate driving, walking, or cycling routes from a saved listing.
+
+1. Create a free Geoapify project and copy its API key.
+2. Add `GEOAPIFY_API_KEY` to the Render environment.
+3. Redeploy the service.
+4. In ScoreRent, open **Destinations**, save a place, then open a listing and calculate a route.
+
+Route results are cached in the database for each listing, destination, and travel mode. Public-transport routing is intentionally excluded from the first version because schedule coverage and reliability vary by location.

@@ -130,6 +130,28 @@ def listing_detail_page(request: Request, listing_id: int):
             )
             row = cur.fetchone()
 
+            cur.execute(
+                """
+                SELECT * FROM saved_destinations
+                WHERE user_id = %s
+                ORDER BY label ASC
+                """,
+                (user["id"],),
+            )
+            destinations = cur.fetchall()
+
+            cur.execute(
+                """
+                SELECT lc.*, sd.label AS destination_label, sd.address AS destination_address
+                FROM listing_commutes lc
+                JOIN saved_destinations sd ON sd.id = lc.destination_id
+                WHERE lc.listing_id = %s AND lc.user_id = %s
+                ORDER BY sd.label ASC, lc.travel_mode ASC
+                """,
+                (listing_id, user["id"]),
+            )
+            commutes = cur.fetchall()
+
     if not row:
         return RedirectResponse("/listings", status_code=303)
 
@@ -139,7 +161,28 @@ def listing_detail_page(request: Request, listing_id: int):
     listing["pros"] = _load_json(listing.pop("pros_json"), [])
     listing["cons"] = _load_json(listing.pop("cons_json"), [])
 
+    commute_items = []
+    for commute in commutes:
+        item = dict(commute)
+        item["distance_km"] = round(item["distance_metres"] / 1000, 1)
+        total_minutes = max(1, round(item["duration_seconds"] / 60))
+        item["duration_minutes"] = total_minutes
+        item["duration_label"] = (
+            f"{total_minutes // 60} hr {total_minutes % 60} min"
+            if total_minutes >= 60
+            else f"{total_minutes} min"
+        )
+        commute_items.append(item)
+
     return templates.TemplateResponse(
         "listing_detail.html",
-        {"request": request, "user": user, "listing": listing},
+        {
+            "request": request,
+            "user": user,
+            "listing": listing,
+            "destinations": destinations,
+            "commutes": commute_items,
+            "commute_error": request.query_params.get("commute_error"),
+            "commute_success": request.query_params.get("commute_success"),
+        },
     )

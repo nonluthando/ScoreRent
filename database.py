@@ -92,6 +92,50 @@ def init_db():
                 """
             )
 
+            # Saved destinations for commute comparisons
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS saved_destinations (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    label TEXT NOT NULL,
+                    address TEXT NOT NULL,
+                    latitude DOUBLE PRECISION NOT NULL,
+                    longitude DOUBLE PRECISION NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL,
+                    updated_at TIMESTAMPTZ NOT NULL
+                )
+                """
+            )
+
+            # Cached routes between saved listings and destinations
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS listing_commutes (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+                    destination_id INTEGER NOT NULL REFERENCES saved_destinations(id) ON DELETE CASCADE,
+                    travel_mode TEXT NOT NULL,
+                    distance_metres INTEGER NOT NULL,
+                    duration_seconds INTEGER NOT NULL,
+                    calculated_at TIMESTAMPTZ NOT NULL,
+                    UNIQUE (listing_id, destination_id, travel_mode)
+                )
+                """
+            )
+
+            # Safe additive migration for existing listing tables
+            cur.execute(
+                "ALTER TABLE listings ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION"
+            )
+            cur.execute(
+                "ALTER TABLE listings ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION"
+            )
+            cur.execute(
+                "ALTER TABLE listings ADD COLUMN IF NOT EXISTS geocoded_address TEXT"
+            )
+
             # Indexes for performance
             cur.execute(
                 "CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON profiles(user_id)"
@@ -103,6 +147,14 @@ def init_db():
 
             cur.execute(
                 "CREATE INDEX IF NOT EXISTS idx_listings_user_id ON listings(user_id)"
+            )
+
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_saved_destinations_user_id ON saved_destinations(user_id)"
+            )
+
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_listing_commutes_listing_id ON listing_commutes(listing_id)"
             )
 
         conn.commit()
