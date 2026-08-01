@@ -1,0 +1,771 @@
+diff --git a/README.md b/README.md
+index 55423ff..e335176 100644
+--- a/README.md
++++ b/README.md
+@@ -418,3 +418,14 @@ Without `TEST_DATABASE_URL`, pure unit tests still run and database-backed tests
+ Authenticated users can now save imported listings with costs, location, required documents,
+ amenities, factual pros and cons, source links, and personal notes. The database table is created
+ on application startup. Imported information must still be reviewed before it is saved.
++
++## Distance and travel-time calculations
++
++ScoreRent can save personal destinations such as work or campus and calculate driving, walking, or cycling routes from a saved listing.
++
++1. Create a free Geoapify project and copy its API key.
++2. Add `GEOAPIFY_API_KEY` to the Render environment.
++3. Redeploy the service.
++4. In ScoreRent, open **Destinations**, save a place, then open a listing and calculate a route.
++
++Route results are cached in the database for each listing, destination, and travel mode. Public-transport routing is intentionally excluded from the first version because schedule coverage and reliability vary by location.
+diff --git a/database.py b/database.py
+index a2372b8..6e3dd23 100644
+--- a/database.py
++++ b/database.py
+@@ -92,6 +92,50 @@ def init_db():
+                 """
+             )
+ 
++            # Saved destinations for commute comparisons
++            cur.execute(
++                """
++                CREATE TABLE IF NOT EXISTS saved_destinations (
++                    id SERIAL PRIMARY KEY,
++                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
++                    label TEXT NOT NULL,
++                    address TEXT NOT NULL,
++                    latitude DOUBLE PRECISION NOT NULL,
++                    longitude DOUBLE PRECISION NOT NULL,
++                    created_at TIMESTAMPTZ NOT NULL,
++                    updated_at TIMESTAMPTZ NOT NULL
++                )
++                """
++            )
++
++            # Cached routes between saved listings and destinations
++            cur.execute(
++                """
++                CREATE TABLE IF NOT EXISTS listing_commutes (
++                    id SERIAL PRIMARY KEY,
++                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
++                    listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
++                    destination_id INTEGER NOT NULL REFERENCES saved_destinations(id) ON DELETE CASCADE,
++                    travel_mode TEXT NOT NULL,
++                    distance_metres INTEGER NOT NULL,
++                    duration_seconds INTEGER NOT NULL,
++                    calculated_at TIMESTAMPTZ NOT NULL,
++                    UNIQUE (listing_id, destination_id, travel_mode)
++                )
++                """
++            )
++
++            # Safe additive migration for existing listing tables
++            cur.execute(
++                "ALTER TABLE listings ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION"
++            )
++            cur.execute(
++                "ALTER TABLE listings ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION"
++            )
++            cur.execute(
++                "ALTER TABLE listings ADD COLUMN IF NOT EXISTS geocoded_address TEXT"
++            )
++
+             # Indexes for performance
+             cur.execute(
+                 "CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON profiles(user_id)"
+@@ -105,6 +149,14 @@ def init_db():
+                 "CREATE INDEX IF NOT EXISTS idx_listings_user_id ON listings(user_id)"
+             )
+ 
++            cur.execute(
++                "CREATE INDEX IF NOT EXISTS idx_saved_destinations_user_id ON saved_destinations(user_id)"
++            )
++
++            cur.execute(
++                "CREATE INDEX IF NOT EXISTS idx_listing_commutes_listing_id ON listing_commutes(listing_id)"
++            )
++
+         conn.commit()
+     finally:
+         conn.close()
+diff --git a/main.py b/main.py
+index c7e1d8d..4ffc18c 100644
+--- a/main.py
++++ b/main.py
+@@ -6,6 +6,7 @@ from routers.api import router as api_router
+ from routers.web import router as web_router
+ from routers.listing_imports import router as listing_import_router
+ from routers.listings import router as listings_router
++from routers.commutes import router as commutes_router
+ 
+ 
+ app = FastAPI(title="ScoreRent")
+@@ -20,6 +21,7 @@ app.include_router(web_router)
+ app.include_router(api_router)
+ app.include_router(listing_import_router)
+ app.include_router(listings_router)
++app.include_router(commutes_router)
+ 
+ 
+ @app.on_event("startup")
+diff --git a/routers/commutes.py b/routers/commutes.py
+new file mode 100644
+index 0000000..2ed51f5
+--- /dev/null
++++ b/routers/commutes.py
+@@ -0,0 +1,220 @@
++from __future__ import annotations
++
++from datetime import datetime, timezone
++from urllib.parse import quote
++
++from fastapi import APIRouter, Form, Request
++from fastapi.responses import RedirectResponse
++from fastapi.templating import Jinja2Templates
++
++from auth import get_current_user
++from database import get_conn
++from services.geospatial_service import (
++    GeospatialServiceError,
++    SUPPORTED_TRAVEL_MODES,
++    calculate_route,
++    geocode_address,
++)
++
++router = APIRouter(tags=["commutes"])
++templates = Jinja2Templates(directory="templates")
++
++
++def _now():
++    return datetime.now(timezone.utc)
++
++
++@router.get("/destinations")
++def destinations_page(request: Request):
++    user = get_current_user(request)
++    if not user:
++        return RedirectResponse("/login", status_code=303)
++
++    with get_conn() as conn:
++        with conn.cursor() as cur:
++            cur.execute(
++                """
++                SELECT * FROM saved_destinations
++                WHERE user_id = %s
++                ORDER BY label ASC, created_at DESC
++                """,
++                (user["id"],),
++            )
++            destinations = cur.fetchall()
++
++    return templates.TemplateResponse(
++        "destinations.html",
++        {
++            "request": request,
++            "user": user,
++            "destinations": destinations,
++            "error": request.query_params.get("error"),
++            "success": request.query_params.get("success"),
++        },
++    )
++
++
++@router.post("/destinations")
++def save_destination(
++    request: Request,
++    label: str = Form(...),
++    address: str = Form(...),
++):
++    user = get_current_user(request)
++    if not user:
++        return RedirectResponse("/login", status_code=303)
++
++    clean_label = label.strip()
++    if not clean_label:
++        return RedirectResponse(
++            "/destinations?error=" + quote("Give this destination a name, such as Work or Campus."),
++            status_code=303,
++        )
++
++    try:
++        place = geocode_address(address)
++    except GeospatialServiceError as exc:
++        return RedirectResponse(
++            "/destinations?error=" + quote(str(exc)), status_code=303
++        )
++
++    with get_conn() as conn:
++        with conn.cursor() as cur:
++            cur.execute(
++                """
++                INSERT INTO saved_destinations (
++                    user_id, label, address, latitude, longitude, created_at, updated_at
++                )
++                VALUES (%s, %s, %s, %s, %s, %s, %s)
++                """,
++                (
++                    user["id"], clean_label, place.address,
++                    place.latitude, place.longitude, _now(), _now(),
++                ),
++            )
++        conn.commit()
++
++    return RedirectResponse(
++        "/destinations?success=" + quote(f"{clean_label} was saved."),
++        status_code=303,
++    )
++
++
++@router.post("/destinations/{destination_id}/delete")
++def delete_destination(request: Request, destination_id: int):
++    user = get_current_user(request)
++    if not user:
++        return RedirectResponse("/login", status_code=303)
++
++    with get_conn() as conn:
++        with conn.cursor() as cur:
++            cur.execute(
++                "DELETE FROM saved_destinations WHERE id = %s AND user_id = %s",
++                (destination_id, user["id"]),
++            )
++        conn.commit()
++
++    return RedirectResponse("/destinations", status_code=303)
++
++
++@router.post("/listings/{listing_id}/commutes")
++def calculate_listing_commute(
++    request: Request,
++    listing_id: int,
++    destination_id: int = Form(...),
++    travel_mode: str = Form("drive"),
++):
++    user = get_current_user(request)
++    if not user:
++        return RedirectResponse("/login", status_code=303)
++
++    clean_mode = travel_mode.strip().lower()
++    if clean_mode not in SUPPORTED_TRAVEL_MODES:
++        return RedirectResponse(
++            f"/listings/{listing_id}?commute_error=" + quote("Choose a valid travel mode."),
++            status_code=303,
++        )
++
++    with get_conn() as conn:
++        with conn.cursor() as cur:
++            cur.execute(
++                "SELECT * FROM listings WHERE id = %s AND user_id = %s",
++                (listing_id, user["id"]),
++            )
++            listing = cur.fetchone()
++
++            cur.execute(
++                "SELECT * FROM saved_destinations WHERE id = %s AND user_id = %s",
++                (destination_id, user["id"]),
++            )
++            destination = cur.fetchone()
++
++        if not listing or not destination:
++            return RedirectResponse("/listings", status_code=303)
++
++        try:
++            listing_latitude = listing.get("latitude")
++            listing_longitude = listing.get("longitude")
++
++            if listing_latitude is None or listing_longitude is None:
++                if not listing.get("location"):
++                    raise GeospatialServiceError(
++                        "Add a listing location before calculating a commute."
++                    )
++                listing_place = geocode_address(listing["location"])
++                listing_latitude = listing_place.latitude
++                listing_longitude = listing_place.longitude
++
++                with conn.cursor() as cur:
++                    cur.execute(
++                        """
++                        UPDATE listings
++                        SET latitude = %s, longitude = %s,
++                            geocoded_address = %s, updated_at = %s
++                        WHERE id = %s AND user_id = %s
++                        """,
++                        (
++                            listing_latitude, listing_longitude,
++                            listing_place.address, _now(), listing_id, user["id"],
++                        ),
++                    )
++
++            route = calculate_route(
++                float(listing_latitude),
++                float(listing_longitude),
++                float(destination["latitude"]),
++                float(destination["longitude"]),
++                clean_mode,
++            )
++
++            with conn.cursor() as cur:
++                cur.execute(
++                    """
++                    INSERT INTO listing_commutes (
++                        user_id, listing_id, destination_id, travel_mode,
++                        distance_metres, duration_seconds, calculated_at
++                    )
++                    VALUES (%s, %s, %s, %s, %s, %s, %s)
++                    ON CONFLICT (listing_id, destination_id, travel_mode)
++                    DO UPDATE SET
++                        distance_metres = EXCLUDED.distance_metres,
++                        duration_seconds = EXCLUDED.duration_seconds,
++                        calculated_at = EXCLUDED.calculated_at
++                    """,
++                    (
++                        user["id"], listing_id, destination_id, clean_mode,
++                        route.distance_metres, route.duration_seconds, _now(),
++                    ),
++                )
++            conn.commit()
++        except GeospatialServiceError as exc:
++            conn.rollback()
++            return RedirectResponse(
++                f"/listings/{listing_id}?commute_error=" + quote(str(exc)),
++                status_code=303,
++            )
++
++    return RedirectResponse(
++        f"/listings/{listing_id}?commute_success=" + quote("Travel time calculated."),
++        status_code=303,
++    )
+diff --git a/routers/listings.py b/routers/listings.py
+index 840647e..1c5ebe0 100644
+--- a/routers/listings.py
++++ b/routers/listings.py
+@@ -130,6 +130,28 @@ def listing_detail_page(request: Request, listing_id: int):
+             )
+             row = cur.fetchone()
+ 
++            cur.execute(
++                """
++                SELECT * FROM saved_destinations
++                WHERE user_id = %s
++                ORDER BY label ASC
++                """,
++                (user["id"],),
++            )
++            destinations = cur.fetchall()
++
++            cur.execute(
++                """
++                SELECT lc.*, sd.label AS destination_label, sd.address AS destination_address
++                FROM listing_commutes lc
++                JOIN saved_destinations sd ON sd.id = lc.destination_id
++                WHERE lc.listing_id = %s AND lc.user_id = %s
++                ORDER BY sd.label ASC, lc.travel_mode ASC
++                """,
++                (listing_id, user["id"]),
++            )
++            commutes = cur.fetchall()
++
+     if not row:
+         return RedirectResponse("/listings", status_code=303)
+ 
+@@ -139,7 +161,28 @@ def listing_detail_page(request: Request, listing_id: int):
+     listing["pros"] = _load_json(listing.pop("pros_json"), [])
+     listing["cons"] = _load_json(listing.pop("cons_json"), [])
+ 
++    commute_items = []
++    for commute in commutes:
++        item = dict(commute)
++        item["distance_km"] = round(item["distance_metres"] / 1000, 1)
++        total_minutes = max(1, round(item["duration_seconds"] / 60))
++        item["duration_minutes"] = total_minutes
++        item["duration_label"] = (
++            f"{total_minutes // 60} hr {total_minutes % 60} min"
++            if total_minutes >= 60
++            else f"{total_minutes} min"
++        )
++        commute_items.append(item)
++
+     return templates.TemplateResponse(
+         "listing_detail.html",
+-        {"request": request, "user": user, "listing": listing},
++        {
++            "request": request,
++            "user": user,
++            "listing": listing,
++            "destinations": destinations,
++            "commutes": commute_items,
++            "commute_error": request.query_params.get("commute_error"),
++            "commute_success": request.query_params.get("commute_success"),
++        },
+     )
+diff --git a/services/geospatial_service.py b/services/geospatial_service.py
+new file mode 100644
+index 0000000..b33f63b
+--- /dev/null
++++ b/services/geospatial_service.py
+@@ -0,0 +1,158 @@
++from __future__ import annotations
++
++import os
++from dataclasses import dataclass
++from typing import Literal
++
++import httpx
++
++GEOAPIFY_API_URL = "https://api.geoapify.com/v1"
++GEOAPIFY_API_KEY = os.getenv("GEOAPIFY_API_KEY", "").strip()
++REQUEST_TIMEOUT_SECONDS = 15.0
++
++TravelMode = Literal["drive", "walk", "bicycle"]
++SUPPORTED_TRAVEL_MODES: set[str] = {"drive", "walk", "bicycle"}
++
++
++class GeospatialServiceError(RuntimeError):
++    """Raised when an address or route cannot be resolved."""
++
++
++@dataclass(frozen=True)
++class GeocodedPlace:
++    address: str
++    latitude: float
++    longitude: float
++
++
++@dataclass(frozen=True)
++class RouteResult:
++    distance_metres: int
++    duration_seconds: int
++
++
++def _require_api_key() -> str:
++    if not GEOAPIFY_API_KEY:
++        raise GeospatialServiceError(
++            "Distance calculation is not configured yet. Add GEOAPIFY_API_KEY."
++        )
++    return GEOAPIFY_API_KEY
++
++
++def geocode_address(address: str) -> GeocodedPlace:
++    clean_address = address.strip()
++    if not clean_address:
++        raise GeospatialServiceError("Enter an address or place name.")
++
++    try:
++        response = httpx.get(
++            f"{GEOAPIFY_API_URL}/geocode/search",
++            params={
++                "text": clean_address,
++                "format": "json",
++                "limit": 1,
++                "filter": "countrycode:za",
++                "apiKey": _require_api_key(),
++            },
++            timeout=REQUEST_TIMEOUT_SECONDS,
++        )
++        response.raise_for_status()
++        payload = response.json()
++    except httpx.TimeoutException as exc:
++        raise GeospatialServiceError(
++            "The location service took too long to respond. Try again."
++        ) from exc
++    except httpx.HTTPStatusError as exc:
++        if exc.response.status_code in {401, 403}:
++            message = "The location service API key was rejected."
++        elif exc.response.status_code == 429:
++            message = "The location service limit has been reached. Try again later."
++        else:
++            message = "The location service could not process this address."
++        raise GeospatialServiceError(message) from exc
++    except (httpx.RequestError, ValueError) as exc:
++        raise GeospatialServiceError(
++            "The location service is temporarily unavailable."
++        ) from exc
++
++    results = payload.get("results") or []
++    if not results:
++        raise GeospatialServiceError(
++            "No matching South African location was found. Add a suburb or city and try again."
++        )
++
++    result = results[0]
++    try:
++        return GeocodedPlace(
++            address=result.get("formatted") or clean_address,
++            latitude=float(result["lat"]),
++            longitude=float(result["lon"]),
++        )
++    except (KeyError, TypeError, ValueError) as exc:
++        raise GeospatialServiceError(
++            "The location service returned an incomplete address result."
++        ) from exc
++
++
++def calculate_route(
++    origin_latitude: float,
++    origin_longitude: float,
++    destination_latitude: float,
++    destination_longitude: float,
++    travel_mode: str,
++) -> RouteResult:
++    clean_mode = travel_mode.strip().lower()
++    if clean_mode not in SUPPORTED_TRAVEL_MODES:
++        raise GeospatialServiceError("Choose driving, walking, or cycling.")
++
++    waypoints = (
++        f"{origin_latitude},{origin_longitude}|"
++        f"{destination_latitude},{destination_longitude}"
++    )
++
++    try:
++        response = httpx.get(
++            f"{GEOAPIFY_API_URL}/routing",
++            params={
++                "waypoints": waypoints,
++                "mode": clean_mode,
++                "format": "json",
++                "apiKey": _require_api_key(),
++            },
++            timeout=REQUEST_TIMEOUT_SECONDS,
++        )
++        response.raise_for_status()
++        payload = response.json()
++    except httpx.TimeoutException as exc:
++        raise GeospatialServiceError(
++            "The route calculation took too long. Try again."
++        ) from exc
++    except httpx.HTTPStatusError as exc:
++        if exc.response.status_code in {401, 403}:
++            message = "The location service API key was rejected."
++        elif exc.response.status_code == 429:
++            message = "The route calculation limit has been reached. Try again later."
++        else:
++            message = "A route could not be calculated for these locations."
++        raise GeospatialServiceError(message) from exc
++    except (httpx.RequestError, ValueError) as exc:
++        raise GeospatialServiceError(
++            "The route service is temporarily unavailable."
++        ) from exc
++
++    results = payload.get("results") or []
++    if not results:
++        raise GeospatialServiceError(
++            "No route was found between the listing and destination."
++        )
++
++    route = results[0]
++    try:
++        return RouteResult(
++            distance_metres=max(0, int(round(float(route["distance"])))),
++            duration_seconds=max(0, int(round(float(route["time"])))),
++        )
++    except (KeyError, TypeError, ValueError) as exc:
++        raise GeospatialServiceError(
++            "The route service returned an incomplete result."
++        ) from exc
+diff --git a/static/styles.css b/static/styles.css
+index 387a6ef..d658cc3 100644
+--- a/static/styles.css
++++ b/static/styles.css
+@@ -1368,3 +1368,53 @@ nav .links a.active {
+   padding: 8px 0;
+   border-bottom: 1px solid var(--border, #e6e6e6);
+ }
++
++.commuteForm {
++  display: grid;
++  grid-template-columns: minmax(0, 1fr) minmax(160px, 220px) auto;
++  gap: 14px;
++  align-items: end;
++}
++
++.commuteGrid {
++  display: grid;
++  gap: 10px;
++}
++
++.commuteResult {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 18px;
++  padding: 14px 16px;
++  border: 1px solid var(--border, #d9d9d9);
++  border-radius: 12px;
++}
++
++.commuteNumbers {
++  display: flex;
++  flex-direction: column;
++  align-items: flex-end;
++  gap: 2px;
++}
++
++.alert {
++  padding: 12px 14px;
++  border-radius: 10px;
++}
++
++.alert.error {
++  background: #fff1f0;
++  border: 1px solid #f3b7b3;
++}
++
++.alert.success {
++  background: #effaf2;
++  border: 1px solid #b7dfc0;
++}
++
++@media (max-width: 760px) {
++  .commuteForm {
++    grid-template-columns: 1fr;
++  }
++}
+diff --git a/templates/destinations.html b/templates/destinations.html
+new file mode 100644
+index 0000000..56b5a29
+--- /dev/null
++++ b/templates/destinations.html
+@@ -0,0 +1,54 @@
++{% extends "base.html" %}
++{% block title %}Destinations · ScoreRent{% endblock %}
++{% block content %}
++<section class="stack" style="padding-top:26px;">
++  <div class="pageHeader">
++    <div>
++      <p class="eyebrow">Travel preferences</p>
++      <h2>Saved destinations</h2>
++      <p class="muted">Save places you travel to regularly, then calculate distance and travel time from any listing.</p>
++    </div>
++    <a class="button" href="/listings">Back to listings</a>
++  </div>
++
++  {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
++  {% if success %}<div class="alert success">{{ success }}</div>{% endif %}
++
++  <div class="grid-2">
++    <article class="card stack">
++      <h3>Add a destination</h3>
++      <form method="post" action="/destinations" class="stack">
++        <label>
++          Label
++          <input name="label" required maxlength="60" placeholder="Work, campus, gym…">
++        </label>
++        <label>
++          Address or place
++          <input name="address" required maxlength="250" placeholder="UCT Upper Campus, Cape Town">
++        </label>
++        <button class="button primary" type="submit">Save destination</button>
++      </form>
++      <p class="muted small">Use a specific suburb, city, or full address for a more accurate result.</p>
++    </article>
++
++    <article class="card stack">
++      <h3>Your destinations</h3>
++      {% if destinations %}
++        {% for destination in destinations %}
++          <div class="detailRow">
++            <div>
++              <strong>{{ destination.label }}</strong>
++              <p class="muted small" style="margin:4px 0 0;">{{ destination.address }}</p>
++            </div>
++            <form method="post" action="/destinations/{{ destination.id }}/delete">
++              <button class="button" type="submit">Remove</button>
++            </form>
++          </div>
++        {% endfor %}
++      {% else %}
++        <p class="muted">No destinations saved yet.</p>
++      {% endif %}
++    </article>
++  </div>
++</section>
++{% endblock %}
+diff --git a/templates/listing_detail.html b/templates/listing_detail.html
+index 84e8a60..a31d2c1 100644
+--- a/templates/listing_detail.html
++++ b/templates/listing_detail.html
+@@ -40,6 +40,63 @@
+     </article>
+   </div>
+ 
++
++  <article class="card stack">
++    <div class="pageHeader">
++      <div>
++        <h3>Distance and travel time</h3>
++        <p class="muted">Compare this listing with work, campus, or anywhere else you save.</p>
++      </div>
++      <a class="button" href="/destinations">Manage destinations</a>
++    </div>
++
++    {% if commute_error %}<div class="alert error">{{ commute_error }}</div>{% endif %}
++    {% if commute_success %}<div class="alert success">{{ commute_success }}</div>{% endif %}
++
++    {% if destinations %}
++      <form method="post" action="/listings/{{ listing.id }}/commutes" class="commuteForm">
++        <label>
++          Destination
++          <select name="destination_id" required>
++            {% for destination in destinations %}
++              <option value="{{ destination.id }}">{{ destination.label }} — {{ destination.address }}</option>
++            {% endfor %}
++          </select>
++        </label>
++        <label>
++          Travel mode
++          <select name="travel_mode">
++            <option value="drive">Driving</option>
++            <option value="walk">Walking</option>
++            <option value="bicycle">Cycling</option>
++          </select>
++        </label>
++        <button class="button primary" type="submit">Calculate</button>
++      </form>
++    {% else %}
++      <p class="muted">Save a destination first to calculate travel time.</p>
++      <a class="button primary" href="/destinations">Add destination</a>
++    {% endif %}
++
++    {% if commutes %}
++      <div class="commuteGrid">
++        {% for commute in commutes %}
++          <div class="commuteResult">
++            <div>
++              <strong>{{ commute.destination_label }}</strong>
++              <p class="muted small">{{ commute.travel_mode|capitalize }}</p>
++            </div>
++            <div class="commuteNumbers">
++              <strong>{{ commute.duration_label }}</strong>
++              <span>{{ commute.distance_km }} km</span>
++            </div>
++          </div>
++        {% endfor %}
++      </div>
++    {% endif %}
++    <p class="muted small">Travel times are estimates and can change with traffic, route conditions, and the exact address.</p>
++  </article>
++
+   <article class="card stack">
+     <h3>Notes and source</h3>
+     <p>{{ listing.notes or 'No personal notes added.' }}</p>
+diff --git a/templates/nav.html b/templates/nav.html
+index f40f871..f409c1c 100644
+--- a/templates/nav.html
++++ b/templates/nav.html
+@@ -12,6 +12,7 @@
+       <a class="navLink {% if path == '/import-listing' %}active{% endif %}" href="/import-listing">Import</a>
+       <a class="navLink {% if path == '/profile' %}active{% endif %}" href="/profile">Profile</a>
+       <a class="navLink {% if path.startswith('/listings') %}active{% endif %}" href="/listings">Listings</a>
++      <a class="navLink {% if path == '/destinations' %}active{% endif %}" href="/destinations">Destinations</a>
+       <a class="navLink {% if path == '/history' %}active{% endif %}" href="/history">History</a>
+       <a class="navLink {% if path.startswith('/learn') %}active{% endif %}" href="/learn">Learn</a>
+       <a class="navLink dangerLink" href="/logout">Logout</a>
+diff --git a/tests/test_geospatial_service.py b/tests/test_geospatial_service.py
+new file mode 100644
+index 0000000..a7bdbe0
+--- /dev/null
++++ b/tests/test_geospatial_service.py
+@@ -0,0 +1,5 @@
++from services.geospatial_service import SUPPORTED_TRAVEL_MODES
++
++
++def test_supported_modes_are_limited_to_mvp_modes():
++    assert SUPPORTED_TRAVEL_MODES == {"drive", "walk", "bicycle"}
