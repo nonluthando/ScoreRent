@@ -40,6 +40,63 @@
     </article>
   </div>
 
+
+  <article class="card stack">
+    <div class="pageHeader">
+      <div>
+        <h3>Distance and travel time</h3>
+        <p class="muted">Compare this listing with work, campus, or anywhere else you save.</p>
+      </div>
+      <a class="button" href="/destinations">Manage destinations</a>
+    </div>
+
+    {% if commute_error %}<div class="alert error">{{ commute_error }}</div>{% endif %}
+    {% if commute_success %}<div class="alert success">{{ commute_success }}</div>{% endif %}
+
+    {% if destinations %}
+      <form method="post" action="/listings/{{ listing.id }}/commutes" class="commuteForm">
+        <label>
+          Destination
+          <select name="destination_id" required>
+            {% for destination in destinations %}
+              <option value="{{ destination.id }}">{{ destination.label }} — {{ destination.address }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Travel mode
+          <select name="travel_mode">
+            <option value="drive">Driving</option>
+            <option value="walk">Walking</option>
+            <option value="bicycle">Cycling</option>
+          </select>
+        </label>
+        <button class="button primary" type="submit">Calculate</button>
+      </form>
+    {% else %}
+      <p class="muted">Save a destination first to calculate travel time.</p>
+      <a class="button primary" href="/destinations">Add destination</a>
+    {% endif %}
+
+    {% if commutes %}
+      <div class="commuteGrid">
+        {% for commute in commutes %}
+          <div class="commuteResult">
+            <div>
+              <strong>{{ commute.destination_label }}</strong>
+              <p class="muted small">{{ commute.travel_mode|capitalize }}</p>
+            </div>
+            <div class="commuteNumbers">
+              <strong>{{ commute.duration_label }}</strong>
+              <span>{{ commute.distance_km }} km</span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    <p class="muted small">Travel times are estimates and can change with traffic, route conditions, and the exact address.</p>
+  </article>
+
   <article class="card stack">
     <h3>Notes and source</h3>
     <p>{{ listing.notes or 'No personal notes added.' }}</p>

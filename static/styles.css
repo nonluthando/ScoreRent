@@ -1368,3 +1368,53 @@ nav .links a.active {
   padding: 8px 0;
   border-bottom: 1px solid var(--border, #e6e6e6);
 }
+
+.commuteForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 220px) auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.commuteGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.commuteResult {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--border, #d9d9d9);
+  border-radius: 12px;
+}
+
+.commuteNumbers {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.alert {
+  padding: 12px 14px;
+  border-radius: 10px;
+}
+
+.alert.error {
+  background: #fff1f0;
+  border: 1px solid #f3b7b3;
+}
+
+.alert.success {
+  background: #effaf2;
+  border: 1px solid #b7dfc0;
+}
+
+@media (max-width: 760px) {
+  .commuteForm {
+    grid-template-columns: 1fr;
+  }
+}

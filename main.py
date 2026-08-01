@@ -6,6 +6,7 @@ from routers.api import router as api_router
 from routers.web import router as web_router
 from routers.listing_imports import router as listing_import_router
 from routers.listings import router as listings_router
+from routers.commutes import router as commutes_router
 
 
 app = FastAPI(title="ScoreRent")
@@ -20,6 +21,7 @@ app.include_router(web_router)
 app.include_router(api_router)
 app.include_router(listing_import_router)
 app.include_router(listings_router)
+app.include_router(commutes_router)
 
 
 @app.on_event("startup")
