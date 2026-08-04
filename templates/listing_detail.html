@@ -1,106 +1,116 @@
 {% extends "base.html" %}
 {% block title %}{{ listing.title }} · ScoreRent{% endblock %}
 {% block content %}
-<section class="stack" style="padding-top:26px;">
-  <div class="pageHeader">
-    <div>
-      <p class="eyebrow">Saved listing</p>
-      <h2>{{ listing.title }}</h2>
-      <p class="muted">{{ listing.location or 'Location not added' }}</p>
-    </div>
-    <a class="button" href="/listings">Back to listings</a>
-  </div>
-
-  <div class="grid-2">
-    <article class="card stack">
-      <h3>Costs</h3>
-      <div class="detailRow"><span>Monthly rent</span><strong>R{{ '{:,}'.format(listing.monthly_rent) }}</strong></div>
-      <div class="detailRow"><span>Deposit</span><strong>R{{ '{:,}'.format(listing.deposit) }}</strong></div>
-      <div class="detailRow"><span>Application fee</span><strong>R{{ '{:,}'.format(listing.application_fee) }}</strong></div>
-      <div class="detailRow"><span>Initial cost</span><strong>R{{ '{:,}'.format(listing.upfront_cost) }}</strong></div>
-      <p class="muted small">Initial cost = first month’s rent + deposit + application fee.</p>
-    </article>
-
-    <article class="card stack">
-      <h3>Amenities</h3>
-      {% if listing.amenities %}
-        <div class="tagList">{% for item in listing.amenities %}<span class="tag">{{ item }}</span>{% endfor %}</div>
-      {% else %}<p class="muted">No amenities recorded.</p>{% endif %}
-    </article>
-  </div>
-
-  <div class="grid-2">
-    <article class="card stack">
-      <h3>Pros</h3>
-      {% if listing.pros %}<ul>{% for item in listing.pros %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p class="muted">No pros recorded.</p>{% endif %}
-    </article>
-    <article class="card stack">
-      <h3>Cons</h3>
-      {% if listing.cons %}<ul>{% for item in listing.cons %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p class="muted">No cons recorded.</p>{% endif %}
-    </article>
-  </div>
-
-
-  <article class="card stack">
-    <div class="pageHeader">
+<section class="stack">
+  <header class="listingHero">
+    <div class="listingHeroTop">
       <div>
-        <h3>Distance and travel time</h3>
-        <p class="muted">Compare this listing with work, campus, or anywhere else you save.</p>
+        <p class="eyebrow">Saved listing</p>
+        <h1>{{ listing.title }}</h1>
+        <p>{{ listing.location or 'Location not added' }}</p>
+        {% if listing.location_is_exact %}
+          <span class="statusBadge ready">Exact location confirmed</span>
+        {% else %}
+          <span class="statusBadge mutedStatus">Exact location needed for travel comparison</span>
+        {% endif %}
       </div>
-      <a class="button" href="/destinations">Manage destinations</a>
+      <div class="listingHeroPrice">
+        <strong>R{{ '{:,}'.format(listing.monthly_rent) }}</strong>
+        <small>per month</small>
+      </div>
     </div>
 
-    {% if commute_error %}<div class="alert error">{{ commute_error }}</div>{% endif %}
-    {% if commute_success %}<div class="alert success">{{ commute_success }}</div>{% endif %}
-
-    {% if destinations %}
-      <form method="post" action="/listings/{{ listing.id }}/commutes" class="commuteForm">
-        <label>
-          Destination
-          <select name="destination_id" required>
-            {% for destination in destinations %}
-              <option value="{{ destination.id }}">{{ destination.label }} — {{ destination.address }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>
-          Travel mode
-          <select name="travel_mode">
-            <option value="drive">Driving</option>
-            <option value="walk">Walking</option>
-            <option value="bicycle">Cycling</option>
-          </select>
-        </label>
-        <button class="button primary" type="submit">Calculate</button>
-      </form>
-    {% else %}
-      <p class="muted">Save a destination first to calculate travel time.</p>
-      <a class="button primary" href="/destinations">Add destination</a>
-    {% endif %}
-
-    {% if commutes %}
-      <div class="commuteGrid">
-        {% for commute in commutes %}
-          <div class="commuteResult">
-            <div>
-              <strong>{{ commute.destination_label }}</strong>
-              <p class="muted small">{{ commute.travel_mode|capitalize }}</p>
-            </div>
-            <div class="commuteNumbers">
-              <strong>{{ commute.duration_label }}</strong>
-              <span>{{ commute.distance_km }} km</span>
-            </div>
-          </div>
-        {% endfor %}
+    <div class="listingHeroBottom">
+      <div class="tagList">
+        {% for item in listing.amenities[:4] %}<span class="statusBadge">{{ item }}</span>{% endfor %}
       </div>
-    {% endif %}
-    <p class="muted small">Travel times are estimates and can change with traffic, route conditions, and the exact address.</p>
-  </article>
+      <div class="actions">
+        <a class="button primary" href="/compare?listing_ids={{ listing.id }}">Add to comparison</a>
+        <a class="button" href="/listings">Back to shortlist</a>
+      </div>
+    </div>
+  </header>
 
-  <article class="card stack">
-    <h3>Notes and source</h3>
-    <p>{{ listing.notes or 'No personal notes added.' }}</p>
-    {% if listing.source_url %}<a href="{{ listing.source_url }}" target="_blank" rel="noopener noreferrer">Open original listing</a>{% endif %}
-  </article>
+  <div class="detailLayout">
+    <div class="detailMain">
+      <section class="card stack">
+        <div class="sectionHeader">
+          <div><p class="eyebrow">At a glance</p><h2 class="sectionTitle">Costs</h2></div>
+          <span class="statusBadge">{{ listing.area_demand|title }} demand</span>
+        </div>
+        <div class="grid-2">
+          <div>
+            <div class="detailRow"><span>Monthly rent</span><strong>R{{ '{:,}'.format(listing.monthly_rent) }}</strong></div>
+            <div class="detailRow"><span>Deposit</span><strong>R{{ '{:,}'.format(listing.deposit) }}</strong></div>
+            <div class="detailRow"><span>Application fee</span><strong>R{{ '{:,}'.format(listing.application_fee) }}</strong></div>
+          </div>
+          <div class="costHighlight">
+            <span class="label">Estimated upfront cost</span>
+            <strong>R{{ '{:,}'.format(listing.upfront_cost) }}</strong>
+            <p class="small">First month’s rent + deposit + application fee.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card stack">
+        <div><p class="eyebrow">What is included</p><h2 class="sectionTitle">Amenities</h2></div>
+        {% if listing.amenities %}
+          <div class="tagList">{% for item in listing.amenities %}<span class="tag">{{ item }}</span>{% endfor %}</div>
+        {% else %}
+          <p class="muted">No amenities were recorded from the listing.</p>
+        {% endif %}
+      </section>
+
+      <div class="proConGrid">
+        <section class="card stack">
+          <div><p class="eyebrow">Supported by the listing</p><h2 class="sectionTitle">Pros</h2></div>
+          {% if listing.pros %}
+            <ul class="insightList positive">{% for item in listing.pros %}<li>{{ item }}</li>{% endfor %}</ul>
+          {% else %}<p class="muted">No factual pros recorded.</p>{% endif %}
+        </section>
+        <section class="card stack">
+          <div><p class="eyebrow">Worth checking</p><h2 class="sectionTitle">Potential downsides</h2></div>
+          {% if listing.cons %}
+            <ul class="insightList caution">{% for item in listing.cons %}<li>{{ item }}</li>{% endfor %}</ul>
+          {% else %}<p class="muted">No potential downsides recorded.</p>{% endif %}
+        </section>
+      </div>
+
+      <section class="card stack">
+        <div><p class="eyebrow">Your context</p><h2 class="sectionTitle">Notes and source</h2></div>
+        <p>{{ listing.notes or 'No personal notes added.' }}</p>
+        {% if listing.source_url %}<a class="button" href="{{ listing.source_url }}" target="_blank" rel="noopener noreferrer">Open original listing</a>{% endif %}
+      </section>
+    </div>
+
+    <aside class="detailAside">
+      <section class="card stack">
+        <div>
+          <p class="eyebrow">Travel comparison</p>
+          <h2 class="sectionTitle">Listing location</h2>
+          <p class="muted small">Only confirm this when the listing gives a full address or a uniquely identifiable building. A suburb alone is not exact.</p>
+        </div>
+        {% if location_saved %}<div class="alert success">Location updated.</div>{% endif %}
+        <form method="post" action="/listings/{{ listing.id }}/location" class="stack">
+          <div class="stack" style="gap:8px;">
+            <label for="location">Address or building</label>
+            <input id="location" name="location" value="{{ listing.location or '' }}" placeholder="12 Main Road, Observatory">
+          </div>
+          <label class="checkbox exactLocationCheck">
+            <input type="checkbox" name="location_is_exact" value="yes" {% if listing.location_is_exact %}checked{% endif %}>
+            <span>This is an exact address or uniquely identifiable building</span>
+          </label>
+          <button class="button primary wide" type="submit">Save location</button>
+        </form>
+      </section>
+
+      <section class="card stack softCard">
+        <p class="eyebrow">Required documents</p>
+        {% if listing.required_documents %}
+          <div class="tagList">{% for item in listing.required_documents %}<span class="tag">{{ item.replace('_',' ')|title }}</span>{% endfor %}</div>
+        {% else %}<p class="muted small">No required documents recorded.</p>{% endif %}
+      </section>
+    </aside>
+  </div>
 </section>
 {% endblock %}

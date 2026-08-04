@@ -1,81 +1,67 @@
 {% extends "base.html" %}
+{% block title %}Renter profile · ScoreRent{% endblock %}
 {% block content %}
+<section class="stack flowPage">
+  <header class="pageHeader">
+    <div>
+      <p class="eyebrow">Your application context</p>
+      <h1>Renter profile</h1>
+      <p>Save your income, renter type and available documents once so future evaluations are faster.</p>
+    </div>
+    <a class="button" href="/evaluate">Evaluate listing</a>
+  </header>
 
-<section class="stack" style="padding-top: 26px;">
-  <div class="stack" style="gap:10px;">
-    <h2>Your renter profile</h2>
-    <p>Set your details once, then evaluate listings quickly.</p>
-  </div>
-
-  <form method="post" class="card stack">
-
-    <div class="grid-2">
-      <div class="stack">
-        <label>Renter type</label>
-        <select name="renter_type" id="renter_type">
-          <option value="worker" {% if renter_type=="worker" %}selected{% endif %}>Worker</option>
-          <option value="new_professional" {% if renter_type=="new_professional" %}selected{% endif %}>New professional</option>
-          <option value="student" {% if renter_type=="student" %}selected{% endif %}>Student</option>
+  <form method="post" class="stack">
+    <section class="formSection">
+      <div class="formSectionHeader">
+        <span class="formSectionNumber">1</span>
+        <div><h2 class="sectionTitle">Renter details</h2><p class="muted small">These details choose the correct evaluation rules.</p></div>
+      </div>
+      <div class="grid-2">
+        <div class="stack" style="gap:8px;">
+          <label for="renter_type">Renter type</label>
+          <select name="renter_type" id="renter_type">
+            <option value="worker" {% if renter_type=="worker" %}selected{% endif %}>Worker</option>
+            <option value="new_professional" {% if renter_type=="new_professional" %}selected{% endif %}>New professional</option>
+            <option value="student" {% if renter_type=="student" %}selected{% endif %}>Student</option>
+          </select>
+        </div>
+        <div class="stack" style="gap:8px;">
+          <label for="monthly_income">Monthly income or support (R)</label>
+          <input id="monthly_income" name="monthly_income" type="number" min="0" required value="{{ monthly_income }}">
+        </div>
+      </div>
+      <div class="stack" id="bursary_block" style="display:none; margin-top:18px;">
+        <label for="is_bursary_student">Are you a bursary student?</label>
+        <select id="is_bursary_student" name="is_bursary_student">
+          <option value="no" {% if not is_bursary_student %}selected{% endif %}>No</option>
+          <option value="yes" {% if is_bursary_student %}selected{% endif %}>Yes</option>
         </select>
+        <p class="fieldHint">This ensures ScoreRent applies the appropriate student rules.</p>
       </div>
+    </section>
 
-      <div class="stack">
-        <label>Monthly income / support (R)</label>
-        <input name="monthly_income" type="number" min="0" required value="{{ monthly_income }}" />
+    <section class="formSection stack">
+      <div class="formSectionHeader">
+        <span class="formSectionNumber">2</span>
+        <div><h2 class="sectionTitle">Documents available</h2><p class="muted small">Select what you can provide today. This is compared with each listing’s requirements.</p></div>
       </div>
-    </div>
-
-    <div class="stack" id="bursary_block" style="display:none;">
-      <label>Are you a bursary student?</label>
-      <select name="is_bursary_student">
-        <option value="no" {% if not is_bursary_student %}selected{% endif %}>No</option>
-        <option value="yes" {% if is_bursary_student %}selected{% endif %}>Yes</option>
-      </select>
-      <p class="muted small" style="margin-top:-6px;">
-        This ensures ScoreRent applies the correct student rules.
-      </p>
-    </div>
-
-    <hr />
-
-    <div class="stack">
-      <label>Documents you have</label>
-      <p class="muted" style="margin-top:-6px;">
-        Tick what you can provide. ScoreRent uses this to check document fit.
-      </p>
-
       <div class="checkbox-group">
         {% for doc in (doc_clusters["worker"] | sort) %}
-          <label class="checkbox">
-            <input type="checkbox" name="submitted_documents" value="{{ doc }}"
-              {% if doc in docs_selected %}checked{% endif %}/>
-            <span>{{ doc.replace("_", " ").title() }}</span>
-          </label>
+          <label class="checkbox"><input type="checkbox" name="submitted_documents" value="{{ doc }}" {% if doc in docs_selected %}checked{% endif %}><span>{{ doc.replace("_", " ")|title }}</span></label>
         {% endfor %}
-
         {% for doc in (doc_clusters["new_professional"] | sort) %}
-          <label class="checkbox">
-            <input type="checkbox" name="submitted_documents" value="{{ doc }}"
-              {% if doc in docs_selected %}checked{% endif %}/>
-            <span>{{ doc.replace("_", " ").title() }}</span>
-          </label>
+          <label class="checkbox"><input type="checkbox" name="submitted_documents" value="{{ doc }}" {% if doc in docs_selected %}checked{% endif %}><span>{{ doc.replace("_", " ")|title }}</span></label>
         {% endfor %}
-
         {% for doc in (doc_clusters["student"] | sort) %}
-          <label class="checkbox">
-            <input type="checkbox" name="submitted_documents" value="{{ doc }}"
-              {% if doc in docs_selected %}checked{% endif %}/>
-            <span>{{ doc.replace("_", " ").title() }}</span>
-          </label>
+          <label class="checkbox"><input type="checkbox" name="submitted_documents" value="{{ doc }}" {% if doc in docs_selected %}checked{% endif %}><span>{{ doc.replace("_", " ")|title }}</span></label>
         {% endfor %}
       </div>
-    </div>
+    </section>
 
-    <hr />
-
-    <div class="actions">
-      <button class="btn" type="submit">Save profile</button>
-      <a class="btn secondary" href="/evaluate">Go evaluate</a>
+    <div class="formActionBar">
+      <button class="button primary" type="submit">Save profile</button>
+      <a class="button" href="/dashboard">Cancel</a>
     </div>
   </form>
 </section>
@@ -83,14 +69,11 @@
 <script>
   const renterTypeSelect = document.getElementById("renter_type");
   const bursaryBlock = document.getElementById("bursary_block");
-
   function updateBursaryVisibility() {
     if (!renterTypeSelect || !bursaryBlock) return;
-    bursaryBlock.style.display = (renterTypeSelect.value === "student") ? "block" : "none";
+    bursaryBlock.style.display = renterTypeSelect.value === "student" ? "flex" : "none";
   }
-
   renterTypeSelect.addEventListener("change", updateBursaryVisibility);
   updateBursaryVisibility();
 </script>
-
 {% endblock %}

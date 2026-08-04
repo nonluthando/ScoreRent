@@ -1,108 +1,134 @@
 {% extends "base.html" %}
-{% block title %}Confirm imported listing · ScoreRent{% endblock %}
+{% block title %}Review imported listing · ScoreRent{% endblock %}
 {% block content %}
-<section class="stack" style="padding-top:26px;">
-  <div class="stack" style="gap:10px;">
-    <p class="eyebrow">Review required</p>
-    <h2>Confirm imported listing</h2>
-    <p>Correct anything the image reader misread. Blank fields were not confidently found.</p>
+<section class="stack flowPage">
+  <header class="pageHeader">
+    <div>
+      <p class="eyebrow">Review required</p>
+      <h1>Check the listing details.</h1>
+      <p>Correct anything that was misread. Blank fields were not found confidently.</p>
+    </div>
+  </header>
+
+  <div class="progressSteps" aria-label="Import progress">
+    <div class="progressStep"><span>✓</span>Upload screenshots</div>
+    <div class="progressStep active"><span>2</span>Review details</div>
+    <div class="progressStep"><span>3</span>Save or evaluate</div>
   </div>
 
   {% if extraction.warnings %}
-    <div class="card stack">
-      <h3>Check these fields</h3>
-      {% for warning in extraction.warnings %}<p class="muted">{{ warning }}</p>{% endfor %}
+    <div class="alert warning">
+      <strong>Give these fields an extra check:</strong>
+      <ul>{% for warning in extraction.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
     </div>
   {% endif %}
 
-  <form method="post" action="/evaluate" class="card stack">
-    <div class="grid-2">
-      <div class="stack">
-        <label for="listing_name">Listing name</label>
-        <input id="listing_name" name="listing_name" value="{{ extraction.listing_name.value or '' }}">
-        {% if extraction.listing_name.evidence %}<small class="muted">Read from: {{ extraction.listing_name.evidence }}</small>{% endif %}
+  <form method="post" action="/evaluate" class="stack">
+    <section class="formSection">
+      <div class="formSectionHeader">
+        <span class="formSectionNumber">1</span>
+        <div><h2 class="sectionTitle">Property and location</h2><p class="muted small">Confirm the listing identity before comparing it.</p></div>
       </div>
-      <div class="stack">
-        <label for="location">Location</label>
-        <input id="location" name="location" value="{{ extraction.location.value or '' }}">
-        <small class="muted">Used for reference only. ScoreRent does not infer safety or demand.</small>
-      </div>
-    </div>
-
-    <div class="grid-2">
-      <div class="stack">
-        <label for="rent">Monthly rent (R)</label>
-        <input id="rent" name="rent" type="number" min="1" required value="{{ extraction.rent.value or '' }}">
-        {% if extraction.rent.evidence %}<small class="muted">Read from: {{ extraction.rent.evidence }}</small>{% endif %}
-      </div>
-      <div class="stack">
-        <label for="deposit">Deposit (R)</label>
-        <input id="deposit" name="deposit" type="number" min="0" required value="{{ extraction.deposit.value if extraction.deposit.value is not none else '' }}">
-        {% if extraction.deposit.evidence %}<small class="muted">Read from: {{ extraction.deposit.evidence }}</small>{% endif %}
-      </div>
-    </div>
-
-    <div class="grid-2">
-      <div class="stack">
-        <label for="application_fee">Application fee (R)</label>
-        <input id="application_fee" name="application_fee" type="number" min="0" required value="{{ extraction.application_fee.value if extraction.application_fee.value is not none else '' }}">
-        {% if extraction.application_fee.evidence %}<small class="muted">Read from: {{ extraction.application_fee.evidence }}</small>{% endif %}
-      </div>
-      <div class="stack">
-        <label for="area_demand">Area demand</label>
-        <select id="area_demand" name="area_demand">
-          {% for demand in demand_levels %}<option value="{{ demand }}" {% if demand == 'MEDIUM' %}selected{% endif %}>{{ demand }}</option>{% endfor %}
-        </select>
-      </div>
-    </div>
-
-    <div class="stack">
-      <label><strong>Documents required by the listing</strong></label>
-      <p class="muted small">Only select documents the listing actually requests.</p>
-      <div class="checkbox-group">
-        {% for document in available_documents %}
-          <label class="checkbox">
-            <input type="checkbox" name="required_documents" value="{{ document }}" {% if document in extraction.required_documents %}checked{% endif %}>
-            <span>{{ document.replace('_', ' ').title() }}</span>
+      <div class="reviewGrid">
+        <div class="stack" style="gap:8px;">
+          <label for="listing_name">Listing name</label>
+          <input id="listing_name" name="listing_name" value="{{ extraction.listing_name.value or '' }}" placeholder="Example: Furnished Observatory studio">
+          {% if extraction.listing_name.evidence %}<small class="muted">Read from: {{ extraction.listing_name.evidence }}</small>{% endif %}
+        </div>
+        <div class="stack" style="gap:8px;">
+          <label for="location">Address or building</label>
+          <input id="location" name="location" value="{{ extraction.location.value or '' }}" placeholder="Full address, building, or area">
+          {% if extraction.location.evidence %}<small class="muted">Read from: {{ extraction.location.evidence }}</small>{% endif %}
+          <label class="checkbox exactLocationCheck">
+            <input type="checkbox" name="location_is_exact" value="yes" {% if extraction.location_precision == 'exact' %}checked{% endif %}>
+            <span>This is an exact address or uniquely identifiable building</span>
           </label>
-        {% endfor %}
+          <small class="muted">A suburb alone is not precise enough for travel comparison.</small>
+        </div>
       </div>
-    </div>
+    </section>
 
-    <div class="grid-2">
-      <div class="stack">
-        <label for="amenities_text">Amenities</label>
-        <textarea id="amenities_text" name="amenities_text" rows="7" placeholder="One amenity per line">{{ extraction.amenities | join('\n') }}</textarea>
-        <small class="muted">Examples: Wi-Fi included, furnished, parking, laundry.</small>
+    <section class="formSection">
+      <div class="formSectionHeader">
+        <span class="formSectionNumber">2</span>
+        <div><h2 class="sectionTitle">Costs</h2><p class="muted small">Use zero only when the listing explicitly says there is no charge.</p></div>
       </div>
-      <div class="stack">
-        <label for="source_url">Listing link</label>
-        <input id="source_url" name="source_url" type="url" placeholder="https://...">
-        <label for="notes">Your notes</label>
-        <textarea id="notes" name="notes" rows="4" placeholder="Questions to ask, viewing notes, commute details..."></textarea>
+      <div class="grid-2">
+        <div class="stack" style="gap:8px;">
+          <label for="rent">Monthly rent (R)</label>
+          <input id="rent" name="rent" type="number" min="1" required value="{{ extraction.rent.value or '' }}">
+          {% if extraction.rent.evidence %}<small class="muted">Read from: {{ extraction.rent.evidence }}</small>{% endif %}
+        </div>
+        <div class="stack" style="gap:8px;">
+          <label for="deposit">Deposit (R)</label>
+          <input id="deposit" name="deposit" type="number" min="0" required value="{{ extraction.deposit.value if extraction.deposit.value is not none else '' }}">
+          {% if extraction.deposit.evidence %}<small class="muted">Read from: {{ extraction.deposit.evidence }}</small>{% endif %}
+        </div>
+        <div class="stack" style="gap:8px;">
+          <label for="application_fee">Application fee (R)</label>
+          <input id="application_fee" name="application_fee" type="number" min="0" required value="{{ extraction.application_fee.value if extraction.application_fee.value is not none else '' }}">
+          {% if extraction.application_fee.evidence %}<small class="muted">Read from: {{ extraction.application_fee.evidence }}</small>{% endif %}
+        </div>
+        <div class="stack" style="gap:8px;">
+          <label for="area_demand">Area demand</label>
+          <select id="area_demand" name="area_demand">
+            {% for demand in demand_levels %}<option value="{{ demand }}" {% if demand == 'MEDIUM' %}selected{% endif %}>{{ demand|title }}</option>{% endfor %}
+          </select>
+        </div>
       </div>
-    </div>
+    </section>
 
-    <div class="grid-2">
-      <div class="stack">
-        <label for="pros_text">Factual pros</label>
-        <textarea id="pros_text" name="pros_text" rows="6" placeholder="One supported benefit per line">{{ extraction.pros | join('\n') }}</textarea>
+    <section class="formSection stack">
+      <div class="formSectionHeader">
+        <span class="formSectionNumber">3</span>
+        <div><h2 class="sectionTitle">Requirements and amenities</h2><p class="muted small">Keep only details that are supported by the advert.</p></div>
       </div>
-      <div class="stack">
-        <label for="cons_text">Factual cons</label>
-        <textarea id="cons_text" name="cons_text" rows="6" placeholder="One supported limitation per line">{{ extraction.cons | join('\n') }}</textarea>
+      <div>
+        <label><strong>Documents required by the listing</strong></label>
+        <p class="muted small">Select only documents the listing actually requests.</p>
+        <div class="checkbox-group">
+          {% for document in available_documents %}
+            <label class="checkbox">
+              <input type="checkbox" name="required_documents" value="{{ document }}" {% if document in extraction.required_documents %}checked{% endif %}>
+              <span>{{ document.replace('_', ' ')|title }}</span>
+            </label>
+          {% endfor %}
+        </div>
       </div>
-    </div>
+      <div class="grid-2">
+        <div class="stack" style="gap:8px;">
+          <label for="amenities_text">Amenities</label>
+          <textarea id="amenities_text" name="amenities_text" rows="7" placeholder="One amenity per line">{{ extraction.amenities | join('\n') }}</textarea>
+          <small class="muted">Examples: Wi-Fi included, furnished, parking, laundry.</small>
+        </div>
+        <div class="stack" style="gap:8px;">
+          <label for="source_url">Listing link</label>
+          <input id="source_url" name="source_url" type="url" placeholder="https://...">
+          <label for="notes">Your notes</label>
+          <textarea id="notes" name="notes" rows="4" placeholder="Questions to ask, viewing notes, practical concerns..."></textarea>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="stack" style="gap:8px;">
+          <label for="pros_text">Factual pros</label>
+          <textarea id="pros_text" name="pros_text" rows="6" placeholder="One supported benefit per line">{{ extraction.pros | join('\n') }}</textarea>
+        </div>
+        <div class="stack" style="gap:8px;">
+          <label for="cons_text">Potential downsides</label>
+          <textarea id="cons_text" name="cons_text" rows="6" placeholder="One supported limitation per line">{{ extraction.cons | join('\n') }}</textarea>
+        </div>
+      </div>
+    </section>
 
-    <div class="grid-2">
+    <div class="formActionBar">
       <button type="submit" class="button primary">Evaluate now</button>
-      <button type="submit" formaction="/listings" class="button">Save listing</button>
+      <button type="submit" formaction="/listings" class="button">Save to shortlist</button>
     </div>
   </form>
 
-  <details class="card">
-    <summary>View extracted listing text</summary>
-    <pre style="white-space:pre-wrap; overflow-wrap:anywhere;">{{ extraction.raw_text }}</pre>
+  <details class="card rawTextDetails">
+    <summary>View the text read from the screenshots</summary>
+    <pre>{{ extraction.raw_text }}</pre>
   </details>
 </section>
 {% endblock %}

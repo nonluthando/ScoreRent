@@ -133,8 +133,34 @@ def dashboard_page(request: Request):
         """,
         (current_user["id"],),
     )
-
     latest_evaluation = db_cursor.fetchone()
+
+    db_cursor.execute(
+        """
+        SELECT
+            (SELECT COUNT(*) FROM listings WHERE user_id = %s) AS listing_count,
+            (SELECT COUNT(*) FROM evaluations WHERE user_id = %s) AS evaluation_count,
+            (
+                SELECT COUNT(*)
+                FROM listings
+                WHERE user_id = %s AND location_is_exact = TRUE
+            ) AS commute_ready_count
+        """,
+        (current_user["id"], current_user["id"], current_user["id"]),
+    )
+    dashboard_stats = db_cursor.fetchone()
+
+    db_cursor.execute(
+        """
+        SELECT id, title, location, monthly_rent
+        FROM listings
+        WHERE user_id = %s
+        ORDER BY updated_at DESC
+        LIMIT 3
+        """,
+        (current_user["id"],),
+    )
+    recent_listings = db_cursor.fetchall()
 
     db_cursor.close()
     db_connection.close()
@@ -145,6 +171,8 @@ def dashboard_page(request: Request):
             "request": request,
             "user": current_user,
             "last_eval": latest_evaluation,
+            "dashboard_stats": dashboard_stats,
+            "recent_listings": recent_listings,
         },
     )
 
@@ -555,72 +583,6 @@ def evaluation_results_page(request: Request, evaluation_id: int):
             "listing": load_json_field(evaluation_record["listing_json"], {}),
             "reasons": load_json_field(evaluation_record["reasons_json"], []),
             "actions": load_json_field(evaluation_record["actions_json"], []),
-        },
-    )
-
-
-@router.get("/compare")
-def compare_evaluations_page(request: Request):
-    current_user = require_authenticated_user(request)
-
-    if not current_user:
-        return RedirectResponse("/login", status_code=303)
-
-    db_connection = get_conn()
-    db_cursor = db_connection.cursor()
-
-    db_cursor.execute(
-        """
-        SELECT
-            id,
-            listing_name,
-            score,
-            verdict,
-            confidence,
-            listing_json,
-            reasons_json,
-            created_at
-        FROM evaluations
-        WHERE user_id = %s
-        ORDER BY created_at DESC
-        LIMIT 3
-        """,
-        (current_user["id"],),
-    )
-
-    evaluation_rows = db_cursor.fetchall()
-
-    db_cursor.close()
-    db_connection.close()
-
-    items = []
-
-    for row in evaluation_rows:
-        listing = load_json_field(row["listing_json"], {})
-        reasons = load_json_field(row["reasons_json"], [])
-
-        items.append(
-            {
-                "id": row["id"],
-                "listing_name": row["listing_name"] or "Unnamed listing",
-                "score": row["score"],
-                "verdict": row["verdict"],
-                "confidence": row["confidence"],
-                "rent": listing.get("rent", 0),
-                "deposit": listing.get("deposit", 0),
-                "application_fee": listing.get("application_fee", 0),
-                "demand": listing.get("area_demand", "MEDIUM"),
-                "top_reason": reasons[0] if reasons else "No reason available",
-                "created_at": row["created_at"],
-            }
-        )
-
-    return templates.TemplateResponse(
-        "compare.html",
-        {
-            "request": request,
-            "user": current_user,
-            "items": items,
         },
     )
 

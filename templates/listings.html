@@ -1,43 +1,116 @@
 {% extends "base.html" %}
-{% block title %}Saved listings · ScoreRent{% endblock %}
+{% block title %}My listings · ScoreRent{% endblock %}
 {% block content %}
-<section class="stack" style="padding-top:26px;">
-  <div class="pageHeader">
+<section class="stack">
+  <header class="pageHeader">
     <div>
       <p class="eyebrow">Rental shortlist</p>
-      <h2>Saved listings</h2>
-      <p class="muted">Keep the costs, amenities and practical trade-offs in one place.</p>
+      <h1>My listings</h1>
+      <p>Keep prices, amenities, exact locations and practical trade-offs together.</p>
     </div>
-    <a class="button primary" href="/import-listing">Import listing</a>
-  </div>
+    <div class="pageHeaderActions">
+      {% if listings|length >= 2 %}<a class="button" href="/compare">Compare listings</a>{% endif %}
+      <a class="button primary" href="/import-listing">Import listing</a>
+    </div>
+  </header>
 
   {% if not listings %}
-    <div class="card stack">
-      <h3>No saved listings yet</h3>
-      <p class="muted">Import a screenshot and choose “Save listing” after reviewing the details.</p>
+    <article class="card emptyState stack">
+      <span class="emptyStateIcon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19.5z"/></svg>
+      </span>
+      <div>
+        <h2>Your shortlist is empty</h2>
+        <p>Import a listing screenshot, verify the extracted details and save it here.</p>
+      </div>
       <a class="button primary" href="/import-listing">Import your first listing</a>
-    </div>
+    </article>
   {% else %}
-    <div class="grid-2">
-      {% for listing in listings %}
-        <article class="card stack">
-          <div>
-            <p class="eyebrow">{{ listing.location or 'Location not added' }}</p>
-            <h3>{{ listing.title }}</h3>
-          </div>
-          <div class="metricGrid">
-            <div><span class="muted small">Rent</span><strong>R{{ '{:,}'.format(listing.monthly_rent) }}</strong></div>
-            <div><span class="muted small">Upfront</span><strong>R{{ '{:,}'.format(listing.upfront_cost) }}</strong></div>
-          </div>
-          {% if listing.amenities %}
-            <div class="tagList">
-              {% for amenity in listing.amenities[:5] %}<span class="tag">{{ amenity }}</span>{% endfor %}
+    <form method="get" action="/compare" class="stack" id="listingComparisonForm">
+      <div class="comparisonToolbar card">
+        <div>
+          <strong>Build a comparison</strong>
+          <p class="muted small"><span id="selectedListingCount">0</span> selected · choose 2–4 listings</p>
+        </div>
+        <button class="button primary" type="submit">Compare selected</button>
+      </div>
+
+      <div class="listingGrid">
+        {% for listing in listings %}
+          <article class="card listingCard selectableListing">
+            <label class="listingSelector">
+              <input type="checkbox" name="listing_ids" value="{{ listing.id }}">
+              <span>Select</span>
+            </label>
+
+            <div class="listingMedia">
+              <div class="listingMediaTop">
+                <span class="propertyGlyph" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-5v6h-5A1.5 1.5 0 0 1 3 19.5z"/></svg>
+                </span>
+                {% if listing.location_is_exact %}
+                  <span class="statusBadge ready">Travel-ready</span>
+                {% endif %}
+              </div>
+              <div>
+                <div class="listingMediaLocation">{{ listing.location or 'Location not added' }}</div>
+                <div class="listingMediaPrice">R{{ '{:,}'.format(listing.monthly_rent) }} <small>/ month</small></div>
+              </div>
             </div>
-          {% endif %}
-          <a class="button" href="/listings/{{ listing.id }}">View details</a>
-        </article>
-      {% endfor %}
-    </div>
+
+            <div class="listingCardBody">
+              <div>
+                <h2 class="listingCardTitle">{{ listing.title }}</h2>
+                {% if not listing.location_is_exact %}
+                  <span class="statusBadge mutedStatus">Exact location needed for travel</span>
+                {% endif %}
+              </div>
+
+              <div class="listingCardMeta">
+                <div><span class="label">Upfront cost</span><strong>R{{ '{:,}'.format(listing.upfront_cost) }}</strong></div>
+                <div><span class="label">Demand</span><strong>{{ listing.area_demand|title }}</strong></div>
+              </div>
+
+              {% if listing.amenities %}
+                <div class="tagList">
+                  {% for amenity in listing.amenities[:4] %}<span class="tag">{{ amenity }}</span>{% endfor %}
+                  {% if listing.amenities|length > 4 %}<span class="tag">+{{ listing.amenities|length - 4 }}</span>{% endif %}
+                </div>
+              {% else %}
+                <p class="muted small">No amenities recorded yet.</p>
+              {% endif %}
+
+              <div class="listingCardActions">
+                <a class="button wide" href="/listings/{{ listing.id }}">View listing</a>
+              </div>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    </form>
   {% endif %}
 </section>
+
+<script>
+  (() => {
+    const form = document.getElementById('listingComparisonForm');
+    if (!form) return;
+    const boxes = [...form.querySelectorAll('input[name="listing_ids"]')];
+    const count = document.getElementById('selectedListingCount');
+    const update = () => {
+      const selected = boxes.filter((box) => box.checked);
+      count.textContent = selected.length;
+      boxes.forEach((box) => box.closest('.selectableListing')?.classList.toggle('selected', box.checked));
+    };
+    boxes.forEach((box) => box.addEventListener('change', update));
+    form.addEventListener('submit', (event) => {
+      const selected = boxes.filter((box) => box.checked).length;
+      if (selected < 2 || selected > 4) {
+        event.preventDefault();
+        window.alert('Choose between two and four listings to compare.');
+      }
+    });
+    update();
+  })();
+</script>
 {% endblock %}

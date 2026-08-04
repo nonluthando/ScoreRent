@@ -9,7 +9,8 @@ from services.listing_import_service import (
 def make_result(**overrides):
     values = {
         "listing_name": GeminiTextField(value="Observatory studio", evidence="Observatory studio", confidence="high"),
-        "location": GeminiTextField(value="Observatory, Cape Town", evidence="Observatory", confidence="high"),
+        "location": GeminiTextField(value="12 Main Road, Observatory, Cape Town", evidence="12 Main Road", confidence="high"),
+        "location_precision": "exact",
         "rent": GeminiMoneyField(value=8500, evidence="Rent R8 500 pm", confidence="high"),
         "deposit": GeminiMoneyField(value=8500, evidence="Deposit R8 500", confidence="high"),
         "application_fee": GeminiMoneyField(value=250, evidence="Application fee R250", confidence="high"),
@@ -27,7 +28,8 @@ def test_maps_structured_gemini_response_to_existing_listing_schema():
     assert result.rent.value == 8500
     assert result.deposit.value == 8500
     assert result.application_fee.value == 250
-    assert result.location.value == "Observatory, Cape Town"
+    assert result.location.value == "12 Main Road, Observatory, Cape Town"
+    assert result.location_precision == "exact"
     assert result.required_documents == ["payslip", "bank statement"]
 
 

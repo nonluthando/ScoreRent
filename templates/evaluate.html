@@ -1,20 +1,24 @@
 {% extends "base.html" %}
+{% block title %}Evaluate a listing · ScoreRent{% endblock %}
 {% block content %}
 
-<section class="stack" style="padding-top: 26px;">
-  <div class="stack" style="gap:10px;">
-    <h2>Evaluate listing</h2>
-    <p>
-      Enter listing details below. We’ll calculate your match score and
-      recommend what to do next.
-    </p>
-  </div>
+<section class="stack flowPage">
+  <header class="pageHeader">
+    <div>
+      <p class="eyebrow">Manual evaluation</p>
+      <h1>Check your application fit.</h1>
+      <p>Enter the listing costs and requirements. ScoreRent will explain the result and suggest practical next steps.</p>
+    </div>
+  </header>
 
   {% if user %}
-    <div class="card">
-      <strong>Have listing screenshots?</strong>
-      <p class="muted">Let ScoreRent read them, then confirm the extracted details before evaluation.</p>
-      <a class="button" href="/import-listing">Import screenshots</a>
+    <div class="card noticeCard sectionHeader">
+      <div>
+        <p class="eyebrow">Faster option</p>
+        <h3>Have listing screenshots?</h3>
+        <p class="muted small">Import them first, then review the extracted details before evaluating.</p>
+      </div>
+      <a class="button primary" href="/import-listing">Import screenshots</a>
     </div>
   {% endif %}
 

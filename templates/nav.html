@@ -1,26 +1,100 @@
 {% set path = request.url.path %}
 {% set logged_in = user is defined and user %}
 
-<nav class="topNav">
-  <div class="navLeft">
-    <a class="brand" href="/">ScoreRent</a>
-  </div>
+{% macro icon(name) -%}
+  {% if name == 'home' %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-5v6h-5A1.5 1.5 0 0 1 3 19.5z"/></svg>
+  {% elif name == 'listings' %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5zM8 8h8M8 12h8M8 16h5"/></svg>
+  {% elif name == 'compare' %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4 4 8l4 4M4 8h13M16 20l4-4-4-4m4 4H7"/></svg>
+  {% elif name == 'import' %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V14"/></svg>
+  {% elif name == 'evaluate' %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h5m-5 4h3"/></svg>
+  {% elif name == 'history' %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9M4.5 5v4h4M12 8v4l3 2"/></svg>
+  {% elif name == 'profile' %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 8a7 7 0 0 0-14 0"/></svg>
+  {% elif name == 'learn' %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 7 9-4 9 4-9 4zM6 9.5V15c0 1.7 2.7 3 6 3s6-1.3 6-3V9.5M21 7v7"/></svg>
+  {% elif name == 'logout' %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5m4-4 4-3-4-3m4 3H9"/></svg>
+  {% endif %}
+{%- endmacro %}
 
-  <div class="navLinks">
-    {% if logged_in %}
-      <a class="navLink navCta {% if path == '/evaluate' %}active{% endif %}" href="/evaluate">Evaluate</a>
-      <a class="navLink {% if path == '/import-listing' %}active{% endif %}" href="/import-listing">Import</a>
-      <a class="navLink {% if path == '/profile' %}active{% endif %}" href="/profile">Profile</a>
-      <a class="navLink {% if path.startswith('/listings') %}active{% endif %}" href="/listings">Listings</a>
-      <a class="navLink {% if path == '/destinations' %}active{% endif %}" href="/destinations">Destinations</a>
-      <a class="navLink {% if path == '/history' %}active{% endif %}" href="/history">History</a>
-      <a class="navLink {% if path.startswith('/learn') %}active{% endif %}" href="/learn">Learn</a>
-      <a class="navLink dangerLink" href="/logout">Logout</a>
-    {% else %}
-      <a class="navLink navCta {% if path == '/evaluate' %}active{% endif %}" href="/evaluate">Evaluate</a>
-      <a class="navLink {% if path.startswith('/learn') %}active{% endif %}" href="/learn">Learn</a>
-      <a class="navLink {% if path == '/login' %}active{% endif %}" href="/login">Login</a>
-      <a class="navLink {% if path == '/signup' %}active{% endif %}" href="/signup">Sign up</a>
-    {% endif %}
-  </div>
-</nav>
+{% if logged_in %}
+  <aside class="appSidebar" aria-label="Primary navigation">
+    <a class="sidebarBrand" href="/dashboard" aria-label="ScoreRent dashboard">
+      <span class="brandMark">S</span>
+      <span>
+        <strong>ScoreRent</strong>
+        <small>Rental decisions</small>
+      </span>
+    </a>
+
+    <nav class="sidebarNav">
+      <p class="navSectionLabel">Workspace</p>
+      <a class="sidebarLink {% if path == '/dashboard' %}active{% endif %}" href="/dashboard" {% if path == '/dashboard' %}aria-current="page"{% endif %}>
+        {{ icon('home') }}<span>Overview</span>
+      </a>
+      <a class="sidebarLink {% if path.startswith('/listings') %}active{% endif %}" href="/listings" {% if path.startswith('/listings') %}aria-current="page"{% endif %}>
+        {{ icon('listings') }}<span>My listings</span>
+      </a>
+      <a class="sidebarLink {% if path == '/compare' %}active{% endif %}" href="/compare" {% if path == '/compare' %}aria-current="page"{% endif %}>
+        {{ icon('compare') }}<span>Compare</span>
+      </a>
+      <a class="sidebarLink {% if path == '/history' or path.startswith('/results/') %}active{% endif %}" href="/history">
+        {{ icon('history') }}<span>Evaluations</span>
+      </a>
+
+      <p class="navSectionLabel">Tools</p>
+      <a class="sidebarLink sidebarLinkPrimary {% if path == '/import-listing' %}active{% endif %}" href="/import-listing">
+        {{ icon('import') }}<span>Import listing</span>
+      </a>
+      <a class="sidebarLink {% if path == '/evaluate' %}active{% endif %}" href="/evaluate">
+        {{ icon('evaluate') }}<span>Evaluate manually</span>
+      </a>
+      <a class="sidebarLink {% if path.startswith('/learn') %}active{% endif %}" href="/learn">
+        {{ icon('learn') }}<span>Learn</span>
+      </a>
+    </nav>
+
+    <div class="sidebarAccount">
+      <a class="accountCard {% if path == '/profile' %}active{% endif %}" href="/profile">
+        <span class="accountAvatar">{{ user.email[0]|upper }}</span>
+        <span class="accountMeta">
+          <strong>Profile</strong>
+          <small>{{ user.email }}</small>
+        </span>
+        <span aria-hidden="true">›</span>
+      </a>
+      <a class="sidebarLogout" href="/logout">{{ icon('logout') }}<span>Sign out</span></a>
+    </div>
+  </aside>
+
+  <header class="mobileTopbar">
+    <a class="mobileBrand" href="/dashboard"><span class="brandMark">S</span><strong>ScoreRent</strong></a>
+    <a class="mobileAvatar" href="/profile" aria-label="Open profile">{{ user.email[0]|upper }}</a>
+  </header>
+
+  <nav class="mobileBottomNav" aria-label="Mobile navigation">
+    <a class="{% if path == '/dashboard' %}active{% endif %}" href="/dashboard">{{ icon('home') }}<span>Home</span></a>
+    <a class="{% if path.startswith('/listings') %}active{% endif %}" href="/listings">{{ icon('listings') }}<span>Listings</span></a>
+    <a class="mobileImportAction {% if path == '/import-listing' %}active{% endif %}" href="/import-listing">{{ icon('import') }}<span>Import</span></a>
+    <a class="{% if path == '/compare' %}active{% endif %}" href="/compare">{{ icon('compare') }}<span>Compare</span></a>
+    <a class="{% if path == '/profile' %}active{% endif %}" href="/profile">{{ icon('profile') }}<span>Profile</span></a>
+  </nav>
+{% else %}
+  <header class="publicNav">
+    <a class="publicBrand" href="/">
+      <span class="brandMark">S</span>
+      <span><strong>ScoreRent</strong><small>Rental decisions</small></span>
+    </a>
+    <nav class="publicLinks" aria-label="Public navigation">
+      <a class="{% if path.startswith('/learn') %}active{% endif %}" href="/learn">Learn</a>
+      <a class="{% if path == '/login' %}active{% endif %}" href="/login">Sign in</a>
+      <a class="button primary compactButton" href="/signup">Create account</a>
+    </nav>
+  </header>
+{% endif %}

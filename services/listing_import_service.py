@@ -51,6 +51,7 @@ class GeminiTextField(BaseModel):
 class GeminiListingExtraction(BaseModel):
     listing_name: GeminiTextField
     location: GeminiTextField
+    location_precision: Literal["exact", "area_only", "unknown"] = "unknown"
     rent: GeminiMoneyField
     deposit: GeminiMoneyField
     application_fee: GeminiMoneyField
@@ -97,6 +98,10 @@ Rules:
 - Never invent subjective claims such as safe, beautiful, ideal, spacious, affordable, or good value unless the listing explicitly states the underlying fact.
 - Exclude phone numbers, email addresses, names of private individuals, and other contact details.
 - Location is reference information only; never infer market demand, safety, affordability, or a ScoreRent verdict.
+- Set location_precision to "exact" only when the screenshots show a full street address
+  or a uniquely identifiable building/residence name with enough area context to resolve one place.
+- Set location_precision to "area_only" for a suburb, neighbourhood, town, city, estate without
+  a unique building, or an approximate location. Use "unknown" when no useful location is visible.
 - Do not score the property and do not recommend whether the user should apply.
 - Evidence must be a short fragment copied from the visible listing text.
 - Add a warning for important missing or conflicting information, especially rent, deposit, or fees.
@@ -223,6 +228,7 @@ def _to_listing_extraction(result: GeminiListingExtraction) -> ListingExtraction
     return ListingExtraction(
         listing_name=_field(result.listing_name),
         location=_field(result.location),
+        location_precision=result.location_precision,
         rent=_field(result.rent),
         deposit=_field(result.deposit),
         application_fee=_field(result.application_fee),

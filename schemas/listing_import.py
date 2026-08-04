@@ -15,6 +15,7 @@ class ExtractedField:
 class ListingExtraction:
     listing_name: ExtractedField = field(default_factory=ExtractedField)
     location: ExtractedField = field(default_factory=ExtractedField)
+    location_precision: str = "unknown"
     rent: ExtractedField = field(default_factory=ExtractedField)
     deposit: ExtractedField = field(default_factory=ExtractedField)
     application_fee: ExtractedField = field(default_factory=ExtractedField)

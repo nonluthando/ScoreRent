@@ -1,55 +1,48 @@
 {% extends "base.html" %}
+{% block title %}Evaluations · ScoreRent{% endblock %}
 {% block content %}
-
-<section class="stack" style="padding-top: 26px;">
-  <div class="stack" style="gap:10px;">
-    <h2>Saved evaluations</h2>
-    <p>
-      Review past listings you've evaluated.
-    </p>
-  </div>
-
-  <div class="actions">
-    <a class="btn" href="/evaluate">New evaluation</a>
-    <a class="btn secondary" href="/profile">Update profile</a>
-  </div>
+<section class="stack">
+  <header class="pageHeader">
+    <div>
+      <p class="eyebrow">Decision history</p>
+      <h1>Evaluations</h1>
+      <p>Return to earlier scores, reasons and recommended next steps.</p>
+    </div>
+    <div class="pageHeaderActions">
+      <a class="button" href="/profile">Renter profile</a>
+      <a class="button primary" href="/evaluate">New evaluation</a>
+    </div>
+  </header>
 
   {% if evaluations and evaluations|length > 0 %}
-    <div class="stack" style="margin-top: 18px;">
+    <div class="historyList">
       {% for e in evaluations %}
-        <a href="/results/{{ e['id'] }}" class="card stack" style="text-decoration:none;">
-          <div class="grid-2" style="align-items:center;">
-            <div class="stack" style="gap:4px;">
-              <h3 style="margin:0;">{{ e["listing_name"] or "Listing" }}</h3>
-              <p style="margin:0; opacity:.85;">
-                {{ e["created_at"] }}
-              </p>
-            </div>
-
-            <div class="stack" style="gap:8px; justify-self:end; text-align:right;">
-              <div class="badge">Score: {{ e["score"] }}/100</div>
-
-              {% if e["confidence"] == "HIGH" %}
-                <div class="badge good">{{ e["verdict"] }} • {{ e["confidence"] }}</div>
-              {% elif e["confidence"] == "MEDIUM" %}
-                <div class="badge warn">{{ e["verdict"] }} • {{ e["confidence"] }}</div>
-              {% else %}
-                <div class="badge bad">{{ e["verdict"] }} • {{ e["confidence"] }}</div>
-              {% endif %}
-            </div>
+        <a href="/results/{{ e['id'] }}" class="historyItem">
+          <div>
+            <p class="eyebrow">{{ e['created_at']|string|replace('T',' ') }}</p>
+            <h2 class="listingCardTitle">{{ e["listing_name"] or "Unnamed listing" }}</h2>
+          </div>
+          <div class="historyMeta">
+            <span class="badge">Score {{ e["score"] }}/100</span>
+            {% if e["confidence"] == "HIGH" %}
+              <span class="badge good">{{ e["verdict"]|replace('_',' ')|title }} · High confidence</span>
+            {% elif e["confidence"] == "MEDIUM" %}
+              <span class="badge warn">{{ e["verdict"]|replace('_',' ')|title }} · Medium confidence</span>
+            {% else %}
+              <span class="badge bad">{{ e["verdict"]|replace('_',' ')|title }} · Low confidence</span>
+            {% endif %}
           </div>
         </a>
       {% endfor %}
     </div>
   {% else %}
-    <div class="card stack" style="margin-top: 18px;">
-      <h3>No saved evaluations yet</h3>
-      <p>Run your first evaluation to start building history.</p>
-      <div class="actions">
-        <a class="btn" href="/evaluate">Start evaluation</a>
-      </div>
-    </div>
+    <article class="card emptyState stack">
+      <span class="emptyStateIcon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9M4.5 5v4h4M12 8v4l3 2"/></svg>
+      </span>
+      <div><h2>No evaluations yet</h2><p>Run your first evaluation to start building a decision history.</p></div>
+      <a class="button primary" href="/evaluate">Evaluate a listing</a>
+    </article>
   {% endif %}
 </section>
-
 {% endblock %}

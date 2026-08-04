@@ -75,6 +75,7 @@ def init_db():
                     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                     title TEXT NOT NULL,
                     location TEXT,
+                    location_is_exact BOOLEAN NOT NULL DEFAULT FALSE,
                     monthly_rent INTEGER NOT NULL,
                     deposit INTEGER NOT NULL DEFAULT 0,
                     application_fee INTEGER NOT NULL DEFAULT 0,
@@ -134,6 +135,9 @@ def init_db():
             )
             cur.execute(
                 "ALTER TABLE listings ADD COLUMN IF NOT EXISTS geocoded_address TEXT"
+            )
+            cur.execute(
+                "ALTER TABLE listings ADD COLUMN IF NOT EXISTS location_is_exact BOOLEAN NOT NULL DEFAULT FALSE"
             )
 
             # Indexes for performance

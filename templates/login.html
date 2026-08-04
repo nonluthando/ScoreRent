@@ -1,18 +1,25 @@
 {% extends "base.html" %}
+{% block title %}Sign in · ScoreRent{% endblock %}
 {% block content %}
-<h2>Sign in</h2>
+<section class="authLayout">
+  <div class="authIntro">
+    <p class="eyebrow">Welcome back</p>
+    <h1>Pick up where your shortlist left off.</h1>
+    <p>Review saved listings, compare the trade-offs and return to earlier evaluation results.</p>
+    <div class="trustLine"><span>Private shortlist</span><span>Editable listing details</span><span>Clear decision support</span></div>
+  </div>
 
-{% if error %}
-  <p class="error">{{ error }}</p>
-{% endif %}
-
-<form method="post" action="/login" class="card">
-  <label>Email</label>
-  <input name="email" type="email" required />
-
-  <label>Password</label>
-  <input name="password" type="password" required />
-
-  <button class="btn" type="submit">Login</button>
-</form>
+  <div class="authPanel">
+    <p class="eyebrow">Account access</p>
+    <h2>Sign in</h2>
+    <p class="muted">Use the email and password linked to your ScoreRent account.</p>
+    {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+    <form method="post" action="/login" class="stack">
+      <div class="stack" style="gap:8px;"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required></div>
+      <div class="stack" style="gap:8px;"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required></div>
+      <button class="button primary" type="submit">Sign in</button>
+    </form>
+    <p class="authSwitch">New to ScoreRent? <a href="/signup">Create an account</a></p>
+  </div>
+</section>
 {% endblock %}

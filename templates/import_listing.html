@@ -1,33 +1,55 @@
 {% extends "base.html" %}
-{% block title %}Import listing screenshots · ScoreRent{% endblock %}
+{% block title %}Import a listing · ScoreRent{% endblock %}
 {% block content %}
-<section class="stack" style="padding-top:26px; max-width:760px;">
-  <div class="stack" style="gap:10px;">
-    <p class="eyebrow">AI-assisted import</p>
-    <h2>Import listing screenshots</h2>
-    <p>Upload up to four screenshots. ScoreRent will read the listing text, then ask you to confirm every field before evaluating it.</p>
+<section class="stack flowPage">
+  <header class="pageHeader">
+    <div>
+      <p class="eyebrow">Listing import</p>
+      <h1>Turn screenshots into a listing you can compare.</h1>
+      <p>Upload the advert, verify what was read and save the result to your shortlist.</p>
+    </div>
+  </header>
+
+  <div class="progressSteps" aria-label="Import progress">
+    <div class="progressStep active"><span>1</span>Upload screenshots</div>
+    <div class="progressStep"><span>2</span>Review details</div>
+    <div class="progressStep"><span>3</span>Save or evaluate</div>
   </div>
 
   {% if error %}
-    <div class="card" role="alert"><strong>Could not read the screenshots.</strong><p>{{ error }}</p></div>
+    <div class="alert error" role="alert"><strong>We could not read those screenshots.</strong><br>{{ error }}</div>
   {% endif %}
 
   <form method="post" enctype="multipart/form-data" class="card stack">
-    <label for="images"><strong>Listing screenshots</strong></label>
-    <input id="images" name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple required>
-    <p class="muted small">JPEG, PNG or WebP. Maximum four images and 5 MB each.</p>
-    <button type="submit" class="button primary">Read screenshots</button>
+    <div class="uploadDropzone">
+      <span class="uploadIcon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V14"/></svg>
+      </span>
+      <h2>Upload listing screenshots</h2>
+      <p>Use clear screenshots that show the price, address, costs, amenities and requirements.</p>
+      <input id="images" name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple required>
+      <p class="muted small">JPEG, PNG or WebP · up to four images · 5 MB each</p>
+    </div>
+
+    <div class="privacyNote">
+      <span aria-hidden="true">ⓘ</span>
+      <div><strong>Protect personal information.</strong> Screenshots are processed by an external image-reading service. Crop out names, phone numbers, email addresses and private conversations before uploading.</div>
+    </div>
+
+    <button type="submit" class="button primary wide">Read screenshots</button>
   </form>
 
-  <div class="card stack">
-    <h3>Before you upload</h3>
-    <p class="muted">Your screenshots are securely sent to an external AI service for extraction. Avoid uploading images containing names, phone numbers, email addresses or private conversations.</p>
-    <p class="muted"><strong>Crop out names, phone numbers, email addresses, private chats and any other personal information first.</strong></p>
-  </div>
-
-  <div class="card stack">
-    <h3>What happens next</h3>
-    <p class="muted">The import tool extracts visible listing details only. It does not calculate your score. You review the rent, deposit, fees and documents before ScoreRent’s existing rules run.</p>
-  </div>
+  <section class="grid-2">
+    <article class="card stack softCard">
+      <p class="eyebrow">What gets extracted</p>
+      <h3>Listing facts only</h3>
+      <p class="muted small">Rent, deposit, fees, address, documents, amenities and clearly stated pros or limitations.</p>
+    </article>
+    <article class="card stack softCard">
+      <p class="eyebrow">You stay in control</p>
+      <h3>Nothing is final yet</h3>
+      <p class="muted small">Every field remains editable. ScoreRent’s existing rules—not the image reader—calculate the application score.</p>
+    </article>
+  </section>
 </section>
 {% endblock %}

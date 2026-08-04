@@ -1,40 +1,30 @@
 {% extends "base.html" %}
-
-{% block title %}Learn | ScoreRent{% endblock %}
-
+{% block title %}Rental guides · ScoreRent{% endblock %}
 {% block content %}
-<section class="learnHero">
-  <span class="badge bad">Learn</span>
-  <h1>Rental application guide</h1>
-  <p>
-    Practical guides to help you understand rental applications,
-    improve your ScoreRent result, and avoid wasting money on weak applications.
-  </p>
-</section>
+<section class="stack">
+  <header class="learnHero">
+    <p class="eyebrow">Rental knowledge</p>
+    <h1>Make sense of the application process.</h1>
+    <p>Practical guides for affordability, documents, stronger applications and common rental red flags.</p>
+  </header>
 
-<section class="learnGrid">
-  <a class="learnCard" href="/learn/rent-affordability">
-    <div class="learnIcon">💰</div>
-    <h3>How much rent you can realistically afford</h3>
-    <p>Understand rent-to-income bands, deposits, and budgeting before you apply.</p>
-  </a>
-
-  <a class="learnCard" href="/learn/documents-landlords-ask-for">
-    <div class="learnIcon">📄</div>
-    <h3>What documents landlords usually ask for</h3>
-    <p>Worker, student, new professional, and guarantor document checklists.</p>
-  </a>
-
-  <a class="learnCard" href="/learn/improve-application">
-    <div class="learnIcon">✅</div>
-    <h3>How to improve a weak rental application</h3>
-    <p>What to fix first when your result is borderline or high risk.</p>
-  </a>
-
-  <a class="learnCard" href="/learn/rental-red-flags">
-    <div class="learnIcon">🛡</div>
-    <h3>Rental red flags before paying an application fee</h3>
-    <p>Warning signs to check before sending money or personal documents.</p>
-  </a>
+  <div class="learnGrid">
+    <a class="learnCard" href="/learn/rent-affordability">
+      <span class="learnIcon">R</span>
+      <span><h3>How much rent can you realistically afford?</h3><p>Understand rent-to-income bands, deposits and budgeting before applying.</p></span>
+    </a>
+    <a class="learnCard" href="/learn/documents-landlords-ask-for">
+      <span class="learnIcon">D</span>
+      <span><h3>What documents do landlords usually ask for?</h3><p>Worker, student, new-professional and guarantor document checklists.</p></span>
+    </a>
+    <a class="learnCard" href="/learn/improve-application">
+      <span class="learnIcon">↑</span>
+      <span><h3>How can you improve a weak application?</h3><p>What to fix first when a result is borderline or high risk.</p></span>
+    </a>
+    <a class="learnCard" href="/learn/rental-red-flags">
+      <span class="learnIcon">!</span>
+      <span><h3>What should you check before paying a fee?</h3><p>Warning signs to review before sending money or personal documents.</p></span>
+    </a>
+  </div>
 </section>
 {% endblock %}

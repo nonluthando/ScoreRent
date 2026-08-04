@@ -1,64 +1,103 @@
-{% set confidence_class = "confidence-low" %}
-{% set confidence_label = evaluation.confidence|upper %}
-
-{% if confidence_label == "HIGH" %}
-  {% set confidence_class = "confidence-high" %}
-{% elif confidence_label == "MEDIUM" %}
-  {% set confidence_class = "confidence-medium" %}
+{% extends "base.html" %}
+{% block title %}Evaluation result · ScoreRent{% endblock %}
+{% block content %}
+{% set ring_class = "" %}
+{% set verdict_label = "Borderline" %}
+{% set verdict_badge = "warn" %}
+{% if evaluation.verdict == "STRONG_MATCH" or evaluation.verdict == "WORTH_APPLYING" %}
+  {% set ring_class = "good" %}
+  {% set verdict_label = "Strong match" %}
+  {% set verdict_badge = "good" %}
+{% elif evaluation.verdict == "HIGH_RISK" or evaluation.verdict == "NOT_WORTH_IT" %}
+  {% set ring_class = "bad" %}
+  {% set verdict_label = "High risk" %}
+  {% set verdict_badge = "bad" %}
 {% endif %}
 
-<div class="scoreBox {{ confidence_class }}">
-  <div class="scoreHeader">
+<section class="stack result">
+  <header class="pageHeader">
     <div>
-      <div class="scoreTitle">Application score</div>
-      <div class="score">{{ evaluation.score }}</div>
-
-      {% set verdict_class = "warn" %}
-
-      {% if evaluation.verdict == "STRONG_MATCH"
-            or evaluation.verdict == "WORTH_APPLYING" %}
-        {% set verdict_class = "good" %}
-      {% elif evaluation.verdict == "HIGH_RISK"
-                or evaluation.verdict == "NOT_WORTH_IT" %}
-        {% set verdict_class = "bad" %}
-      {% endif %}
-
-      {% set verdict_label = evaluation.verdict %}
-
-      {% if evaluation.verdict == "STRONG_MATCH"
-            or evaluation.verdict == "WORTH_APPLYING" %}
-        {% set verdict_label = "Strong match" %}
-      {% elif evaluation.verdict == "BORDERLINE" %}
-        {% set verdict_label = "Borderline" %}
-      {% elif evaluation.verdict == "HIGH_RISK"
-                or evaluation.verdict == "NOT_WORTH_IT" %}
-        {% set verdict_label = "High risk" %}
-      {% endif %}
-
-      <div class="verdict {{ verdict_class }}">
-        {{ verdict_label }}
-      </div>
-
-      <div class="confidenceBadge {{ confidence_class }}">
-        Confidence: {{ confidence_label|title }}
-      </div>
+      <p class="eyebrow">Application evaluation</p>
+      <h1>{{ evaluation.listing_name or "Unnamed listing" }}</h1>
+      <p>See what helped, what weakened the application and what you can do next.</p>
     </div>
-
-    <div class="tipBubble">
-      <span class="tip">What is this?</span>
-
-      <div class="tipContent">
-        <p>
-          This score shows how strong your application looks based on
-          affordability, document fit, demand, and upfront costs.
-          It is <strong>not</strong> a guarantee of approval.
-        </p>
-
-        <p class="confidenceExplanation">
-          Confidence shows how complete the information used for this
-          evaluation is.
-        </p>
-      </div>
+    <div class="pageHeaderActions">
+      <a class="button" href="/history">All evaluations</a>
+      <a class="button primary" href="/evaluate">Evaluate another</a>
     </div>
+  </header>
+
+  <section class="resultHero">
+    <div class="scoreRing {{ ring_class }}" style="--score: {{ evaluation.score }};" aria-label="Application score {{ evaluation.score }} out of 100">
+      <div class="scoreRingInner"><strong>{{ evaluation.score }}</strong><small>out of 100</small></div>
+    </div>
+    <div class="resultHeroText">
+      <p class="eyebrow">Your application fit</p>
+      <h1>{{ verdict_label }}</h1>
+      <p>This is a practical decision guide based on affordability, document fit, demand and upfront costs. It is not a prediction or guarantee of approval.</p>
+      <div class="resultPills">
+        <span class="badge {{ verdict_badge }}">{{ verdict_label }}</span>
+        <span class="badge">{{ evaluation.confidence|title }} information confidence</span>
+        <span class="badge">Rules-based result</span>
+      </div>
+      {% if evaluation.confidence|upper == "LOW" %}
+        <div class="resultWarning">Some important information was missing, so treat this result as an estimate and verify the listing details.</div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card stack">
+    <div><p class="eyebrow">Listing summary</p><h2 class="sectionTitle">Costs used in this evaluation</h2></div>
+    <div class="summary-grid">
+      <div><span class="label">Monthly rent</span>R{{ '{:,}'.format(listing.rent or 0) }}</div>
+      <div><span class="label">Deposit</span>R{{ '{:,}'.format(listing.deposit or 0) }}</div>
+      <div><span class="label">Application fee</span>R{{ '{:,}'.format(listing.application_fee or 0) }}</div>
+      <div><span class="label">Area demand</span>{{ listing.area_demand or "MEDIUM" }}</div>
+    </div>
+  </section>
+
+  {% if reasons %}
+    <section class="card stack">
+      <div><p class="eyebrow">What shaped the result</p><h2 class="sectionTitle">Why you got this score</h2></div>
+      <ul class="reasonList">{% for reason in reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
+    </section>
+  {% endif %}
+
+  {% if actions %}
+    <section class="card stack">
+      <div><p class="eyebrow">Next steps</p><h2 class="sectionTitle">Recommended actions</h2></div>
+      <div class="actionList">
+        {% for action in actions %}
+          <div class="actionItem"><span class="actionNumber">{{ loop.index }}</span><span>{{ action }}</span></div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+
+  {% if listing.breakdown %}
+    <section class="card breakdownCard">
+      <details class="breakdownDetails">
+        <summary class="breakdownSummary">View the detailed score breakdown</summary>
+        <div class="breakdownList">
+          {% for item in listing.breakdown %}
+            {% set badge_class = "zero" %}
+            {% if item.delta > 0 %}{% set badge_class = "pos" %}{% elif item.delta < 0 %}{% set badge_class = "neg" %}{% endif %}
+            <div class="breakItem">
+              <div class="breakTop">
+                <div><div class="breakTitle">{{ item.title }}</div>{% if item.details %}<div class="breakDetailsText">{{ item.details }}</div>{% endif %}</div>
+                <div class="breakRight"><div class="deltaBadge {{ badge_class }}">{% if item.delta > 0 %}+{% endif %}{{ item.delta }}</div><div class="arrowNums">{{ item.before }} → {{ item.after }}</div></div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </details>
+    </section>
+  {% endif %}
+
+  <div class="actions">
+    <a class="button primary" href="/evaluate">Evaluate another listing</a>
+    <a class="button" href="/listings">Open saved listings</a>
+    <a class="button" href="/compare">Compare shortlist</a>
   </div>
-</div>
+</section>
+{% endblock %}
