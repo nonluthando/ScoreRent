@@ -1,71 +1,91 @@
 {% extends "base.html" %}
+{% block title %}Overview · ScoreRent{% endblock %}
 {% block content %}
+<section class="stack">
+  <header class="dashboardHero">
+    <div>
+      <p class="eyebrow">Your rental workspace</p>
+      <h1>Make the next listing easier to judge.</h1>
+      <p>Import a listing, verify the details and keep every cost and trade-off in one shortlist.</p>
+    </div>
+    <a class="button" href="/import-listing">Import a listing</a>
+  </header>
 
-<section class="page-header">
-  <h2>Dashboard</h2>
-  <p class="muted">Welcome back, {{ user.email }}.</p>
+  <div class="dashboardStats">
+    <article class="card statCard">
+      <div><strong>{{ dashboard_stats.listing_count }}</strong><span>Saved listings</span></div>
+      <span class="statIcon">L</span>
+    </article>
+    <article class="card statCard">
+      <div><strong>{{ dashboard_stats.evaluation_count }}</strong><span>Evaluations</span></div>
+      <span class="statIcon">S</span>
+    </article>
+    <article class="card statCard">
+      <div><strong>{{ dashboard_stats.commute_ready_count }}</strong><span>Travel-ready listings</span></div>
+      <span class="statIcon">↗</span>
+    </article>
+  </div>
+
+  <div class="dashboardGrid">
+    {% if last_eval %}
+      <article class="card latestEvaluation">
+        <div class="latestEvalHeader">
+          <div>
+            <p class="eyebrow">Latest evaluation</p>
+            <h2 class="sectionTitle">{{ last_eval.listing_name or "Unnamed listing" }}</h2>
+            <p class="muted small">{{ last_eval.created_at|string|replace('T', ' ') }}</p>
+          </div>
+          <div class="score-badge">{{ last_eval.score }}</div>
+        </div>
+        <div class="eval-summary">
+          <div><span class="label">Verdict</span><strong>{{ last_eval.verdict|replace('_',' ')|title }}</strong></div>
+          <div><span class="label">Confidence</span><strong>{{ last_eval.confidence|title }}</strong></div>
+          <div><span class="label">Next step</span><strong>Review recommendations</strong></div>
+        </div>
+        <div class="latestEvalActions">
+          <a class="button primary" href="/results/{{ last_eval.id }}">Open result</a>
+          <a class="button" href="/history">All evaluations</a>
+        </div>
+      </article>
+    {% else %}
+      <article class="card emptyState stack">
+        <span class="emptyStateIcon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h5m-5 4h3"/></svg>
+        </span>
+        <div><h2>No evaluations yet</h2><p>Run an evaluation to see affordability, document fit and recommended next steps.</p></div>
+        <a class="button primary" href="/evaluate">Evaluate a listing</a>
+      </article>
+    {% endif %}
+
+    <aside class="card stack">
+      <div>
+        <p class="eyebrow">Quick actions</p>
+        <h3>What would you like to do?</h3>
+      </div>
+      <div class="quickActions">
+        <a class="quickAction" href="/import-listing"><span class="quickActionIcon">↑</span><span><strong>Import screenshots</strong><small>Extract and confirm listing details</small></span><span>›</span></a>
+        <a class="quickAction" href="/listings"><span class="quickActionIcon">L</span><span><strong>Open shortlist</strong><small>Review your saved listings</small></span><span>›</span></a>
+        <a class="quickAction" href="/compare"><span class="quickActionIcon">⇄</span><span><strong>Compare listings</strong><small>See costs, amenities and travel</small></span><span>›</span></a>
+      </div>
+    </aside>
+  </div>
+
+  {% if recent_listings %}
+    <section class="stack">
+      <div class="sectionHeader">
+        <div><p class="eyebrow">Recent shortlist</p><h2 class="sectionTitle">Saved listings</h2></div>
+        <a class="button" href="/listings">View all</a>
+      </div>
+      <div class="recentListingGrid">
+        {% for listing in recent_listings %}
+          <a class="card quickAction" href="/listings/{{ listing.id }}">
+            <span class="quickActionIcon">⌂</span>
+            <span><strong>{{ listing.title }}</strong><small>{{ listing.location or 'Location not added' }} · R{{ '{:,}'.format(listing.monthly_rent) }}</small></span>
+            <span>›</span>
+          </a>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
 </section>
-
-{% if last_eval %}
-
-<div class="card dashboard-card">
-
-  <div class="card-header-row">
-    <div>
-      <p class="eyebrow">Latest evaluation</p>
-      <h3>{{ last_eval.listing_name or "Unnamed listing" }}</h3>
-    </div>
-
-    <div class="score-badge">
-      {{ last_eval.score }}/100
-    </div>
-  </div>
-
-  <div class="eval-summary">
-    <div>
-      <span class="label">Verdict</span>
-      <strong>{{ last_eval.verdict }}</strong>
-    </div>
-
-    <div>
-      <span class="label">Confidence</span>
-      <strong>{{ last_eval.confidence }}</strong>
-    </div>
-
-    <div>
-      <span class="label">Date</span>
-      <strong>{{ last_eval.created_at }}</strong>
-    </div>
-  </div>
-
-  <div class="actionsRow compact">
-    <a class="btn" href="/results/{{ last_eval.id }}">View results</a>
-    <a class="btn ghost" href="/evaluate">New evaluation</a>
-    <a class="btn ghost" href="/history">History</a>
-    <a class="btn ghost" href="/compare">Compare</a>
-  </div>
-
-</div>
-
-{% else %}
-
-<div class="card dashboard-card">
-
-  <p class="eyebrow">Get started</p>
-
-  <h3>Welcome to ScoreRent</h3>
-
-  <p class="muted">
-    You have not evaluated any rental listings yet. Start your first evaluation
-    to get a score, verdict, reasons, and recommended next steps.
-  </p>
-
-  <div class="actionsRow compact single">
-    <a class="btn" href="/evaluate">Start evaluation</a>
-  </div>
-
-</div>
-
-{% endif %}
-
 {% endblock %}

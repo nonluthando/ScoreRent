@@ -1,39 +1,172 @@
 {% extends "base.html" %}
+{% block title %}Compare listings · ScoreRent{% endblock %}
 {% block content %}
+<section class="stack">
+  <header class="pageHeader">
+    <div>
+      <p class="eyebrow">Decision workspace</p>
+      <h1>Compare listings</h1>
+      <p>Line up costs, amenities, trade-offs and travel estimates without switching between tabs.</p>
+    </div>
+    <a class="button" href="/listings">Back to shortlist</a>
+  </header>
 
-<h2>Compare Listings</h2>
-<p class="muted">Quick comparison of your most recent evaluations.</p>
+  {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
 
-<div class="card">
-  {% if items %}
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Score</th>
-          <th>Verdict</th>
-          <th>Rent</th>
-          <th>Fee</th>
-          <th>Demand</th>
-          <th>Top reason</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for it in items %}
-          <tr>
-            <td><a href="/results/{{ it.id }}">{{ it.score }}</a></td>
-            <td>{{ it.verdict }}</td>
-            <td>R{{ it.rent }}</td>
-            <td>R{{ it.application_fee }}</td>
-            <td>{{ it.demand }}</td>
-            <td class="muted">{{ it.top_reason }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  {% if not listings %}
+    <article class="card emptyState stack">
+      <span class="emptyStateIcon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M8 4 4 8l4 4M4 8h13M16 20l4-4-4-4m4 4H7"/></svg>
+      </span>
+      <div><h2>Nothing to compare yet</h2><p>Save at least two listings, then return here to compare them.</p></div>
+      <a class="button primary" href="/import-listing">Import a listing</a>
+    </article>
   {% else %}
-    <p class="muted">You need at least one saved evaluation before comparing listings.</p>
-    <a class="btn" href="/evaluate">Run evaluation</a>
-  {% endif %}
-</div>
+    <section class="card compareIntro">
+      <div>
+        <p class="eyebrow">How it works</p>
+        <h2 class="sectionTitle">Choose two to four listings</h2>
+        <p>Costs and listing details are available immediately. Travel estimates appear only when an exact address or uniquely identifiable building has been confirmed.</p>
+      </div>
+      <span class="statusBadge ready">{{ selected_listings|length }} selected</span>
+    </section>
 
+    <form method="get" action="/compare" class="card stack" id="compareSelectionForm">
+      <div class="sectionHeader">
+        <div><h2 class="sectionTitle">Your shortlist</h2><p class="muted small">Select the properties you are seriously considering.</p></div>
+        <button class="button" type="submit">Update comparison</button>
+      </div>
+      <div class="comparisonSelectionGrid">
+        {% for listing in listings %}
+          <label class="comparisonChoice {% if listing.id in selected_ids %}selected{% endif %}">
+            <input type="checkbox" name="listing_ids" value="{{ listing.id }}" {% if listing.id in selected_ids %}checked{% endif %}>
+            <span>
+              <strong>{{ listing.title }}</strong>
+              <small>{{ listing.location or 'Location not added' }}</small>
+              <small>R{{ '{:,}'.format(listing.monthly_rent) }} / month</small>
+              {% if listing.location_is_exact %}
+                <em class="statusBadge ready">Travel-ready</em>
+              {% else %}
+                <em class="statusBadge mutedStatus">Exact location needed</em>
+              {% endif %}
+            </span>
+          </label>
+        {% endfor %}
+      </div>
+    </form>
+
+    {% if selected_listings|length >= 2 and selected_listings|length <= 4 %}
+      <form method="post" action="/compare" class="card stack">
+        <div class="sectionHeader">
+          <div>
+            <p class="eyebrow">Travel destination</p>
+            <h2 class="sectionTitle">Where do you need to go?</h2>
+            <p class="muted small">Enter work, campus or another destination once. It will be checked against every travel-ready listing.</p>
+          </div>
+          {% if destination %}<span class="statusBadge ready">Route estimates updated</span>{% endif %}
+        </div>
+
+        {% for listing in selected_listings %}<input type="hidden" name="listing_ids" value="{{ listing.id }}">{% endfor %}
+
+        <div class="destinationEntry">
+          <label for="destination">Destination</label>
+          <input id="destination" name="destination" required value="{{ destination }}" placeholder="Example: UCT Upper Campus, Rondebosch">
+          <button class="button primary" type="submit">Calculate travel</button>
+        </div>
+      </form>
+
+      <div class="comparisonTableWrap card">
+        <table class="comparisonTable">
+          <thead>
+            <tr>
+              <th>Comparison</th>
+              {% for listing in selected_listings %}
+                <th>
+                  {{ listing.title }}
+                  <small>{{ listing.location or 'Location not added' }}</small>
+                </th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="sectionRow"><th colspan="{{ selected_listings|length + 1 }}">Costs</th></tr>
+            <tr><th>Monthly rent</th>{% for listing in selected_listings %}<td><strong>R{{ '{:,}'.format(listing.monthly_rent) }}</strong></td>{% endfor %}</tr>
+            <tr><th>Deposit</th>{% for listing in selected_listings %}<td>R{{ '{:,}'.format(listing.deposit) }}</td>{% endfor %}</tr>
+            <tr><th>Application fee</th>{% for listing in selected_listings %}<td>R{{ '{:,}'.format(listing.application_fee) }}</td>{% endfor %}</tr>
+            <tr><th>Estimated upfront</th>{% for listing in selected_listings %}<td><strong>R{{ '{:,}'.format(listing.upfront_cost) }}</strong></td>{% endfor %}</tr>
+
+            <tr class="sectionRow"><th colspan="{{ selected_listings|length + 1 }}">Listing fit</th></tr>
+            <tr>
+              <th>Amenities</th>
+              {% for listing in selected_listings %}<td>{{ listing.amenities|join(', ') if listing.amenities else 'Not recorded' }}</td>{% endfor %}
+            </tr>
+            <tr>
+              <th>Pros</th>
+              {% for listing in selected_listings %}
+                <td>{% if listing.pros %}<ul class="compactList">{% for item in listing.pros %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<span class="muted">Not recorded</span>{% endif %}</td>
+              {% endfor %}
+            </tr>
+            <tr>
+              <th>Potential downsides</th>
+              {% for listing in selected_listings %}
+                <td>{% if listing.cons %}<ul class="compactList">{% for item in listing.cons %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<span class="muted">Not recorded</span>{% endif %}</td>
+              {% endfor %}
+            </tr>
+
+            <tr class="sectionRow"><th colspan="{{ selected_listings|length + 1 }}">Location and travel</th></tr>
+            {% if commute_results %}
+              {% for mode in ['drive', 'walk', 'bicycle'] %}
+                <tr class="commuteComparisonRow">
+                  <th>{{ travel_mode_labels[mode] }}</th>
+                  {% for listing in selected_listings %}
+                    {% set result = commute_results.get(listing.id) %}
+                    <td>
+                      {% if result and result.routes.get(mode) %}
+                        <strong>{{ result.routes[mode].duration_label }}</strong>
+                        <small>{{ result.routes[mode].distance_km }} km to {{ destination }}</small>
+                      {% elif result and result.error %}
+                        <span class="statusBadge mutedStatus">Unavailable</span>
+                        <small>{{ result.error }}</small>
+                      {% else %}
+                        <span class="muted">Not calculated</span>
+                      {% endif %}
+                    </td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <th>Travel status</th>
+                {% for listing in selected_listings %}
+                  <td>
+                    {% if listing.location_is_exact %}<span class="statusBadge ready">Ready to calculate</span>{% else %}<span class="statusBadge mutedStatus">Exact location needed</span>{% endif %}
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted small">Travel times are estimates and may change with traffic, route conditions and address accuracy.</p>
+    {% endif %}
+  {% endif %}
+</section>
+
+<script>
+  (() => {
+    const form = document.getElementById('compareSelectionForm');
+    if (!form) return;
+    const choices = [...form.querySelectorAll('.comparisonChoice input')];
+    const update = () => choices.forEach((input) => input.closest('.comparisonChoice')?.classList.toggle('selected', input.checked));
+    choices.forEach((input) => input.addEventListener('change', update));
+    form.addEventListener('submit', (event) => {
+      const total = choices.filter((input) => input.checked).length;
+      if (total < 2 || total > 4) {
+        event.preventDefault();
+        window.alert('Choose between two and four listings.');
+      }
+    });
+    update();
+  })();
+</script>
 {% endblock %}

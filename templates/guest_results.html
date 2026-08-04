@@ -1,259 +1,92 @@
 {% extends "base.html" %}
+{% block title %}Evaluation result · ScoreRent{% endblock %}
 {% block content %}
-
 {% set learn_links = {
-  "Affordability risk": {
-    "text": "Learn how rent affordability works",
-    "url": "/learn/rent-affordability"
-  },
-  "Missing income information": {
-    "text": "Learn how to improve a weak application",
-    "url": "/learn/improve-application"
-  },
-  "Missing renter profile documents": {
-    "text": "Learn what documents landlords ask for",
-    "url": "/learn/documents-landlords-ask-for"
-  },
-  "Missing required documents": {
-    "text": "Learn what documents landlords ask for",
-    "url": "/learn/documents-landlords-ask-for"
-  },
-  "Qualified guarantor support": {
-    "text": "Learn how to strengthen an application",
-    "url": "/learn/improve-application"
-  },
-  "Missing guarantor support": {
-    "text": "Learn how to strengthen an application",
-    "url": "/learn/improve-application"
-  },
-  "Bursary funding shortfall": {
-    "text": "Learn how to improve a weak application",
-    "url": "/learn/improve-application"
-  },
-  "Missing bursary confirmation": {
-    "text": "Learn what student applicants need",
-    "url": "/learn/documents-landlords-ask-for"
-  },
-  "High-demand rental area": {
-    "text": "Learn what weakens an application",
-    "url": "/learn/improve-application"
-  },
-  "Lower competition rental area": {
-    "text": "Learn how ScoreRent calculates your result",
-    "url": "/learn/how-scoring-works"
-  }
+  "Affordability risk": {"text": "Learn how rent affordability works", "url": "/learn/rent-affordability"},
+  "Missing income information": {"text": "Learn how to improve a weak application", "url": "/learn/improve-application"},
+  "Missing renter profile documents": {"text": "Learn what documents landlords ask for", "url": "/learn/documents-landlords-ask-for"},
+  "Missing required documents": {"text": "Learn what documents landlords ask for", "url": "/learn/documents-landlords-ask-for"},
+  "Qualified guarantor support": {"text": "Learn how to strengthen an application", "url": "/learn/improve-application"},
+  "Missing guarantor support": {"text": "Learn how to strengthen an application", "url": "/learn/improve-application"},
+  "Bursary funding shortfall": {"text": "Learn how to improve a weak application", "url": "/learn/improve-application"},
+  "Missing bursary confirmation": {"text": "Learn what student applicants need", "url": "/learn/documents-landlords-ask-for"},
+  "High-demand rental area": {"text": "Learn what weakens an application", "url": "/learn/improve-application"},
+  "Lower competition rental area": {"text": "Learn how ScoreRent calculates your result", "url": "/learn/how-scoring-works"}
 } %}
+{% set ring_class = "" %}
+{% set verdict_label = "Borderline" %}
+{% set verdict_badge = "warn" %}
+{% if result.verdict == "STRONG_MATCH" or result.verdict == "WORTH_APPLYING" %}
+  {% set ring_class = "good" %}{% set verdict_label = "Strong match" %}{% set verdict_badge = "good" %}
+{% elif result.verdict == "HIGH_RISK" or result.verdict == "NOT_WORTH_IT" %}
+  {% set ring_class = "bad" %}{% set verdict_label = "High risk" %}{% set verdict_badge = "bad" %}
+{% endif %}
 
-<section class="stack">
-
-  <header>
-    <h2>Evaluation result</h2>
-
-    <p class="muted">
-      This shows how strong your rental application looks based on affordability,
-      documents, demand, and upfront costs.
-    </p>
+<section class="stack result">
+  <header class="pageHeader">
+    <div><p class="eyebrow">Guest evaluation</p><h1>{{ listing.listing_name or "Unnamed listing" }}</h1><p>Review the result, then create an account to build a shortlist and compare listings.</p></div>
   </header>
 
-  {# Default presentation for a borderline result #}
-  {% set verdict_class = "warn" %}
-  {% set hero_class = "hero-borderline" %}
-  {% set verdict_label = "Borderline" %}
-
-  {% if result.verdict == "STRONG_MATCH"
-        or result.verdict == "WORTH_APPLYING" %}
-
-    {% set verdict_class = "good" %}
-    {% set hero_class = "hero-good" %}
-    {% set verdict_label = "Strong match" %}
-
-  {% elif result.verdict == "HIGH_RISK"
-          or result.verdict == "NOT_WORTH_IT" %}
-
-    {% set verdict_class = "bad" %}
-    {% set hero_class = "hero-bad" %}
-    {% set verdict_label = "High risk" %}
-
-  {% endif %}
-
-  <div class="scoreBox {{ hero_class }}">
-    <div class="scoreHeader">
-
-      <div>
-        <div class="scoreTitle">Match score</div>
-
-        <div class="score">
-          {{ result.score }}
-        </div>
-
-        <div class="verdict {{ verdict_class }}">
-          {{ verdict_label }}
-        </div>
-
-        {% if result.confidence == "LOW" %}
-          <div class="resultWarning">
-            Some important information is missing, so treat this result as an estimate.
-          </div>
-        {% endif %}
-      </div>
-
-      <div class="tipBubble">
-        <span class="tip">What is this?</span>
-
-        <div class="tipContent">
-          <p>
-            This score is a practical guide, not a guarantee. It estimates how
-            strong your application looks for this listing.
-          </p>
-        </div>
-      </div>
-
+  <section class="resultHero">
+    <div class="scoreRing {{ ring_class }}" style="--score: {{ result.score }};" aria-label="Application score {{ result.score }} out of 100">
+      <div class="scoreRingInner"><strong>{{ result.score }}</strong><small>out of 100</small></div>
     </div>
-  </div>
+    <div class="resultHeroText">
+      <p class="eyebrow">Application fit</p>
+      <h1>{{ verdict_label }}</h1>
+      <p>This score is a practical guide based on the information supplied. It is not a guarantee of rental approval.</p>
+      <div class="resultPills"><span class="badge {{ verdict_badge }}">{{ verdict_label }}</span><span class="badge">{{ result.confidence|title }} information confidence</span></div>
+      {% if result.confidence == "LOW" %}<div class="resultWarning">Some important information is missing, so treat this result as an estimate.</div>{% endif %}
+    </div>
+  </section>
+
+  <section class="card stack">
+    <div><p class="eyebrow">Listing summary</p><h2 class="sectionTitle">Details used</h2></div>
+    <div class="summary-grid">
+      <div><span class="label">Monthly rent</span>R{{ listing.rent }}</div>
+      <div><span class="label">Deposit</span>R{{ listing.deposit }}</div>
+      <div><span class="label">Application fee</span>R{{ listing.application_fee }}</div>
+      <div><span class="label">Area demand</span>{{ listing.area_demand }}</div>
+    </div>
+  </section>
 
   {% if result.actions %}
-    <div class="card">
-      <h3>Recommended actions</h3>
-
-      <div class="actionList">
-        {% for action in result.actions %}
-          <div class="actionItem">
-            <span class="actionNumber">
-              {{ loop.index }}
-            </span>
-
-            <span>
-              {{ action }}
-            </span>
-          </div>
-        {% endfor %}
-      </div>
-    </div>
+    <section class="card stack">
+      <div><p class="eyebrow">Next steps</p><h2 class="sectionTitle">Recommended actions</h2></div>
+      <div class="actionList">{% for action in result.actions %}<div class="actionItem"><span class="actionNumber">{{ loop.index }}</span><span>{{ action }}</span></div>{% endfor %}</div>
+    </section>
   {% endif %}
 
-  <div class="card">
-    <h3>Listing summary</h3>
-
-    <div class="summary-grid">
-      <div>
-        <span class="label">Name</span>
-        {{ listing.listing_name or "Unnamed listing" }}
-      </div>
-
-      <div>
-        <span class="label">Rent</span>
-        R{{ listing.rent }}
-      </div>
-
-      <div>
-        <span class="label">Deposit</span>
-        R{{ listing.deposit }}
-      </div>
-
-      <div>
-        <span class="label">Application fee</span>
-        R{{ listing.application_fee }}
-      </div>
-
-      <div>
-        <span class="label">Demand</span>
-        {{ listing.area_demand }}
-      </div>
-    </div>
-  </div>
-
   {% if result.breakdown %}
-    <div class="card breakdownCard">
+    <section class="card breakdownCard">
       <details class="breakdownDetails" open>
-
-        <summary class="breakdownSummary">
-          Why you got this score
-        </summary>
-
+        <summary class="breakdownSummary">Why you got this score</summary>
         <div class="breakdownList">
           {% for b in result.breakdown %}
-
-            {% set delta = b.delta %}
-            {% set before = b.before %}
-            {% set after = b.after %}
-            {% set learn = learn_links.get(b.title) %}
-
             {% set badge_class = "zero" %}
-
-            {% if delta > 0 %}
-              {% set badge_class = "pos" %}
-            {% elif delta < 0 %}
-              {% set badge_class = "neg" %}
-            {% endif %}
-
-            {% set clamped = after %}
-
-            {% if clamped < 0 %}
-              {% set clamped = 0 %}
-            {% elif clamped > 100 %}
-              {% set clamped = 100 %}
-            {% endif %}
-
+            {% if b.delta > 0 %}{% set badge_class = "pos" %}{% elif b.delta < 0 %}{% set badge_class = "neg" %}{% endif %}
+            {% set clamped = b.after %}{% if clamped < 0 %}{% set clamped = 0 %}{% elif clamped > 100 %}{% set clamped = 100 %}{% endif %}
+            {% set learn = learn_links.get(b.title) %}
             <div class="breakItem">
-
               <div class="breakTop">
                 <div>
-                  <div class="breakTitle">
-                    {{ b.title }}
-                  </div>
-
-                  {% if b.details %}
-                    <div class="breakDetailsText">
-                      {{ b.details }}
-                    </div>
-                  {% endif %}
-
-                  {% if learn %}
-                    <a
-                      class="learnInlineLink"
-                      href="{{ learn.url }}"
-                    >
-                      {{ learn.text }} →
-                    </a>
-                  {% endif %}
+                  <div class="breakTitle">{{ b.title }}</div>
+                  {% if b.details %}<div class="breakDetailsText">{{ b.details }}</div>{% endif %}
+                  {% if learn %}<a class="learnInlineLink" href="{{ learn.url }}">{{ learn.text }} →</a>{% endif %}
                 </div>
-
-                <div class="breakRight">
-                  <div class="deltaBadge {{ badge_class }}">
-                    {% if delta > 0 %}+{% endif %}{{ delta }}
-                  </div>
-
-                  <div class="arrowNums">
-                    {{ before }} → {{ after }}
-                  </div>
-                </div>
+                <div class="breakRight"><div class="deltaBadge {{ badge_class }}">{% if b.delta > 0 %}+{% endif %}{{ b.delta }}</div><div class="arrowNums">{{ b.before }} → {{ b.after }}</div></div>
               </div>
-
-              <div class="miniBar">
-                <div
-                  class="miniBarFill"
-                  style="width: {{ clamped }}%;"
-                ></div>
-              </div>
-
+              <div class="miniBar"><div class="miniBarFill" style="width: {{ clamped }}%;"></div></div>
             </div>
           {% endfor %}
         </div>
-
       </details>
-    </div>
+    </section>
   {% endif %}
 
   <div class="actions">
-    <a class="btn" href="/evaluate">
-      Evaluate another
-    </a>
-
-    <a class="btn secondary" href="/signup">
-      Sign up to save history
-    </a>
+    <a class="button primary" href="/signup">Create account and save listings</a>
+    <a class="button" href="/evaluate">Evaluate another</a>
   </div>
-
 </section>
-
 {% endblock %}

@@ -419,13 +419,19 @@ Authenticated users can now save imported listings with costs, location, require
 amenities, factual pros and cons, source links, and personal notes. The database table is created
 on application startup. Imported information must still be reviewed before it is saved.
 
-## Distance and travel-time calculations
+## Listing comparison and travel time
 
-ScoreRent can save personal destinations such as work or campus and calculate driving, walking, or cycling routes from a saved listing.
+Authenticated users can select two to four saved listings and compare rent, upfront costs,
+amenities, pros, and potential downsides side by side. They enter one workplace, campus,
+or other destination on the comparison page, and ScoreRent calculates driving, walking,
+and cycling estimates for every selected listing with a confirmed exact location.
 
-1. Create a free Geoapify project and copy its API key.
+1. Create a Geoapify project and copy its API key.
 2. Add `GEOAPIFY_API_KEY` to the Render environment.
 3. Redeploy the service.
-4. In ScoreRent, open **Destinations**, save a place, then open a listing and calculate a route.
+4. Import and save listings, confirm exact addresses where available, then choose **Compare**.
 
-Route results are cached in the database for each listing, destination, and travel mode. Public-transport routing is intentionally excluded from the first version because schedule coverage and reliability vary by location.
+Suburb-only or approximate locations remain usable for normal listing comparison, but travel
+calculations are withheld until the user confirms a full address or uniquely identifiable building.
+Public-transport routing is intentionally excluded from the first version because schedule coverage
+and reliability vary by location.

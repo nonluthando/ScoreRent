@@ -1,55 +1,69 @@
 {% extends "base.html" %}
+{% block title %}ScoreRent · Make a smarter rental decision{% endblock %}
 {% block content %}
-
-<section class="stack" style="padding-top: 30px;">
-  <div class="stack" style="gap:10px;">
-    <h1>Decide if a rental listing is worth applying for.</h1>
+<section class="heroSection">
+  <div class="heroCopy">
+    <p class="eyebrow">Rental decision support</p>
+    <h1>Choose the rental that works on paper and in real life.</h1>
     <p>
-      ScoreRent helps renters avoid wasting money on application fees by checking affordability,
-      document fit, and demand pressure before applying.
+      Import listing screenshots, check affordability and documents, compare upfront costs,
+      amenities and travel time, then keep your shortlist in one calm workspace.
     </p>
-  </div>
 
-  <div class="actions">
-    <a class="btn" href="/evaluate">Start evaluation</a>
-    {% if user %}
-      <a class="btn secondary" href="/history">View saved evaluations</a>
-    {% else %}
-      <a class="btn secondary" href="/login">Log in to save evaluations</a>
-    {% endif %}
-  </div>
-
-  <div class="grid-2" style="margin-top: 12px;">
-    <div class="card stack">
-      <div class="badge good">Fast and simple</div>
-      <h3>Get a clear recommendation</h3>
-      <p>
-        ScoreRent outputs one of three recommendations: Apply, Borderline, or Not worth it.
-        You also get the reasons behind the result.
-      </p>
+    <div class="heroActions">
+      {% if user %}
+        <a class="button primary" href="/import-listing">Import a listing</a>
+        <a class="button" href="/listings">Open my shortlist</a>
+      {% else %}
+        <a class="button primary" href="/signup">Start your shortlist</a>
+        <a class="button" href="/evaluate">Try an evaluation</a>
+      {% endif %}
     </div>
 
-    <div class="card stack">
-      <div class="badge warn">Practical guidance</div>
-      <h3>Know what to fix first</h3>
-      <p>
-        See missing documents, affordability risks, and next steps such as adding a guarantor
-        or targeting a lower rent range.
-      </p>
+    <div class="trustLine">
+      <span>Rules-based scoring</span>
+      <span>Editable imported details</span>
+      <span>Side-by-side comparisons</span>
     </div>
   </div>
 
-  <div class="card stack" style="margin-top: 14px;">
-    <h3>How it works</h3>
-    <ol style="margin:0; padding-left: 18px; color: var(--muted); font-weight: 600;">
-      <li>Create a renter profile (or use guest mode)</li>
-      <li>Enter the listing details and required documents</li>
-      <li>Get a confidence score with reasons and recommended actions</li>
-    </ol>
-    <p class="muted small" style="margin-top: 10px;">
-      Note: The confidence score is not the probability of acceptance.
-    </p>
+  <div class="productPreview" aria-label="ScoreRent comparison preview">
+    <div class="previewBrowser">
+      <div class="previewTop">
+        <span class="previewDot"></span><span class="previewDot"></span><span class="previewDot"></span>
+      </div>
+      <div class="previewBody">
+        <p class="eyebrow">Shortlist preview</p>
+        <div class="previewListing">
+          <small>Observatory, Cape Town</small>
+          <h3>Furnished studio near transport</h3>
+          <div class="previewPrice">R7,200 <small>/ month</small></div>
+        </div>
+        <div class="previewMetrics">
+          <div class="previewMetric"><small>Upfront</small><strong>R14,400</strong></div>
+          <div class="previewMetric"><small>Application fit</small><strong>Strong</strong></div>
+          <div class="previewMetric"><small>Commute</small><strong>18 min</strong></div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
+<section class="featureStrip" aria-label="ScoreRent features">
+  <article class="featureCard">
+    <span class="featureIcon">01</span>
+    <h3>Import and verify</h3>
+    <p>Read visible listing details from screenshots, then correct every field before saving.</p>
+  </article>
+  <article class="featureCard">
+    <span class="featureIcon">02</span>
+    <h3>Understand the trade-offs</h3>
+    <p>See affordability, document fit, upfront costs, amenities, pros and potential downsides.</p>
+  </article>
+  <article class="featureCard">
+    <span class="featureIcon">03</span>
+    <h3>Compare what matters</h3>
+    <p>Put two to four listings side by side and calculate travel time when exact locations are available.</p>
+  </article>
+</section>
 {% endblock %}

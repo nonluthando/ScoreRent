@@ -3,20 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="description" content="ScoreRent helps renters compare affordability, upfront costs, amenities and practical trade-offs before applying.">
   <title>{% block title %}ScoreRent{% endblock %}</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-  <div class="container">
+  {% set logged_in = user is defined and user %}
+  <a class="skipLink" href="#main-content">Skip to content</a>
+
+  <div class="{% if logged_in %}appShell{% else %}publicShell{% endif %}">
     {% include "nav.html" %}
 
-    <main class="mainContent">
-      {% block content %}{% endblock %}
-    </main>
+    <div class="pageShell">
+      <main id="main-content" class="mainContent">
+        {% block content %}{% endblock %}
+      </main>
 
-    <footer class="siteFooter">
-      ScoreRent is an informational tool. It does not guarantee rental approval.
-    </footer>
+      <footer class="siteFooter">
+        <span>ScoreRent is an informational decision-support tool.</span>
+        <span>Rental approval is always decided by the property provider.</span>
+      </footer>
+    </div>
   </div>
 </body>
 </html>

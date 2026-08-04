@@ -56,6 +56,9 @@ def clean_database(request):
     conn = database.get_conn()
     try:
         with conn.cursor() as cur:
+            cur.execute("DELETE FROM listing_commutes")
+            cur.execute("DELETE FROM saved_destinations")
+            cur.execute("DELETE FROM listings")
             cur.execute("DELETE FROM evaluations")
             cur.execute("DELETE FROM profiles")
             cur.execute("DELETE FROM users")
