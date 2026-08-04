@@ -1,0 +1,4597 @@
+diff --git a/routers/web.py b/routers/web.py
+index b9c4d65..b6c5053 100644
+--- a/routers/web.py
++++ b/routers/web.py
+@@ -133,9 +133,35 @@ def dashboard_page(request: Request):
+         """,
+         (current_user["id"],),
+     )
+-
+     latest_evaluation = db_cursor.fetchone()
+ 
++    db_cursor.execute(
++        """
++        SELECT
++            (SELECT COUNT(*) FROM listings WHERE user_id = %s) AS listing_count,
++            (SELECT COUNT(*) FROM evaluations WHERE user_id = %s) AS evaluation_count,
++            (
++                SELECT COUNT(*)
++                FROM listings
++                WHERE user_id = %s AND location_is_exact = TRUE
++            ) AS commute_ready_count
++        """,
++        (current_user["id"], current_user["id"], current_user["id"]),
++    )
++    dashboard_stats = db_cursor.fetchone()
++
++    db_cursor.execute(
++        """
++        SELECT id, title, location, monthly_rent
++        FROM listings
++        WHERE user_id = %s
++        ORDER BY updated_at DESC
++        LIMIT 3
++        """,
++        (current_user["id"],),
++    )
++    recent_listings = db_cursor.fetchall()
++
+     db_cursor.close()
+     db_connection.close()
+ 
+@@ -145,6 +171,8 @@ def dashboard_page(request: Request):
+             "request": request,
+             "user": current_user,
+             "last_eval": latest_evaluation,
++            "dashboard_stats": dashboard_stats,
++            "recent_listings": recent_listings,
+         },
+     )
+ 
+diff --git a/static/styles.css b/static/styles.css
+index 68b87b7..43a6350 100644
+--- a/static/styles.css
++++ b/static/styles.css
+@@ -1,1604 +1,759 @@
+-
+ :root {
+-  --bg: #f5f6f8;
+-  --bg-alt: #eef0f3;
+-
++  --bg: #f4f7f6;
++  --bg-strong: #edf3f1;
+   --surface: #ffffff;
+-  --surface-soft: #fff5f5;
+-  --surface-tint: #fff8f8;
+-
+-  --text: #111827;
+-  --text-soft: #374151;
+-  --muted: #667085;
+-  --muted-light: #98a2b3;
+-
+-  --border: #e4e7ec;
+-  --border-strong: #d0d5dd;
+-
+-  --primary: #e30613;
+-  --primary-dark: #b8000b;
+-  --primary-deep: #7a0007;
+-  --primary-soft: #fff1f2;
+-  --primary-line: rgba(227, 6, 19, 0.22);
+-
++  --surface-soft: #f8faf9;
++  --surface-tint: #eef8f5;
++  --surface-warm: #fff8ed;
++  --text: #17211f;
++  --text-soft: #374744;
++  --muted: #6d7d79;
++  --muted-light: #93a19e;
++  --border: #dce5e2;
++  --border-strong: #c8d5d1;
++  --primary: #0f766e;
++  --primary-dark: #0a5c56;
++  --primary-deep: #064e49;
++  --primary-soft: #e8f7f3;
++  --primary-line: rgba(15, 118, 110, 0.22);
++  --accent: #d97706;
++  --accent-soft: #fff4df;
+   --success: #15803d;
+-  --success-soft: #ecfdf5;
+-  --success-line: rgba(21, 128, 61, 0.25);
+-
+-  --warning: #b7791f;
+-  --warning-soft: #fffbeb;
+-  --warning-line: rgba(183, 121, 31, 0.25);
+-
++  --success-soft: #ecfdf3;
++  --warning: #b45309;
++  --warning-soft: #fff7e6;
+   --danger: #b42318;
+-  --danger-soft: #fff1f2;
+-  --danger-line: rgba(180, 35, 24, 0.25);
+-
+-  --shadow-xs: 0 1px 2px rgba(17, 24, 39, 0.05);
+-  --shadow-sm: 0 6px 18px rgba(17, 24, 39, 0.06);
+-  --shadow-md: 0 12px 28px rgba(17, 24, 39, 0.08);
+-  --shadow-lg: 0 22px 46px rgba(17, 24, 39, 0.12);
+-  --shadow-red: 0 18px 38px rgba(227, 6, 19, 0.22);
+-
+-  --radius-sm: 12px;
+-  --radius: 18px;
+-  --radius-lg: 26px;
+-  --radius-xl: 34px;
+-
+-  --container: 1080px;
+-}
+-
+-/* ============================================================
+-   Reset / Base
+-============================================================ */
+-
+-* {
+-  box-sizing: border-box;
+-}
+-
+-html {
+-  min-height: 100%;
+-  scroll-behavior: smooth;
+-}
+-
++  --danger-soft: #fff1f0;
++  --info: #2563eb;
++  --info-soft: #eff6ff;
++  --shadow-xs: 0 1px 2px rgba(21, 40, 35, 0.05);
++  --shadow-sm: 0 8px 24px rgba(22, 50, 43, 0.07);
++  --shadow-md: 0 18px 44px rgba(22, 50, 43, 0.10);
++  --shadow-lg: 0 28px 72px rgba(22, 50, 43, 0.14);
++  --radius-sm: 10px;
++  --radius: 16px;
++  --radius-lg: 22px;
++  --radius-xl: 30px;
++  --sidebar-width: 264px;
++  --content-max: 1280px;
++}
++
++* { box-sizing: border-box; }
++html { min-height: 100%; scroll-behavior: smooth; }
+ body {
+   min-height: 100%;
+   margin: 0;
+-  padding: 0;
+-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+-    "Segoe UI", Roboto, Arial, sans-serif;
+-  background:
+-    radial-gradient(circle at 0% 0%, rgba(227, 6, 19, 0.08), transparent 26rem),
+-    linear-gradient(180deg, #ffffff 0%, var(--bg) 38%, var(--bg) 100%);
+   color: var(--text);
++  background: var(--bg);
++  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+   line-height: 1.55;
+   -webkit-font-smoothing: antialiased;
+ }
+-
+-img,
+-svg {
+-  max-width: 100%;
+-}
+-
+-a {
+-  color: var(--primary);
+-  text-decoration: none;
++img, svg { max-width: 100%; }
++a { color: var(--primary); text-decoration: none; }
++a:hover { color: var(--primary-dark); }
++button, input, select, textarea { font: inherit; }
++button, a { -webkit-tap-highlight-color: transparent; }
++::selection { background: rgba(15, 118, 110, 0.18); }
++
++h1, h2, h3, h4, p { margin-top: 0; }
++h1, h2, h3, h4 { color: var(--text); line-height: 1.15; letter-spacing: -0.025em; }
++h1 { font-size: clamp(2.35rem, 5vw, 4.7rem); margin-bottom: 20px; }
++h2 { font-size: clamp(1.75rem, 3vw, 2.45rem); margin-bottom: 10px; }
++h3 { font-size: 1.08rem; margin-bottom: 8px; }
++p { color: var(--text-soft); }
++ul, ol { color: var(--text-soft); }
++
++.skipLink {
++  position: fixed;
++  top: -80px;
++  left: 18px;
++  z-index: 9999;
++  padding: 12px 16px;
++  border-radius: 10px;
++  color: white;
++  background: var(--primary-deep);
+   font-weight: 800;
+ }
++.skipLink:focus { top: 18px; }
+ 
+-a:hover {
+-  color: var(--primary-dark);
+-  text-decoration: none;
+-}
+-
+-button,
+-input,
+-select,
+-textarea {
+-  font: inherit;
+-}
+-
+-::selection {
+-  background: rgba(227, 6, 19, 0.16);
+-}
+-
+-/* ============================================================
+-   Layout
+-============================================================ */
+-
+-.container {
+-  width: min(var(--container), 92vw);
+-  margin: 0 auto;
+-  padding-bottom: 80px;
+-}
+-
+-.mainContent {
+-  margin-top: 24px;
+-}
+-
+-.stack {
++/* Shell */
++.appShell { min-height: 100vh; }
++.pageShell {
++  min-height: 100vh;
++  margin-left: var(--sidebar-width);
+   display: flex;
+   flex-direction: column;
+-  gap: 18px;
+-}
+-
+-.grid-2 {
+-  display: grid;
+-  grid-template-columns: 1fr 1fr;
+-  gap: 18px;
+ }
+-
+-.result {
+-  width: min(860px, 100%);
++.mainContent {
++  width: min(var(--content-max), calc(100% - 56px));
+   margin: 0 auto;
++  padding: 38px 0 56px;
++  flex: 1;
+ }
+-
+-hr {
+-  border: 0;
+-  border-top: 1px solid var(--border);
+-  margin: 22px 0;
+-}
+-
+-/* ============================================================
+-   Navigation
+-============================================================ */
+-
+-.topNav,
+-nav {
+-  background: rgba(255, 255, 255, 0.96);
+-  border-bottom: 1px solid var(--border);
+-  padding: 16px 0;
+-  margin-bottom: 28px;
++.publicShell {
++  min-height: 100vh;
++  background:
++    radial-gradient(circle at 9% 0%, rgba(15,118,110,.11), transparent 30rem),
++    radial-gradient(circle at 94% 12%, rgba(217,119,6,.08), transparent 24rem),
++    var(--bg);
+ }
+-
+-.topNav {
++.publicShell .pageShell { margin-left: 0; }
++.publicShell .mainContent { padding-top: 42px; }
++.siteFooter {
++  width: min(var(--content-max), calc(100% - 56px));
++  margin: 0 auto;
++  padding: 22px 0 32px;
++  border-top: 1px solid var(--border);
+   display: flex;
+   justify-content: space-between;
+-  align-items: center;
+-  gap: 18px;
++  gap: 24px;
++  color: var(--muted);
++  font-size: .78rem;
+ }
+ 
+-.navLeft {
++/* Sidebar */
++.appSidebar {
++  position: fixed;
++  inset: 0 auto 0 0;
++  z-index: 100;
++  width: var(--sidebar-width);
++  padding: 24px 18px 18px;
+   display: flex;
+-  align-items: center;
+-  gap: 14px;
++  flex-direction: column;
++  background: #0d2926;
++  color: white;
++  box-shadow: 14px 0 40px rgba(7, 38, 34, 0.10);
+ }
+-
+-.brand,
+-nav .brand {
+-  display: inline-flex;
++.sidebarBrand {
++  min-height: 54px;
++  padding: 4px 8px 20px;
++  display: flex;
+   align-items: center;
+-  gap: 9px;
+-  color: var(--text);
+-  font-size: 25px;
+-  font-weight: 950;
+-  letter-spacing: -1px;
+-  text-decoration: none;
+-}
+-
+-.brand::after,
+-nav .brand::after {
+-  content: "";
+-  width: 10px;
+-  height: 10px;
+-  flex: 0 0 10px;
+-  border-radius: 999px;
+-  background: var(--primary);
+-  box-shadow: 0 0 0 5px rgba(227, 6, 19, 0.12);
+-}
+-
+-.brand:hover,
+-nav .brand:hover {
+-  color: var(--text);
++  gap: 12px;
++  color: white;
++  border-bottom: 1px solid rgba(255,255,255,.10);
+ }
+-
+-.brandTag {
+-  display: inline-flex;
+-  align-items: center;
+-  color: var(--primary-dark);
+-  background: var(--primary-soft);
+-  border: 1px solid rgba(227, 6, 19, 0.15);
+-  border-radius: 999px;
+-  padding: 7px 11px;
+-  font-size: 12px;
++.sidebarBrand:hover { color: white; }
++.brandMark {
++  width: 40px;
++  height: 40px;
++  flex: 0 0 40px;
++  display: grid;
++  place-items: center;
++  border-radius: 13px;
++  color: #0d2926;
++  background: #bff2e4;
++  font-size: 1.15rem;
++  font-weight: 950;
++  box-shadow: inset 0 0 0 1px rgba(255,255,255,.45);
++}
++.sidebarBrand strong, .publicBrand strong { display: block; font-size: 1.08rem; letter-spacing: -.02em; }
++.sidebarBrand small, .publicBrand small { display: block; margin-top: 2px; font-size: .7rem; color: rgba(255,255,255,.58); font-weight: 650; letter-spacing: .02em; }
++.sidebarNav { display: flex; flex-direction: column; gap: 4px; padding-top: 18px; }
++.navSectionLabel {
++  margin: 15px 12px 6px;
++  color: rgba(255,255,255,.42);
++  font-size: .66rem;
+   font-weight: 850;
+-  white-space: nowrap;
++  letter-spacing: .12em;
++  text-transform: uppercase;
+ }
+-
+-.navLinks,
+-nav .links {
+-  display: grid;
+-  grid-template-columns: repeat(4, auto);
++.sidebarLink {
++  min-height: 44px;
++  padding: 10px 12px;
++  display: flex;
+   align-items: center;
++  gap: 12px;
++  border: 1px solid transparent;
++  border-radius: 12px;
++  color: rgba(255,255,255,.72);
++  font-size: .88rem;
++  font-weight: 720;
++  transition: .16s ease;
++}
++.sidebarLink svg, .sidebarLogout svg, .mobileBottomNav svg {
++  width: 20px;
++  height: 20px;
++  fill: none;
++  stroke: currentColor;
++  stroke-width: 1.8;
++  stroke-linecap: round;
++  stroke-linejoin: round;
++}
++.sidebarLink:hover { color: white; background: rgba(255,255,255,.07); }
++.sidebarLink.active { color: white; background: rgba(191,242,228,.14); border-color: rgba(191,242,228,.12); }
++.sidebarLinkPrimary { margin-top: 2px; color: #dffbf3; }
++.sidebarLinkPrimary:not(.active) { background: rgba(15,118,110,.25); }
++.sidebarAccount { margin-top: auto; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.10); }
++.accountCard {
++  padding: 10px;
++  display: grid;
++  grid-template-columns: 36px minmax(0,1fr) auto;
+   gap: 10px;
+-}
+-
+-.navLink,
+-nav .links a {
+-  display: inline-flex;
+-  justify-content: center;
+   align-items: center;
+-  min-height: 40px;
+-  padding: 10px 14px;
+-  border: 1px solid transparent;
+-  border-radius: 999px;
+-  color: var(--text);
+-  background: transparent;
+-  font-size: 13px;
+-  font-weight: 850;
+-  text-decoration: none;
+-  transition: 0.15s ease;
+-}
+-
+-.navLink:hover,
+-.navLink.active,
+-nav .links a:hover {
+-  background: var(--primary-soft);
+-  border-color: rgba(227, 6, 19, 0.18);
+-  color: var(--primary-dark);
+-}
+-
+-.navCta {
+-  background: var(--primary);
+-  border-color: var(--primary);
+-  color: white;
+-  box-shadow: 0 10px 20px rgba(227, 6, 19, 0.18);
+-}
+-
+-.navCta:hover {
+-  background: var(--primary-dark);
+-  border-color: var(--primary-dark);
++  border-radius: 13px;
+   color: white;
++  background: rgba(255,255,255,.055);
+ }
+-
+-.secondaryLink {
+-  background: white;
+-  border-color: var(--border);
+-}
+-
+-.dangerLink:hover {
+-  background: var(--danger-soft);
+-  border-color: var(--danger-line);
+-  color: var(--danger);
+-}
+-
+-/* ============================================================
+-   Typography
+-============================================================ */
+-
+-h1,
+-h2,
+-h3 {
+-  margin: 0 0 14px;
+-  color: var(--text);
+-  letter-spacing: -0.7px;
+-  line-height: 1.08;
+-}
+-
+-h1 {
+-  font-size: clamp(36px, 5vw, 60px);
+-  font-weight: 950;
+-}
+-
+-h2 {
+-  font-size: clamp(25px, 3vw, 38px);
+-  font-weight: 920;
+-}
+-
+-h3 {
+-  font-size: 21px;
+-  font-weight: 880;
+-}
+-
+-p {
+-  margin: 0 0 15px;
+-  color: var(--muted);
+-  font-size: 16px;
+-  font-weight: 500;
+-}
+-
+-.muted {
+-  color: var(--muted);
++.accountCard:hover, .accountCard.active { color: white; background: rgba(255,255,255,.10); }
++.accountAvatar, .mobileAvatar {
++  width: 36px;
++  height: 36px;
++  display: grid;
++  place-items: center;
++  border-radius: 50%;
++  color: var(--primary-deep);
++  background: #c9f4e8;
++  font-weight: 900;
+ }
+-
+-.small {
+-  font-size: 13px;
++.accountMeta { min-width: 0; }
++.accountMeta strong { display: block; font-size: .78rem; }
++.accountMeta small { display: block; overflow: hidden; color: rgba(255,255,255,.48); font-size: .67rem; text-overflow: ellipsis; white-space: nowrap; }
++.sidebarLogout { margin-top: 8px; padding: 9px 12px; display: flex; align-items: center; gap: 11px; color: rgba(255,255,255,.52); font-size: .78rem; font-weight: 700; }
++.sidebarLogout:hover { color: #ffd8d3; }
++.mobileTopbar, .mobileBottomNav { display: none; }
++
++/* Public navigation */
++.publicNav {
++  width: min(1180px, calc(100% - 40px));
++  min-height: 76px;
++  margin: 0 auto;
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 20px;
++  border-bottom: 1px solid rgba(200,213,209,.8);
++}
++.publicBrand { display: flex; align-items: center; gap: 11px; color: var(--text); }
++.publicBrand:hover { color: var(--text); }
++.publicBrand small { color: var(--muted); }
++.publicLinks { display: flex; align-items: center; gap: 8px; }
++.publicLinks > a:not(.button) { padding: 9px 13px; border-radius: 10px; color: var(--text-soft); font-size: .84rem; font-weight: 750; }
++.publicLinks > a:hover, .publicLinks > a.active { color: var(--primary); background: var(--primary-soft); }
++
++/* Layout helpers */
++.stack { display: flex; flex-direction: column; gap: 18px; }
++.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; }
++.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 18px; }
++.actions, .actionsRow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
++.actionsRow.compact { gap: 8px; }
++.result { width: min(900px, 100%); margin-inline: auto; }
++.muted { color: var(--muted) !important; }
++.small { font-size: .78rem; }
++.eyebrow {
++  margin: 0 0 8px;
++  color: var(--primary);
++  font-size: .7rem;
++  font-weight: 900;
++  letter-spacing: .13em;
++  text-transform: uppercase;
+ }
+-
+-.error {
+-  color: var(--danger);
+-  font-weight: 850;
++.label { display: block; margin-bottom: 4px; color: var(--muted); font-size: .71rem; font-weight: 760; text-transform: uppercase; letter-spacing: .055em; }
++.pageHeader, .page-header {
++  margin-bottom: 6px;
++  display: flex;
++  align-items: flex-start;
++  justify-content: space-between;
++  gap: 24px;
+ }
++.pageHeader p:last-child, .page-header p:last-child { margin-bottom: 0; }
++.pageHeaderActions { display: flex; gap: 10px; flex-wrap: wrap; }
++.sectionHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
++.sectionHeader p { margin-bottom: 0; }
++.sectionTitle { margin-bottom: 3px; }
++hr { border: 0; border-top: 1px solid var(--border); margin: 8px 0; }
+ 
+-/* ============================================================
+-   Cards
+-============================================================ */
+-
++/* Cards */
+ .card {
+-  background: var(--surface);
++  padding: 22px;
+   border: 1px solid var(--border);
+-  border-radius: var(--radius-lg);
+-  padding: 26px;
+-  box-shadow: var(--shadow-sm);
+-  margin-bottom: 22px;
+-}
+-
+-.card.warning {
+-  background: var(--surface-soft);
+-  border-color: rgba(227, 6, 19, 0.24);
+-}
+-
+-.card.compact {
+-  padding: 18px;
+-}
+-
+-.card.flat {
+-  box-shadow: none;
++  border-radius: var(--radius);
++  background: var(--surface);
++  box-shadow: var(--shadow-xs);
+ }
+-
+-/* ============================================================
+-   Forms
+-============================================================ */
+-
+-label {
+-  display: block;
+-  margin-top: 12px;
+-  color: var(--text);
+-  font-size: 13px;
++.card:hover { border-color: var(--border-strong); }
++.softCard { background: var(--surface-soft); }
++.cardHeaderRow, .card-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
++.noticeCard { border-color: var(--primary-line); background: var(--primary-soft); }
++.emptyState { padding: 44px 28px; text-align: center; align-items: center; }
++.emptyStateIcon { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 20px; color: var(--primary); background: var(--primary-soft); }
++.emptyStateIcon svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 1.7; }
++
++/* Buttons */
++.button, .btn {
++  min-height: 44px;
++  padding: 10px 17px;
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  gap: 8px;
++  border: 1px solid var(--border-strong);
++  border-radius: 11px;
++  color: var(--text-soft);
++  background: var(--surface);
++  box-shadow: var(--shadow-xs);
++  cursor: pointer;
++  font-size: .84rem;
+   font-weight: 820;
++  line-height: 1;
++  transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease, background .14s ease;
+ }
+-
+-input,
+-select,
+-textarea {
++.button:hover, .btn:hover { transform: translateY(-1px); color: var(--text); border-color: #aebeb9; box-shadow: var(--shadow-sm); }
++.button.primary, .btn:not(.secondary):not(.ghost), .navCta {
++  color: white;
++  border-color: var(--primary);
++  background: var(--primary);
++  box-shadow: 0 8px 22px rgba(15,118,110,.18);
++}
++.button.primary:hover, .btn:not(.secondary):not(.ghost):hover { color: white; border-color: var(--primary-dark); background: var(--primary-dark); }
++.button.secondary, .btn.secondary, .btn.ghost { color: var(--primary); border-color: var(--primary-line); background: var(--primary-soft); box-shadow: none; }
++.button.secondary:hover, .btn.secondary:hover, .btn.ghost:hover { color: var(--primary-dark); background: #dff3ed; }
++.button.danger { color: var(--danger); border-color: rgba(180,35,24,.22); background: var(--danger-soft); }
++.button.wide { width: 100%; }
++.compactButton { min-height: 38px; padding: 9px 14px; }
++.iconButton { width: 42px; padding-inline: 0; }
++
++/* Forms */
++form { margin: 0; }
++label { color: var(--text-soft); font-size: .79rem; font-weight: 780; }
++input, select, textarea {
+   width: 100%;
+-  margin-top: 7px;
+-  padding: 14px 15px;
+-  border: 1px solid #d6dae2;
+-  border-radius: 17px;
+-  background: white;
++  min-height: 46px;
++  padding: 11px 13px;
++  border: 1px solid var(--border-strong);
++  border-radius: 11px;
+   color: var(--text);
+-  font-size: 15px;
+-  font-weight: 600;
+-  box-shadow: inset 0 1px 0 rgba(17, 24, 39, 0.03);
+-}
+-
+-textarea {
+-  min-height: 120px;
+-  resize: vertical;
+-}
+-
+-input:focus,
+-select:focus,
+-textarea:focus {
+-  outline: 4px solid rgba(227, 6, 19, 0.11);
+-  border-color: var(--primary);
+-}
+-
+-input::placeholder,
+-textarea::placeholder {
+-  color: var(--muted-light);
+-}
+-
+-.checkbox-group {
+-  display: grid;
+-  grid-template-columns: 1fr 1fr;
+-  gap: 12px;
+-  margin-top: 14px;
+-}
+-
++  background: #fff;
++  outline: none;
++  box-shadow: 0 1px 0 rgba(15,40,35,.02);
++  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
++}
++textarea { min-height: 118px; resize: vertical; }
++input:hover, select:hover, textarea:hover { border-color: #aabbb6; }
++input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(15,118,110,.11); }
++input[type="file"] { padding: 12px; background: var(--surface-soft); }
++input[type="file"]::file-selector-button { margin-right: 12px; padding: 9px 12px; border: 0; border-radius: 8px; color: white; background: var(--primary); font-weight: 800; cursor: pointer; }
++.checkbox-group { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+ .checkbox {
++  min-height: 44px;
++  padding: 10px 12px;
+   display: flex;
+   align-items: center;
+-  gap: 11px;
+-  padding: 13px 15px;
++  gap: 9px;
+   border: 1px solid var(--border);
+-  border-radius: 18px;
+-  background: white;
+-  color: var(--text-soft);
+-  font-weight: 780;
+-  box-shadow: var(--shadow-xs);
++  border-radius: 10px;
++  background: var(--surface-soft);
++  cursor: pointer;
+ }
+-
+-.checkbox input {
+-  width: auto;
+-  margin: 0;
+-  accent-color: var(--primary);
++.checkbox:hover { border-color: var(--primary-line); background: var(--primary-soft); }
++.checkbox input { width: 17px; min-height: 17px; height: 17px; margin: 0; accent-color: var(--primary); box-shadow: none; }
++.checkbox span { font-size: .78rem; font-weight: 680; }
++.exactLocationCheck { align-items: flex-start; border-color: var(--primary-line); background: var(--primary-soft); }
++.fieldHint { margin: -10px 0 0; color: var(--muted); font-size: .73rem; }
++.formSection { padding: 22px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
++.formSectionHeader { margin-bottom: 17px; display: flex; gap: 12px; align-items: flex-start; }
++.formSectionNumber { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border-radius: 9px; color: var(--primary); background: var(--primary-soft); font-size: .78rem; font-weight: 900; }
++.formActionBar { position: sticky; bottom: 16px; z-index: 20; padding: 13px; display: flex; gap: 10px; border: 1px solid var(--border); border-radius: 15px; background: rgba(255,255,255,.94); box-shadow: var(--shadow-md); backdrop-filter: blur(14px); }
++.formActionBar > * { flex: 1; }
++
++/* Alerts and badges */
++.alert, .error {
++  padding: 14px 16px;
++  border: 1px solid var(--border);
++  border-radius: 11px;
++  color: var(--text-soft);
++  background: var(--surface-soft);
++  font-size: .82rem;
+ }
+-
+-/* ============================================================
+-   Buttons / Actions
+-============================================================ */
+-
+-.btn {
+-  appearance: none;
++.alert.error, .error { color: #7a241c; border-color: rgba(180,35,24,.18); background: var(--danger-soft); }
++.alert.success { color: #13612d; border-color: rgba(21,128,61,.18); background: var(--success-soft); }
++.alert.warning { color: #7a4305; border-color: rgba(180,83,9,.18); background: var(--warning-soft); }
++.badge, .statusBadge, .confidenceBadge {
++  width: fit-content;
+   display: inline-flex;
+-  justify-content: center;
+   align-items: center;
+-  gap: 10px;
+-  min-height: 46px;
+-  border: 0;
+-  border-radius: 999px;
+-  padding: 14px 20px;
+-  background: var(--primary);
+-  color: white;
+-  font-weight: 900;
+-  cursor: pointer;
+-  transition: 0.15s ease;
+-  box-shadow: 0 12px 22px rgba(227, 6, 19, 0.2);
+-}
+-
+-.btn:hover {
+-  background: var(--primary-dark);
+-  color: white;
+-  transform: translateY(-1px);
+-  text-decoration: none;
+-}
+-
+-.btn.secondary {
+-  background: white;
+-  color: var(--text);
++  gap: 5px;
++  padding: 6px 9px;
+   border: 1px solid var(--border);
+-  box-shadow: none;
++  border-radius: 999px;
++  color: var(--text-soft);
++  background: var(--surface-soft);
++  font-size: .67rem;
++  font-style: normal;
++  font-weight: 820;
++  line-height: 1;
+ }
+-
+-.btn.secondary:hover {
+-  background: #f9fafb;
+-  color: var(--text);
++.badge.good, .statusBadge.ready { color: #11612e; border-color: rgba(21,128,61,.18); background: var(--success-soft); }
++.badge.warn { color: #824600; border-color: rgba(180,83,9,.18); background: var(--warning-soft); }
++.badge.bad { color: #8b2d24; border-color: rgba(180,35,24,.18); background: var(--danger-soft); }
++.statusBadge.mutedStatus { color: var(--muted); background: #f2f5f4; }
++
++/* Public home */
++.heroSection { min-height: 610px; display: grid; grid-template-columns: minmax(0,1.03fr) minmax(420px,.97fr); gap: 64px; align-items: center; }
++.heroCopy { padding: 50px 0 72px; }
++.heroCopy > p:not(.eyebrow) { max-width: 650px; margin-bottom: 28px; color: var(--text-soft); font-size: 1.06rem; }
++.heroActions { display: flex; flex-wrap: wrap; gap: 11px; }
++.trustLine { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 18px; color: var(--muted); font-size: .76rem; font-weight: 700; }
++.trustLine span::before { content: "✓"; margin-right: 7px; color: var(--primary); font-weight: 950; }
++.productPreview { position: relative; padding: 18px; border: 1px solid rgba(15,118,110,.16); border-radius: 28px; background: rgba(255,255,255,.78); box-shadow: var(--shadow-lg); backdrop-filter: blur(16px); }
++.previewBrowser { overflow: hidden; border: 1px solid var(--border); border-radius: 19px; background: var(--surface); }
++.previewTop { height: 45px; padding: 0 16px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--border); background: var(--surface-soft); }
++.previewDot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); }
++.previewBody { padding: 20px; }
++.previewListing { padding: 18px; border-radius: 15px; background: linear-gradient(135deg,#0f766e,#164e49); color: white; }
++.previewListing small { color: rgba(255,255,255,.68); }
++.previewListing h3 { margin: 7px 0 18px; color: white; font-size: 1.3rem; }
++.previewPrice { font-size: 1.8rem; font-weight: 900; }
++.previewMetrics { margin-top: 14px; display: grid; grid-template-columns: repeat(3,1fr); gap: 9px; }
++.previewMetric { padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: white; }
++.previewMetric strong { display: block; font-size: .9rem; }
++.previewMetric small { color: var(--muted); font-size: .65rem; }
++.featureStrip { margin: 16px 0 70px; display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
++.featureCard { padding: 22px; border: 1px solid var(--border); border-radius: var(--radius); background: rgba(255,255,255,.7); }
++.featureIcon { width: 40px; height: 40px; margin-bottom: 18px; display: grid; place-items: center; border-radius: 12px; color: var(--primary); background: var(--primary-soft); font-weight: 950; }
++
++/* Dashboard */
++.dashboardHero {
++  padding: 30px;
++  display: grid;
++  grid-template-columns: minmax(0,1fr) auto;
++  gap: 24px;
++  align-items: center;
++  border: 1px solid rgba(15,118,110,.15);
++  border-radius: var(--radius-xl);
++  background:
++    radial-gradient(circle at 88% 15%, rgba(255,255,255,.18), transparent 12rem),
++    linear-gradient(135deg,#0d615b,#123d39);
++  box-shadow: var(--shadow-md);
+ }
+-
+-.actions,
+-.actionsRow.compact {
++.dashboardHero h1 { margin: 0 0 8px; color: white; font-size: clamp(2rem,4vw,3.1rem); }
++.dashboardHero p { max-width: 620px; margin-bottom: 0; color: rgba(255,255,255,.73); }
++.dashboardHero .eyebrow { color: #bff2e4; }
++.dashboardHero .button { border-color: white; color: var(--primary-deep); background: white; }
++.dashboardStats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
++.statCard { padding: 18px 20px; display: flex; justify-content: space-between; gap: 14px; align-items: center; }
++.statCard strong { display: block; font-size: 1.65rem; letter-spacing: -.04em; }
++.statCard span { color: var(--muted); font-size: .75rem; font-weight: 720; }
++.statIcon { width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center; border-radius: 13px; color: var(--primary); background: var(--primary-soft); font-weight: 900; }
++.dashboardGrid { display: grid; grid-template-columns: minmax(0,1.45fr) minmax(280px,.75fr); gap: 18px; align-items: start; }
++.latestEvaluation { padding: 0; overflow: hidden; }
++.latestEvalHeader { padding: 22px; display: flex; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--border); }
++.score-badge { min-width: 64px; height: 64px; display: grid; place-items: center; border-radius: 18px; color: white; background: var(--primary); font-size: 1.05rem; font-weight: 900; }
++.eval-summary { padding: 18px 22px; display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
++.eval-summary > div { padding: 13px; border-radius: 11px; background: var(--surface-soft); }
++.eval-summary strong { display: block; font-size: .85rem; }
++.latestEvalActions { padding: 0 22px 22px; display: flex; gap: 9px; flex-wrap: wrap; }
++.quickActions { display: flex; flex-direction: column; gap: 10px; }
++.quickAction { padding: 14px; display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; border: 1px solid var(--border); border-radius: 13px; color: var(--text); background: white; }
++.quickAction:hover { color: var(--text); border-color: var(--primary-line); box-shadow: var(--shadow-sm); }
++.quickActionIcon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; color: var(--primary); background: var(--primary-soft); font-weight: 900; }
++.quickAction strong { display: block; font-size: .82rem; }
++.quickAction small { display: block; color: var(--muted); font-size: .7rem; }
++.recentListingGrid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
++
++/* Listing cards */
++.listingGrid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; }
++.listingCard { position: relative; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
++.listingMedia {
++  min-height: 150px;
++  padding: 18px;
+   display: flex;
+-  flex-wrap: wrap;
+-  gap: 12px;
+-  margin-top: 20px;
++  flex-direction: column;
++  justify-content: space-between;
++  color: white;
++  background:
++    linear-gradient(140deg,rgba(8,53,49,.30),rgba(8,53,49,.05)),
++    radial-gradient(circle at 85% 18%,rgba(255,255,255,.24),transparent 7rem),
++    linear-gradient(135deg,#0f766e,#244b46);
++}
++.listingMediaTop { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
++.propertyGlyph { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; background: rgba(255,255,255,.16); backdrop-filter: blur(10px); }
++.propertyGlyph svg { width: 24px; height: 24px; fill: none; stroke: white; stroke-width: 1.7; }
++.listingMediaLocation { color: rgba(255,255,255,.72); font-size: .72rem; font-weight: 720; }
++.listingMediaPrice { color: white; font-size: 1.7rem; font-weight: 920; letter-spacing: -.04em; }
++.listingMediaPrice small { font-size: .7rem; color: rgba(255,255,255,.65); font-weight: 700; }
++.listingCardBody { padding: 19px; display: flex; flex-direction: column; gap: 15px; flex: 1; }
++.listingCardTitle { margin: 0; font-size: 1.02rem; }
++.listingCardMeta { display: flex; justify-content: space-between; gap: 12px; }
++.listingCardMeta > div { min-width: 0; }
++.listingCardMeta strong { display: block; font-size: .86rem; }
++.listingSelector { position: absolute; top: 14px; right: 14px; z-index: 4; }
++.listingSelector input { position: absolute; opacity: 0; pointer-events: none; }
++.listingSelector span { min-height: 34px; padding: 8px 11px; display: inline-flex; align-items: center; border: 1px solid rgba(255,255,255,.30); border-radius: 999px; color: white; background: rgba(8,47,44,.42); backdrop-filter: blur(12px); font-size: .69rem; font-weight: 820; cursor: pointer; }
++.listingSelector input:checked + span { color: var(--primary-deep); background: #c8f5e9; border-color: #c8f5e9; }
++.selectableListing.selected { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(15,118,110,.10), var(--shadow-sm); }
++.metricGrid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }
++.metricGrid > div { padding: 11px; border-radius: 10px; background: var(--surface-soft); }
++.metricGrid strong { display: block; font-size: .82rem; }
++.tagList { display: flex; flex-wrap: wrap; gap: 6px; }
++.tag { padding: 6px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-soft); background: var(--surface-soft); font-size: .66rem; font-weight: 720; }
++.listingCardActions { margin-top: auto; display: flex; gap: 8px; }
++.listingCardActions .button { flex: 1; }
++.comparisonToolbar { position: sticky; top: 14px; z-index: 40; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 20px; box-shadow: var(--shadow-sm); }
++.comparisonToolbar p { margin: 3px 0 0; }
++
++/* Listing detail */
++.listingHero {
++  min-height: 250px;
++  padding: 28px;
++  display: flex;
++  flex-direction: column;
++  justify-content: space-between;
++  border-radius: var(--radius-xl);
++  color: white;
++  background:
++    radial-gradient(circle at 86% 20%,rgba(255,255,255,.18),transparent 14rem),
++    linear-gradient(135deg,#0d6d65,#183d39);
++  box-shadow: var(--shadow-md);
+ }
+-
+-.actionsRow.compact {
++.listingHero h1 { margin: 8px 0 10px; color: white; font-size: clamp(2rem,4vw,3.25rem); }
++.listingHero p { color: rgba(255,255,255,.72); }
++.listingHeroTop, .listingHeroBottom { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
++.listingHeroPrice { text-align: right; }
++.listingHeroPrice strong { display: block; color: white; font-size: 2rem; letter-spacing: -.04em; }
++.listingHeroPrice small { color: rgba(255,255,255,.62); }
++.listingHero .button { border-color: rgba(255,255,255,.24); color: white; background: rgba(255,255,255,.10); box-shadow: none; backdrop-filter: blur(12px); }
++.listingHero .button.primary { border-color: white; color: var(--primary-deep); background: white; }
++.detailLayout { display: grid; grid-template-columns: minmax(0,1.45fr) minmax(300px,.75fr); gap: 18px; align-items: start; }
++.detailMain, .detailAside { display: flex; flex-direction: column; gap: 18px; }
++.detailAside { position: sticky; top: 18px; }
++.detailRow { min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--border); }
++.detailRow:last-child { border-bottom: 0; }
++.detailRow span { color: var(--muted); font-size: .79rem; }
++.detailRow strong { font-size: .88rem; }
++.costHighlight { padding: 16px; border-radius: 13px; color: var(--primary-deep); background: var(--primary-soft); }
++.costHighlight strong { display: block; font-size: 1.45rem; }
++.proConGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
++.insightList { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; }
++.insightList li { padding-left: 25px; position: relative; color: var(--text-soft); font-size: .82rem; }
++.insightList li::before { position: absolute; left: 0; top: 0; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; font-size: .66rem; font-weight: 900; }
++.insightList.positive li::before { content: "✓"; color: var(--success); background: var(--success-soft); }
++.insightList.caution li::before { content: "!"; color: var(--warning); background: var(--warning-soft); }
++
++/* Compare */
++.compareIntro { padding: 24px; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 20px; align-items: center; border-color: var(--primary-line); background: var(--primary-soft); }
++.comparisonSelectionGrid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
++.comparisonChoice { position: relative; min-height: 150px; cursor: pointer; }
++.comparisonChoice input { position: absolute; opacity: 0; }
++.comparisonChoice > span { height: 100%; padding: 15px; display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--border); border-radius: 13px; background: var(--surface-soft); transition: .15s ease; }
++.comparisonChoice:hover > span { border-color: var(--primary-line); }
++.comparisonChoice input:checked + span, .comparisonChoice.selected > span { border-color: var(--primary); background: var(--primary-soft); box-shadow: 0 0 0 3px rgba(15,118,110,.08); }
++.comparisonChoice strong { font-size: .83rem; }
++.comparisonChoice small { display: block; color: var(--muted); font-size: .68rem; }
++.comparisonChoice .statusBadge { margin-top: auto; }
++.destinationEntry { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: end; }
++.destinationEntry label { grid-column: 1 / -1; }
++.comparisonTableWrap { padding: 0; overflow: auto; }
++.comparisonTable { width: 100%; min-width: 820px; border-collapse: separate; border-spacing: 0; }
++.comparisonTable th, .comparisonTable td { min-width: 180px; padding: 15px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); vertical-align: top; text-align: left; font-size: .77rem; }
++.comparisonTable th:last-child, .comparisonTable td:last-child { border-right: 0; }
++.comparisonTable tr:last-child th, .comparisonTable tr:last-child td { border-bottom: 0; }
++.comparisonTable thead th { position: sticky; top: 0; z-index: 3; color: var(--text); background: #edf4f2; font-size: .78rem; }
++.comparisonTable thead th:first-child { left: 0; z-index: 5; }
++.comparisonTable tbody th { position: sticky; left: 0; z-index: 2; min-width: 160px; color: var(--muted); background: var(--surface-soft); font-size: .7rem; text-transform: uppercase; letter-spacing: .055em; }
++.comparisonTable td strong { display: block; font-size: .9rem; }
++.comparisonTable td small, .comparisonTable th small { display: block; margin-top: 4px; color: var(--muted); font-size: .66rem; font-weight: 620; }
++.comparisonTable .sectionRow th { color: var(--primary); background: var(--primary-soft); }
++.compactList { margin: 0; padding-left: 16px; }
++
++/* Import */
++.flowPage { width: min(920px,100%); }
++.progressSteps { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
++.progressStep { min-height: 52px; padding: 11px 13px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 12px; color: var(--muted); background: var(--surface); font-size: .72rem; font-weight: 760; }
++.progressStep span { width: 25px; height: 25px; flex: 0 0 25px; display: grid; place-items: center; border-radius: 8px; background: var(--bg-strong); font-size: .7rem; }
++.progressStep.active { color: var(--primary-deep); border-color: var(--primary-line); background: var(--primary-soft); }
++.progressStep.active span { color: white; background: var(--primary); }
++.uploadDropzone { padding: 38px 24px; text-align: center; border: 1.5px dashed var(--border-strong); border-radius: var(--radius-lg); background: var(--surface-soft); }
++.uploadDropzone:hover { border-color: var(--primary); background: var(--primary-soft); }
++.uploadIcon { width: 56px; height: 56px; margin: 0 auto 16px; display: grid; place-items: center; border-radius: 17px; color: var(--primary); background: var(--primary-soft); }
++.uploadIcon svg { width: 27px; height: 27px; fill: none; stroke: currentColor; stroke-width: 1.7; }
++.uploadDropzone input { margin-top: 16px; }
++.privacyNote { padding: 15px; display: flex; gap: 12px; align-items: flex-start; border-radius: 12px; color: var(--text-soft); background: var(--surface-warm); font-size: .76rem; }
++.privacyNote strong { color: #7a4305; }
++.reviewGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
++.rawTextDetails summary { cursor: pointer; color: var(--primary); font-weight: 800; }
++.rawTextDetails pre { margin: 16px 0 0; padding: 14px; max-height: 320px; overflow: auto; border-radius: 10px; background: #102824; color: #d8f5ed; font-size: .7rem; }
++
++/* Score/result */
++.resultHero {
++  padding: 30px;
+   display: grid;
+-  grid-template-columns: repeat(2, 1fr);
+-}
+-
+-.actionsRow.compact .btn {
+-  width: 100%;
+-}
+-
+-/* ============================================================
+-   Badges
+-============================================================ */
+-
+-.badge {
+-  display: inline-flex;
++  grid-template-columns: 190px minmax(0,1fr);
++  gap: 28px;
+   align-items: center;
+-  width: fit-content;
+-  border: 1px solid var(--border);
+-  border-radius: 999px;
+-  padding: 8px 12px;
+-  background: white;
+-  color: var(--text);
+-  font-size: 12px;
+-  font-weight: 900;
+-}
+-
+-.badge.good {
+-  color: var(--success);
+-  background: var(--success-soft);
+-  border-color: var(--success-line);
+-}
+-
+-.badge.warn {
+-  color: var(--warning);
+-  background: var(--warning-soft);
+-  border-color: var(--warning-line);
+-}
+-
+-.badge.bad {
+-  color: var(--danger);
+-  background: var(--danger-soft);
+-  border-color: var(--danger-line);
+-}
+-
+-/* ============================================================
+-   Score / Results
+-============================================================ */
+-
+-.scoreBox,
+-.score-block {
+-  position: relative;
+-  overflow: hidden;
+-  margin-bottom: 28px;
+-  border-radius: 32px;
+-  padding: 32px;
+-  background:
+-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.20), transparent 16rem),
+-    linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 52%, var(--primary-deep) 100%);
+-  color: white;
+-  box-shadow: var(--shadow-red);
+-}
+-
+-.scoreBox::after,
+-.score-block::after {
+-  content: "ScoreRent";
+-  position: absolute;
+-  right: -16px;
+-  bottom: -18px;
+-  color: rgba(255, 255, 255, 0.08);
+-  font-size: 68px;
+-  font-weight: 950;
+-  letter-spacing: -3px;
+-  line-height: 1;
+-}
+-
+-.score,
+-.score-number {
+-  position: relative;
+-  z-index: 1;
+-  color: white;
+-  font-size: clamp(62px, 10vw, 100px);
+-  font-weight: 950;
+-  letter-spacing: -4px;
+-  line-height: 0.9;
+-}
+-
+-.verdict,
+-.score-verdict {
+-  position: relative;
+-  z-index: 1;
+-  margin-top: 10px;
+-  color: white;
+-  font-size: 21px;
+-  font-weight: 920;
+-}
+-
+-.score-confidence,
+-.score-note {
+-  position: relative;
+-  z-index: 1;
+-  color: rgba(255, 255, 255, 0.84);
+-}
+-
+-.score-verdict.bad {
+-  color: white;
+-}
+-
+-/* ============================================================
+-   Progress
+-============================================================ */
+-
+-.progress-section {
+-  margin-bottom: 28px;
+-}
+-
+-.progress-label {
+-  margin-bottom: 7px;
+-  font-size: 14px;
+-  font-weight: 850;
+-}
+-
+-.progress-value {
+-  margin-top: 5px;
+-  color: var(--muted);
+-  font-size: 13px;
+-}
+-
+-.progress-bar {
+-  height: 14px;
+-  overflow: hidden;
+-  border-radius: 999px;
+-  background: #fee2e2;
+-}
+-
+-.progress-bar.small {
+-  height: 9px;
+-}
+-
+-.progress-fill {
+-  height: 100%;
+-  border-radius: inherit;
+-  background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+-}
+-
+-.progress-fill.bad {
+-  background: linear-gradient(90deg, #ef4444, #991b1b);
+-}
+-
+-/* ============================================================
+-   Summary blocks
+-============================================================ */
+-
+-.summary-grid,
+-.eval-summary {
+-  display: grid;
+-  grid-template-columns: 1fr 1fr;
+-  gap: 14px;
+-  margin-top: 1.25rem;
+-  font-size: 14px;
+-}
+-
+-.eval-summary > div,
+-.summary-grid > div {
+-  padding: 1.1rem;
+-  border: 1px solid var(--border);
+-  border-radius: 20px;
+-  background: white;
+-  box-shadow: var(--shadow-xs);
+-}
+-
+-.label {
+-  display: block;
+-  margin-bottom: 0.25rem;
+-  color: var(--muted);
+-  font-size: 0.75rem;
+-  font-weight: 900;
+-  text-transform: uppercase;
+-  letter-spacing: 0.07em;
+-}
+-
+-/* ============================================================
+-   Learn page / Articles
+-============================================================ */
+-
+-.learnHero {
+-  margin-bottom: 24px;
+-  border: 1px solid rgba(227, 6, 19, 0.16);
+-  border-radius: 34px;
+-  padding: 30px;
+-  background:
+-    radial-gradient(circle at top right, rgba(227, 6, 19, 0.16), transparent 18rem),
+-    linear-gradient(135deg, #ffffff 0%, #fff7f7 100%);
+-  box-shadow: var(--shadow-sm);
+-}
+-
+-.learnHero .badge {
+-  margin-bottom: 14px;
+-}
+-
+-.learnGrid {
+-  display: grid;
+-  grid-template-columns: 1fr 1fr;
+-  gap: 18px;
+-}
+-
+-.learnCard {
+-  display: block;
+-  border: 1px solid var(--border);
+-  border-radius: 26px;
+-  padding: 22px;
+-  background: white;
+-  color: var(--text);
+-  box-shadow: var(--shadow-sm);
+-  transition: 0.15s ease;
+-}
+-
+-.learnCard:hover {
+-  transform: translateY(-2px);
+-  border-color: rgba(227, 6, 19, 0.25);
+-  box-shadow: var(--shadow-md);
+-}
+-
+-.learnCard p {
+-  margin-bottom: 0;
+-}
+-
+-.learnIcon {
+-  display: grid;
+-  place-items: center;
+-  width: 42px;
+-  height: 42px;
+-  margin-bottom: 14px;
+-  border-radius: 16px;
+-  background: var(--primary-soft);
+-  color: var(--primary);
+-  font-size: 21px;
+-}
+-
+-.article {
+-  width: min(820px, 100%);
+-  margin: 0 auto;
+-}
+-
+-.articleHeader {
+-  margin-bottom: 22px;
+-  border: 1px solid var(--border);
+-  border-radius: 32px;
+-  padding: 30px;
+-  background: white;
+-  box-shadow: var(--shadow-sm);
+-}
+-
+-.articleHeader .badge {
+-  margin-bottom: 14px;
+-}
+-
+-.articleBody {
+-  border: 1px solid var(--border);
+-  border-radius: 28px;
+-  padding: 28px;
+-  background: white;
+-  box-shadow: var(--shadow-sm);
+-}
+-
+-.articleBody h2 {
+-  margin-top: 26px;
+-  font-size: 26px;
+-}
+-
+-.articleBody h2:first-child {
+-  margin-top: 0;
+-}
+-
+-.articleBody ul,
+-.articleBody ol {
+-  margin: 0 0 18px;
+-  padding-left: 22px;
+-  color: var(--muted);
+-}
+-
+-.articleBody li {
+-  margin-bottom: 9px;
+-}
+-
+-.articleCallout {
+-  margin: 22px 0;
+-  border: 1px solid rgba(227, 6, 19, 0.18);
+-  border-radius: 22px;
+-  padding: 18px;
+-  background: var(--primary-soft);
+-}
+-
+-.articleCallout p {
+-  margin-bottom: 0;
+-  color: var(--text);
+-  font-weight: 700;
+-}
+-
+-/* ============================================================
+-   Reasons / Actions
+-============================================================ */
+-
+-.pillList {
+-  display: grid;
+-  gap: 12px;
+-  margin-top: 12px;
+-}
+-
+-.pill,
+-.reason-line,
+-.action-primary {
+-  border: 1px solid var(--border);
+-  border-radius: 20px;
+-  padding: 15px 17px;
+-  background: white;
+-  color: var(--text-soft);
+-  font-size: 14px;
+-  font-weight: 780;
+-  box-shadow: var(--shadow-xs);
+-}
+-
+-.pillReason,
+-.reason-line {
+-  border-left: 4px solid var(--primary);
+-}
+-
+-.pillAction,
+-.action-primary {
+-  border-left: 4px solid var(--success);
+-  background: var(--success-soft);
+-  border-color: var(--success-line);
+-}
+-
+-/* ============================================================
+-   Breakdown
+-============================================================ */
+-
+-.breakdownCard {
+-  padding: 22px;
+-}
+-
+-.breakdownDetails {
+-  width: 100%;
+-}
+-
+-.breakdownSummary,
+-details summary {
+-  margin-bottom: 12px;
+-  color: var(--text);
+-  cursor: pointer;
+-  font-size: 17px;
+-  font-weight: 900;
+-  list-style: none;
+-}
+-
+-.breakdownSummary::-webkit-details-marker,
+-details summary::-webkit-details-marker {
+-  display: none;
+-}
+-
+-.breakdownSummary::before {
+-  content: "▾";
+-  display: inline-block;
+-  margin-right: 10px;
+-  color: var(--primary);
+-  transform: rotate(-90deg);
+-  transition: transform 0.15s ease;
+-}
+-
+-details[open] .breakdownSummary::before {
+-  transform: rotate(0deg);
+-}
+-
+-.breakdownList {
+-  margin-top: 14px;
+-  border-top: 1px solid var(--border);
+-}
+-
+-.breakItem,
+-.breakdown-item {
+-  padding: 18px 4px;
+-  border-bottom: 1px solid var(--border);
+-}
+-
+-.breakTop,
+-.breakdown-header {
+-  display: flex;
+-  justify-content: space-between;
+-  align-items: baseline;
+-  gap: 12px;
+-}
+-
+-.breakTitle {
+-  font-size: 16px;
+-  font-weight: 880;
+-}
+-
+-.breakRight {
+-  display: flex;
+-  align-items: center;
+-  gap: 12px;
+-  white-space: nowrap;
+-}
+-
+-.deltaBadge {
+-  border: 1px solid var(--border);
+-  border-radius: 999px;
+-  padding: 6px 10px;
+-  background: white;
+-  font-size: 13px;
+-  font-weight: 900;
+-}
+-
+-.deltaBadge.pos {
+-  background: var(--success-soft);
+-  color: var(--success);
+-}
+-
+-.deltaBadge.neg {
+-  background: var(--danger-soft);
+-  color: var(--danger);
+-}
+-
+-.deltaBadge.zero {
+-  background: #f8fafc;
+-  color: var(--muted);
+-}
+-
+-.arrowNums {
+-  color: var(--text);
+-  font-size: 18px;
+-  font-weight: 900;
+-}
+-
+-.breakDetailsText,
+-.breakdown-details {
+-  margin-top: 7px;
+-  color: var(--muted);
+-  font-size: 14px;
+-  font-weight: 650;
+-}
+-
+-.miniBar {
+-  height: 9px;
+-  margin-top: 10px;
+-  overflow: hidden;
+-  border-radius: 999px;
+-  background: #fee2e2;
+-}
+-
+-.miniBarFill {
+-  height: 100%;
+-  border-radius: inherit;
+-  background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+-}
+-
+-/* ============================================================
+-   Footer
+-============================================================ */
+-
+-footer,
+-.siteFooter {
+-  margin-top: 46px;
+-  padding-top: 20px;
+-  border-top: 1px solid var(--border);
+-  color: var(--muted);
+-  font-size: 13px;
+-}
+-
+-/* ============================================================
+-   Mobile
+-============================================================ */
+-
+-@media (max-width: 700px) {
+-  body {
+-    background: var(--bg);
+-  }
+-
+-  .container {
+-    width: min(100% - 32px, 100%);
+-  }
+-
+-  .topNav {
+-    flex-direction: column;
+-    align-items: flex-start;
+-    gap: 14px;
+-    padding: 16px 0;
+-    margin-bottom: 22px;
+-  }
+-
+-  .navLeft {
+-    width: 100%;
+-    align-items: flex-start;
+-    justify-content: space-between;
+-  }
+-
+-  .brand,
+-  nav .brand {
+-    font-size: 24px;
+-  }
+-
+-  .brand::after,
+-  nav .brand::after {
+-    width: 9px;
+-    height: 9px;
+-    flex-basis: 9px;
+-  }
+-
+-  .brandTag {
+-    max-width: 155px;
+-    font-size: 11px;
+-    text-align: right;
+-    white-space: normal;
+-  }
+-
+-  .navLinks,
+-  nav .links {
+-    width: 100%;
+-    grid-template-columns: 1fr 1fr;
+-    gap: 10px;
+-  }
+-
+-  .navLink,
+-  nav .links a {
+-    width: 100%;
+-    justify-content: center;
+-    padding: 12px 14px;
+-    background: white;
+-    border: 1px solid var(--border);
+-    text-align: center;
+-  }
+-
+-  .navCta {
+-    background: var(--primary);
+-    border-color: var(--primary);
+-    color: white;
+-  }
+-
+-  .mainContent {
+-    margin-top: 18px;
+-  }
+-
+-  h1 {
+-    font-size: 36px;
+-  }
+-
+-  h2 {
+-    font-size: 27px;
+-  }
+-
+-  h3 {
+-    font-size: 20px;
+-  }
+-
+-  p {
+-    font-size: 15px;
+-  }
+-
+-  .grid-2,
+-  .summary-grid,
+-  .eval-summary,
+-  .checkbox-group,
+-  .actionsRow.compact,
+-  .learnGrid {
+-    grid-template-columns: 1fr;
+-  }
+-
+-  .card {
+-    padding: 18px;
+-    border-radius: 22px;
+-    box-shadow: var(--shadow-xs);
+-  }
+-
+-  label {
+-    margin-top: 10px;
+-    font-weight: 780;
+-  }
+-
+-  input,
+-  select,
+-  textarea {
+-    padding: 13px 14px;
+-    border-radius: 16px;
+-    font-size: 15px;
+-  }
+-
+-  .checkbox {
+-    padding: 11px 13px;
+-    border-radius: 16px;
+-    box-shadow: none;
+-  }
+-
+-  .checkbox input {
+-    transform: scale(0.9);
+-  }
+-
+-  .btn {
+-    padding: 13px 18px;
+-  }
+-
+-  .scoreBox,
+-  .score-block {
+-    padding: 26px;
+-    border-radius: 28px;
+-  }
+-
+-  .scoreBox::after,
+-  .score-block::after {
+-    font-size: 48px;
+-  }
+-
+-  .score,
+-  .score-number {
+-    font-size: 62px;
+-  }
+-
+-  .learnHero,
+-  .articleHeader,
+-  .articleBody {
+-    padding: 22px;
+-    border-radius: 24px;
+-  }
+-
+-  .breakTop,
+-  .breakdown-header {
+-    align-items: flex-start;
+-    flex-direction: column;
+-  }
+-
+-  .breakRight {
+-    width: 100%;
+-    justify-content: space-between;
+-  }
+-}
+-/* Add to the bottom of static/styles.css */
+-
+-.brandTag {
+-  display: none;
+-}
+-
+-.brand,
+-nav .brand {
+-  display: inline-flex;
+-  align-items: center;
+-  gap: 9px;
+-}
+-
+-.brand::after,
+-nav .brand::after {
+-  content: "";
+-  width: 9px;
+-  height: 9px;
+-  flex: 0 0 9px;
+-  border-radius: 999px;
+-  background: var(--primary);
+-  box-shadow: 0 0 0 5px rgba(227, 6, 19, 0.12);
+-}
+-
+-.navLinks,
+-nav .links {
+-  display: flex;
+-  align-items: center;
+-  gap: 8px;
+-  flex-wrap: wrap;
+-}
+-
+-.navLink,
+-nav .links a {
+-  position: relative;
+-  min-height: 36px;
+-  padding: 8px 11px;
+-  border-radius: 10px;
+-  color: var(--text-soft, #344054);
+-  background: transparent;
+-  border: 1px solid transparent;
+-  font-size: 14px;
+-  font-weight: 760;
+-}
+-
+-.navLink:hover,
+-.navLink.active,
+-nav .links a:hover,
+-nav .links a.active {
+-  color: var(--primary-dark);
+-  background: var(--primary-soft);
+-  border-color: rgba(227, 6, 19, 0.16);
+-}
+-
+-.navCta {
+-  color: var(--primary-dark);
+-  background: var(--primary-soft);
+-  border-color: rgba(227, 6, 19, 0.16);
+-}
+-
+-.navCta:hover {
+-  color: white;
+-  background: var(--primary);
+-}
+-
+-.learnInlineLink {
+-  display: inline-flex;
+-  margin-top: 10px;
+-  color: var(--primary);
+-  font-size: 14px;
+-  font-weight: 800;
+-}
+-
+-.learnInlineLink:hover {
+-  color: var(--primary-dark);
+-  text-decoration: underline;
+-}
+-
+-.learnHero {
+-  margin-bottom: 22px;
+-  border: 1px solid rgba(227, 6, 19, 0.14);
+-  border-radius: 28px;
+-  padding: 28px;
+-  background:
+-    radial-gradient(circle at top right, rgba(227, 6, 19, 0.12), transparent 18rem),
+-    linear-gradient(135deg, #ffffff 0%, #fffafa 100%);
+-  box-shadow: var(--shadow-sm);
+-}
+-
+-.learnGrid {
+-  display: grid;
+-  grid-template-columns: 1fr 1fr;
+-  gap: 16px;
+-}
+-
+-.learnCard {
+-  display: block;
+   border: 1px solid var(--border);
+-  border-radius: 22px;
+-  padding: 20px;
++  border-radius: var(--radius-xl);
+   background: white;
+-  color: var(--text);
+-  box-shadow: var(--shadow-sm);
+-  transition: 0.15s ease;
+-}
+-
+-.learnCard:hover {
+-  transform: translateY(-2px);
+-  border-color: rgba(227, 6, 19, 0.24);
+   box-shadow: var(--shadow-md);
+ }
+-
+-.learnIcon {
+-  display: grid;
+-  place-items: center;
+-  width: 40px;
+-  height: 40px;
+-  margin-bottom: 14px;
+-  border-radius: 14px;
+-  background: var(--primary-soft);
+-  color: var(--primary);
+-  font-size: 20px;
+-}
+-
+-.article {
+-  width: min(820px, 100%);
+-  margin: 0 auto;
+-}
+-
+-.articleHeader,
+-.articleBody {
+-  border: 1px solid var(--border);
+-  border-radius: 24px;
+-  padding: 28px;
+-  background: white;
+-  box-shadow: var(--shadow-sm);
+-  margin-bottom: 20px;
+-}
+-
+-.articleCallout {
+-  margin: 22px 0;
+-  border: 1px solid rgba(227, 6, 19, 0.18);
+-  border-radius: 18px;
+-  padding: 18px;
+-  background: var(--primary-soft);
+-}
+-
+-@media (max-width: 700px) {
+-  .navLinks,
+-  nav .links {
+-    width: 100%;
+-    display: grid;
+-    grid-template-columns: 1fr 1fr;
+-  }
+-
+-  .learnGrid {
+-    grid-template-columns: 1fr;
+-  }
+-}
+-.actionList {
+-  display: grid;
+-  gap: 14px;
+-  margin-top: 14px;
+-}
+-
+-.actionItem {
+-  display: grid;
+-  grid-template-columns: 34px 1fr;
+-  gap: 12px;
+-  align-items: start;
+-  padding: 14px 0;
+-  border-bottom: 1px solid var(--border);
+-  color: var(--text-soft);
+-  font-size: 15px;
+-  font-weight: 650;
+-  line-height: 1.45;
+-}
+-
+-.actionItem:last-child {
+-  border-bottom: 0;
+-}
+-
+-.actionNumber {
+-  display: grid;
+-  place-items: center;
+-  width: 28px;
+-  height: 28px;
+-  border-radius: 999px;
+-  background: var(--primary-soft);
+-  color: var(--primary-dark);
+-  font-size: 13px;
+-  font-weight: 900;
+-}
+-.hero-good{
+-    background:linear-gradient(135deg,#16a34a,#15803d);
+-}
+-
+-.hero-borderline{
+-    background:linear-gradient(135deg,#f59e0b,#d97706);
+-}
+-
+-.hero-bad{
+-    background:linear-gradient(135deg,#ef4444,#b91c1c);
+-}
+-.scoreBox.hero-good,
+-.scoreBox.hero-borderline,
+-.scoreBox.hero-bad {
+-    color: white;
+-}
+-
+-.scoreBox.hero-good .scoreTitle,
+-.scoreBox.hero-borderline .scoreTitle,
+-.scoreBox.hero-bad .scoreTitle,
+-.scoreBox.hero-good .score,
+-.scoreBox.hero-borderline .score,
+-.scoreBox.hero-bad .score,
+-.scoreBox.hero-good .verdict,
+-.scoreBox.hero-borderline .verdict,
+-.scoreBox.hero-bad .verdict {
+-    color: white;
+-}
+-.resultWarning {
+-    margin-top: 16px;
+-    max-width: 520px;
+-    padding: 12px 14px;
+-    border: 1px solid rgba(255, 255, 255, 0.35);
+-    border-radius: 14px;
+-    background: rgba(255, 255, 255, 0.16);
+-    color: white;
+-    font-size: 0.92rem;
+-    font-weight: 650;
+-    line-height: 1.45;
+-}
+-.scoreBox .tip {
+-    color: white;
+-}
+-
+-.scoreBox .tipContent {
+-    color: #111827;
+-}
+-
+-.pageHeader {
+-  display: flex;
+-  align-items: flex-start;
+-  justify-content: space-between;
+-  gap: 18px;
+-  flex-wrap: wrap;
+-}
+-
+-.metricGrid {
+-  display: grid;
+-  grid-template-columns: repeat(2, minmax(0, 1fr));
+-  gap: 12px;
+-}
+-
+-.metricGrid > div {
+-  display: grid;
+-  gap: 4px;
+-}
+-
+-.tagList {
+-  display: flex;
+-  flex-wrap: wrap;
+-  gap: 8px;
+-}
+-
+-.tag {
+-  padding: 6px 10px;
+-  border-radius: 999px;
+-  border: 1px solid var(--border, #d8d8d8);
+-  font-size: 0.9rem;
+-}
+-
+-.detailRow {
+-  display: flex;
+-  justify-content: space-between;
+-  gap: 16px;
+-  padding: 8px 0;
+-  border-bottom: 1px solid var(--border, #e6e6e6);
+-}
+-
+-.commuteForm {
+-  display: grid;
+-  grid-template-columns: minmax(0, 1fr) minmax(160px, 220px) auto;
+-  gap: 14px;
+-  align-items: end;
+-}
+-
+-.commuteGrid {
+-  display: grid;
+-  gap: 10px;
+-}
+-
+-.commuteResult {
+-  display: flex;
+-  align-items: center;
+-  justify-content: space-between;
+-  gap: 18px;
+-  padding: 14px 16px;
+-  border: 1px solid var(--border, #d9d9d9);
+-  border-radius: 12px;
+-}
+-
+-.commuteNumbers {
+-  display: flex;
+-  flex-direction: column;
+-  align-items: flex-end;
+-  gap: 2px;
+-}
+-
+-.alert {
+-  padding: 12px 14px;
+-  border-radius: 10px;
+-}
+-
+-.alert.error {
+-  background: #fff1f0;
+-  border: 1px solid #f3b7b3;
+-}
+-
+-.alert.success {
+-  background: #effaf2;
+-  border: 1px solid #b7dfc0;
+-}
+-
+-@media (max-width: 760px) {
+-  .commuteForm {
+-    grid-template-columns: 1fr;
+-  }
+-}
+-
+-/* ============================================================
+-   Saved listing comparison
+-============================================================ */
+-
+-.comparisonToolbar {
+-  display: flex;
+-  align-items: center;
+-  justify-content: space-between;
+-  gap: 18px;
+-  flex-wrap: wrap;
+-}
+-
+-.selectableListing {
+-  position: relative;
+-}
+-
+-.listingSelector {
+-  display: inline-flex;
+-  align-items: center;
+-  gap: 9px;
+-  width: fit-content;
+-  font-weight: 800;
+-  color: var(--text-soft);
+-}
+-
+-.listingSelector input,
+-.comparisonChoice input,
+-.exactLocationCheck input {
+-  width: 18px;
+-  height: 18px;
+-  accent-color: var(--primary);
+-}
+-
+-.statusBadge {
+-  display: inline-flex;
+-  width: fit-content;
+-  padding: 5px 9px;
+-  border-radius: 999px;
+-  font-size: 0.76rem;
+-  font-style: normal;
+-  font-weight: 850;
+-  line-height: 1.2;
+-}
+-
+-.statusBadge.ready {
+-  color: var(--success);
+-  background: var(--success-soft);
+-  border: 1px solid var(--success-line);
+-}
+-
+-.statusBadge.mutedStatus {
+-  color: var(--muted);
+-  background: var(--bg-alt);
+-  border: 1px solid var(--border);
+-}
+-
+-.comparisonSelectionGrid {
+-  display: grid;
+-  grid-template-columns: repeat(2, minmax(0, 1fr));
+-  gap: 12px;
+-}
+-
+-.comparisonChoice {
+-  display: grid;
+-  grid-template-columns: auto 1fr;
+-  align-items: start;
+-  gap: 11px;
+-  padding: 15px;
+-  border: 1px solid var(--border);
+-  border-radius: var(--radius-sm);
+-  background: white;
+-  cursor: pointer;
+-}
+-
+-.comparisonChoice.selected,
+-.comparisonChoice:has(input:checked) {
+-  border-color: var(--primary-line);
+-  background: var(--primary-soft);
+-}
+-
+-.comparisonChoice > span {
+-  display: grid;
+-  gap: 4px;
+-}
+-
+-.comparisonChoice small {
+-  color: var(--muted);
+-  font-weight: 650;
+-}
+-
+-.destinationEntry {
+-  display: grid;
+-  grid-template-columns: minmax(0, 1fr) auto;
+-  gap: 12px;
+-  align-items: end;
+-}
+-
+-.destinationEntry label {
+-  grid-column: 1 / -1;
+-}
+-
+-.comparisonTableWrap {
+-  overflow-x: auto;
+-  padding: 0;
+-}
+-
+-.comparisonTable {
+-  width: 100%;
+-  min-width: 760px;
+-  border-collapse: collapse;
+-}
+-
+-.comparisonTable th,
+-.comparisonTable td {
+-  min-width: 180px;
+-  padding: 16px;
+-  border-bottom: 1px solid var(--border);
+-  text-align: left;
+-  vertical-align: top;
+-}
+-
+-.comparisonTable th:first-child {
+-  min-width: 170px;
+-  position: sticky;
+-  left: 0;
+-  z-index: 1;
+-  background: var(--surface);
+-}
+-
+-.comparisonTable thead th {
+-  background: var(--surface-tint);
+-}
+-
+-.comparisonTable thead th:first-child {
+-  z-index: 2;
+-  background: var(--surface-tint);
+-}
+-
+-.comparisonTable th small,
+-.comparisonTable td small {
+-  display: block;
+-  margin-top: 4px;
+-  color: var(--muted);
+-  font-weight: 600;
+-}
+-
+-.commuteComparisonRow td strong {
+-  display: block;
+-  color: var(--text);
+-}
+-
+-.compactList {
+-  margin: 0;
+-  padding-left: 18px;
+-}
+-
+-.reasonList {
+-  display: grid;
+-  gap: 10px;
+-  margin: 0;
+-  padding-left: 20px;
+-}
+-
+-.exactLocationCheck {
+-  display: flex;
+-  align-items: flex-start;
+-  gap: 10px;
+-  font-weight: 750;
+-}
+-
+-@media (max-width: 760px) {
+-  .comparisonSelectionGrid {
+-    grid-template-columns: 1fr;
+-  }
+-
+-  .destinationEntry {
+-    grid-template-columns: 1fr;
+-  }
+-
+-  .destinationEntry label {
+-    grid-column: auto;
+-  }
+-}
++.scoreRing {
++  --score-color: var(--warning);
++  width: 168px;
++  height: 168px;
++  padding: 12px;
++  border-radius: 50%;
++  background: conic-gradient(var(--score-color) calc(var(--score) * 1%), #e9efed 0);
++}
++.scoreRing.good { --score-color: var(--success); }
++.scoreRing.bad { --score-color: var(--danger); }
++.scoreRingInner { width: 100%; height: 100%; display: grid; place-items: center; align-content: center; border-radius: 50%; background: white; box-shadow: inset 0 0 0 1px var(--border); }
++.scoreRingInner strong { font-size: 3rem; line-height: 1; letter-spacing: -.08em; }
++.scoreRingInner small { color: var(--muted); font-size: .66rem; font-weight: 820; text-transform: uppercase; letter-spacing: .09em; }
++.resultHero h1 { margin: 6px 0 10px; font-size: clamp(2rem,4vw,3.2rem); }
++.resultHeroText > p { max-width: 650px; margin-bottom: 16px; }
++.resultPills { display: flex; flex-wrap: wrap; gap: 7px; }
++.resultWarning { margin-top: 13px; padding: 11px 13px; border-radius: 10px; color: #7a4305; background: var(--warning-soft); font-size: .74rem; }
++.scoreBox { padding: 25px; border-radius: var(--radius-xl); background: white; border: 1px solid var(--border); }
++.scoreHeader { display: flex; justify-content: space-between; gap: 20px; }
++.scoreTitle { color: var(--muted); font-size: .72rem; font-weight: 850; text-transform: uppercase; letter-spacing: .08em; }
++.score { font-size: 4.6rem; line-height: 1; font-weight: 950; letter-spacing: -.08em; }
++.verdict { margin-top: 8px; font-weight: 900; }
++.verdict.good { color: var(--success); }
++.verdict.warn { color: var(--warning); }
++.verdict.bad { color: var(--danger); }
++.tipBubble { position: relative; }
++.tip { color: var(--primary); font-size: .73rem; font-weight: 800; cursor: help; }
++.tipContent { display: none; position: absolute; top: 28px; right: 0; z-index: 20; width: 280px; padding: 14px; border: 1px solid var(--border); border-radius: 11px; background: white; box-shadow: var(--shadow-md); }
++.tipBubble:hover .tipContent, .tipBubble:focus-within .tipContent { display: block; }
++.tipContent p { margin: 0; font-size: .74rem; }
++.summary-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
++.summary-grid > div { padding: 13px; border-radius: 11px; background: var(--surface-soft); font-size: .83rem; font-weight: 800; }
++.actionList { display: flex; flex-direction: column; gap: 9px; }
++.actionItem { padding: 12px; display: grid; grid-template-columns: 30px 1fr; gap: 11px; align-items: center; border-radius: 10px; background: var(--surface-soft); color: var(--text-soft); font-size: .8rem; }
++.actionNumber { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; color: var(--primary); background: var(--primary-soft); font-weight: 900; }
++.reasonList { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
++.reasonList li { padding: 12px 12px 12px 38px; position: relative; border-radius: 10px; background: var(--surface-soft); color: var(--text-soft); font-size: .78rem; }
++.reasonList li::before { content: "•"; position: absolute; left: 14px; top: 8px; color: var(--primary); font-size: 1.3rem; }
++.breakdownDetails summary { cursor: pointer; }
++.breakdownSummary { font-weight: 850; }
++.breakdownList { margin-top: 15px; display: flex; flex-direction: column; gap: 9px; }
++.breakItem { padding: 13px; border: 1px solid var(--border); border-radius: 10px; }
++.breakTop { display: flex; justify-content: space-between; gap: 16px; }
++.breakTitle { font-size: .8rem; font-weight: 820; }
++.breakDetailsText { margin-top: 4px; color: var(--muted); font-size: .7rem; }
++.breakRight { min-width: 70px; text-align: right; }
++.deltaBadge { display: inline-flex; padding: 4px 7px; border-radius: 999px; font-size: .68rem; font-weight: 900; }
++.deltaBadge.pos { color: var(--success); background: var(--success-soft); }
++.deltaBadge.neg { color: var(--danger); background: var(--danger-soft); }
++.deltaBadge.zero { color: var(--muted); background: var(--surface-soft); }
++.arrowNums { margin-top: 3px; color: var(--muted); font-size: .64rem; }
++.miniBar { height: 5px; margin-top: 10px; overflow: hidden; border-radius: 999px; background: var(--bg-strong); }
++.miniBarFill { height: 100%; border-radius: inherit; background: var(--primary); }
++.learnInlineLink { display: inline-block; margin-top: 7px; font-size: .69rem; font-weight: 800; }
++
++/* History/profile/auth */
++.historyList { display: flex; flex-direction: column; gap: 10px; }
++.historyItem { padding: 17px; display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; border: 1px solid var(--border); border-radius: 13px; color: var(--text); background: white; }
++.historyItem:hover { color: var(--text); border-color: var(--primary-line); box-shadow: var(--shadow-sm); }
++.historyMeta { display: flex; flex-wrap: wrap; gap: 7px; justify-content: flex-end; }
++.authLayout { min-height: 620px; display: grid; grid-template-columns: minmax(0,1fr) minmax(380px,.72fr); gap: 42px; align-items: center; }
++.authIntro { padding: 30px; }
++.authIntro h1 { font-size: clamp(2.4rem,5vw,4.4rem); }
++.authPanel { padding: 30px; border: 1px solid var(--border); border-radius: var(--radius-xl); background: white; box-shadow: var(--shadow-md); }
++.authPanel .button { width: 100%; }
++.authSwitch { margin: 18px 0 0; text-align: center; color: var(--muted); font-size: .76rem; }
++
++/* Learn pages */
++.learnHero { padding: 30px; border: 1px solid var(--primary-line); border-radius: var(--radius-xl); background: linear-gradient(135deg,var(--primary-soft),white); }
++.learnGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
++.learnCard { padding: 22px; display: grid; grid-template-columns: 44px 1fr; gap: 15px; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); background: white; }
++.learnCard:hover { color: var(--text); border-color: var(--primary-line); box-shadow: var(--shadow-sm); }
++.learnIcon { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 13px; color: var(--primary); background: var(--primary-soft); font-weight: 900; }
++.article { width: min(850px,100%); margin-inline: auto; }
++.articleHeader { padding: 28px; border-radius: var(--radius-xl); background: var(--primary-soft); }
++.articleBody { padding: 28px; border: 1px solid var(--border); border-radius: var(--radius); background: white; }
++.articleCallout { padding: 16px; border-left: 4px solid var(--primary); border-radius: 10px; background: var(--primary-soft); }
++
++@media (max-width: 1120px) {
++  .listingGrid, .recentListingGrid { grid-template-columns: repeat(2,minmax(0,1fr)); }
++  .comparisonSelectionGrid { grid-template-columns: repeat(2,minmax(0,1fr)); }
++  .heroSection { grid-template-columns: 1fr 430px; gap: 38px; }
++}
++
++@media (max-width: 900px) {
++  :root { --sidebar-width: 0px; }
++  .appSidebar { display: none; }
++  .pageShell { margin-left: 0; padding-top: 68px; }
++  .mainContent { width: min(100% - 30px, 860px); padding: 24px 0 96px; }
++  .siteFooter { width: calc(100% - 30px); padding-bottom: 104px; flex-direction: column; gap: 5px; }
++  .mobileTopbar { position: fixed; inset: 0 0 auto 0; z-index: 90; height: 68px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.94); backdrop-filter: blur(16px); }
++  .mobileBrand { display: flex; align-items: center; gap: 9px; color: var(--text); }
++  .mobileBrand .brandMark { width: 34px; height: 34px; flex-basis: 34px; border-radius: 11px; font-size: 1rem; }
++  .mobileAvatar { color: var(--primary-deep); }
++  .mobileBottomNav { position: fixed; inset: auto 0 0 0; z-index: 100; height: 74px; padding: 7px max(8px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)); display: grid; grid-template-columns: repeat(5,1fr); border-top: 1px solid var(--border); background: rgba(255,255,255,.96); box-shadow: 0 -10px 30px rgba(18,48,41,.08); backdrop-filter: blur(18px); }
++  .mobileBottomNav a { min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--muted); font-size: .59rem; font-weight: 760; }
++  .mobileBottomNav svg { width: 21px; height: 21px; }
++  .mobileBottomNav a.active { color: var(--primary); }
++  .mobileBottomNav .mobileImportAction { position: relative; color: white; }
++  .mobileBottomNav .mobileImportAction svg { width: 24px; height: 24px; padding: 8px; box-sizing: content-box; border-radius: 14px; background: var(--primary); box-shadow: 0 6px 18px rgba(15,118,110,.25); }
++  .mobileBottomNav .mobileImportAction span { color: var(--primary); }
++  .heroSection { min-height: auto; grid-template-columns: 1fr; }
++  .heroCopy { padding-bottom: 20px; }
++  .productPreview { max-width: 620px; }
++  .featureStrip { grid-template-columns: 1fr; }
++  .dashboardGrid, .detailLayout { grid-template-columns: 1fr; }
++  .detailAside { position: static; }
++  .dashboardHero { grid-template-columns: 1fr; }
++  .dashboardHero .button { width: fit-content; }
++  .listingGrid, .recentListingGrid { grid-template-columns: repeat(2,minmax(0,1fr)); }
++  .resultHero { grid-template-columns: 150px 1fr; }
++  .scoreRing { width: 145px; height: 145px; }
++  .scoreRingInner strong { font-size: 2.55rem; }
++  .summary-grid { grid-template-columns: repeat(2,1fr); }
++  .authLayout { grid-template-columns: 1fr; gap: 16px; }
++  .authIntro { padding: 20px 0; }
++}
++
++@media (max-width: 680px) {
++  h1 { font-size: 2.45rem; }
++  h2 { font-size: 1.75rem; }
++  .publicNav { width: calc(100% - 28px); min-height: 66px; }
++  .publicBrand small { display: none; }
++  .publicLinks a[href^="/learn"] { display: none; }
++  .publicLinks > a:not(.button) { padding-inline: 8px; }
++  .publicShell .mainContent { width: calc(100% - 28px); padding-top: 24px; }
++  .pageHeader, .page-header, .sectionHeader, .listingHeroTop, .listingHeroBottom { flex-direction: column; }
++  .pageHeaderActions, .pageHeader .actions { width: 100%; }
++  .pageHeaderActions .button, .pageHeader .actions .button { flex: 1; }
++  .grid-2, .grid-3, .reviewGrid, .proConGrid { grid-template-columns: 1fr; }
++  .checkbox-group { grid-template-columns: 1fr; }
++  .dashboardStats { grid-template-columns: 1fr; }
++  .dashboardHero { padding: 24px; }
++  .dashboardHero h1 { font-size: 2.15rem; }
++  .dashboardGrid { gap: 14px; }
++  .eval-summary { grid-template-columns: 1fr; }
++  .listingGrid, .recentListingGrid { grid-template-columns: 1fr; }
++  .listingMedia { min-height: 138px; }
++  .comparisonToolbar { position: static; align-items: flex-start; flex-direction: column; }
++  .comparisonToolbar .button { width: 100%; }
++  .comparisonSelectionGrid { grid-template-columns: 1fr; }
++  .destinationEntry { grid-template-columns: 1fr; }
++  .destinationEntry .button { width: 100%; }
++  .progressSteps { grid-template-columns: 1fr; }
++  .progressStep:not(.active) { display: none; }
++  .formActionBar { position: static; flex-direction: column; }
++  .resultHero { padding: 22px; grid-template-columns: 1fr; text-align: center; }
++  .scoreRing { margin-inline: auto; }
++  .resultPills { justify-content: center; }
++  .summary-grid, .reasonList { grid-template-columns: 1fr; }
++  .scoreHeader { flex-direction: column; }
++  .tipContent { left: 0; right: auto; width: min(280px,80vw); }
++  .historyItem { grid-template-columns: 1fr; }
++  .historyMeta { justify-content: flex-start; }
++  .learnGrid { grid-template-columns: 1fr; }
++  .authPanel { padding: 22px; }
++  .siteFooter { font-size: .7rem; }
++}
++
++@media (prefers-reduced-motion: reduce) {
++  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
++}
++
++/* Small editorial refinements */
++.articleHeader { margin-bottom: 16px; }
++.articleHeader h1 { margin-top: 18px; }
++.articleBody h2:not(:first-child) { margin-top: 30px; }
++.articleCallout p { margin: 0; }
++.learnCard h3 { margin-bottom: 6px; }
++.learnCard p { margin: 0; color: var(--muted); font-size: .78rem; }
+diff --git a/templates/base.html b/templates/base.html
+index a50c4a1..a8efeb1 100644
+--- a/templates/base.html
++++ b/templates/base.html
+@@ -3,20 +3,28 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
++  <meta name="theme-color" content="#0f766e">
++  <meta name="description" content="ScoreRent helps renters compare affordability, upfront costs, amenities and practical trade-offs before applying.">
+   <title>{% block title %}ScoreRent{% endblock %}</title>
+   <link rel="stylesheet" href="/static/styles.css">
+ </head>
+ <body>
+-  <div class="container">
++  {% set logged_in = user is defined and user %}
++  <a class="skipLink" href="#main-content">Skip to content</a>
++
++  <div class="{% if logged_in %}appShell{% else %}publicShell{% endif %}">
+     {% include "nav.html" %}
+ 
+-    <main class="mainContent">
+-      {% block content %}{% endblock %}
+-    </main>
++    <div class="pageShell">
++      <main id="main-content" class="mainContent">
++        {% block content %}{% endblock %}
++      </main>
+ 
+-    <footer class="siteFooter">
+-      ScoreRent is an informational tool. It does not guarantee rental approval.
+-    </footer>
++      <footer class="siteFooter">
++        <span>ScoreRent is an informational decision-support tool.</span>
++        <span>Rental approval is always decided by the property provider.</span>
++      </footer>
++    </div>
+   </div>
+ </body>
+ </html>
+diff --git a/templates/compare.html b/templates/compare.html
+index 541eb2f..d4f9d7f 100644
+--- a/templates/compare.html
++++ b/templates/compare.html
+@@ -1,29 +1,40 @@
+ {% extends "base.html" %}
+ {% block title %}Compare listings · ScoreRent{% endblock %}
+ {% block content %}
+-<section class="stack" style="padding-top:26px;">
+-  <div class="pageHeader">
++<section class="stack">
++  <header class="pageHeader">
+     <div>
+-      <p class="eyebrow">Side-by-side decision support</p>
+-      <h2>Compare listings</h2>
+-      <p class="muted">Choose the listings first, then enter one place you need to travel to.</p>
++      <p class="eyebrow">Decision workspace</p>
++      <h1>Compare listings</h1>
++      <p>Line up costs, amenities, trade-offs and travel estimates without switching between tabs.</p>
+     </div>
+-    <a class="button" href="/listings">Back to listings</a>
+-  </div>
++    <a class="button" href="/listings">Back to shortlist</a>
++  </header>
+ 
+   {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+ 
+   {% if not listings %}
+-    <article class="card stack">
+-      <h3>No saved listings yet</h3>
+-      <p class="muted">Import and save at least two listings before comparing them.</p>
+-      <a class="button primary" href="/import-listing">Import listing</a>
++    <article class="card emptyState stack">
++      <span class="emptyStateIcon" aria-hidden="true">
++        <svg viewBox="0 0 24 24"><path d="M8 4 4 8l4 4M4 8h13M16 20l4-4-4-4m4 4H7"/></svg>
++      </span>
++      <div><h2>Nothing to compare yet</h2><p>Save at least two listings, then return here to compare them.</p></div>
++      <a class="button primary" href="/import-listing">Import a listing</a>
+     </article>
+   {% else %}
+-    <form method="get" action="/compare" class="card stack">
++    <section class="card compareIntro">
+       <div>
+-        <h3>1. Choose 2–4 listings</h3>
+-        <p class="muted small">Costs and amenities can always be compared. Travel time is calculated only for listings with a confirmed exact location.</p>
++        <p class="eyebrow">How it works</p>
++        <h2 class="sectionTitle">Choose two to four listings</h2>
++        <p>Costs and listing details are available immediately. Travel estimates appear only when an exact address or uniquely identifiable building has been confirmed.</p>
++      </div>
++      <span class="statusBadge ready">{{ selected_listings|length }} selected</span>
++    </section>
++
++    <form method="get" action="/compare" class="card stack" id="compareSelectionForm">
++      <div class="sectionHeader">
++        <div><h2 class="sectionTitle">Your shortlist</h2><p class="muted small">Select the properties you are seriously considering.</p></div>
++        <button class="button" type="submit">Update comparison</button>
+       </div>
+       <div class="comparisonSelectionGrid">
+         {% for listing in listings %}
+@@ -32,34 +43,35 @@
+             <span>
+               <strong>{{ listing.title }}</strong>
+               <small>{{ listing.location or 'Location not added' }}</small>
+-              <small>R{{ '{:,}'.format(listing.monthly_rent) }} per month</small>
++              <small>R{{ '{:,}'.format(listing.monthly_rent) }} / month</small>
+               {% if listing.location_is_exact %}
+                 <em class="statusBadge ready">Travel-ready</em>
+               {% else %}
+-                <em class="statusBadge mutedStatus">No exact location</em>
++                <em class="statusBadge mutedStatus">Exact location needed</em>
+               {% endif %}
+             </span>
+           </label>
+         {% endfor %}
+       </div>
+-      <button class="button" type="submit">Update selection</button>
+     </form>
+ 
+     {% if selected_listings|length >= 2 and selected_listings|length <= 4 %}
+       <form method="post" action="/compare" class="card stack">
+-        <div>
+-          <h3>2. Where do you need to travel to?</h3>
+-          <p class="muted small">Enter your workplace, campus or another destination once. ScoreRent checks it against every selected listing with an exact location.</p>
++        <div class="sectionHeader">
++          <div>
++            <p class="eyebrow">Travel destination</p>
++            <h2 class="sectionTitle">Where do you need to go?</h2>
++            <p class="muted small">Enter work, campus or another destination once. It will be checked against every travel-ready listing.</p>
++          </div>
++          {% if destination %}<span class="statusBadge ready">Route estimates updated</span>{% endif %}
+         </div>
+ 
+-        {% for listing in selected_listings %}
+-          <input type="hidden" name="listing_ids" value="{{ listing.id }}">
+-        {% endfor %}
++        {% for listing in selected_listings %}<input type="hidden" name="listing_ids" value="{{ listing.id }}">{% endfor %}
+ 
+         <div class="destinationEntry">
+           <label for="destination">Destination</label>
+           <input id="destination" name="destination" required value="{{ destination }}" placeholder="Example: UCT Upper Campus, Rondebosch">
+-          <button class="button primary" type="submit">Calculate and compare</button>
++          <button class="button primary" type="submit">Calculate travel</button>
+         </div>
+       </form>
+ 
+@@ -77,49 +89,43 @@
+             </tr>
+           </thead>
+           <tbody>
+-            <tr>
+-              <th>Monthly rent</th>
+-              {% for listing in selected_listings %}<td>R{{ '{:,}'.format(listing.monthly_rent) }}</td>{% endfor %}
+-            </tr>
+-            <tr>
+-              <th>Deposit</th>
+-              {% for listing in selected_listings %}<td>R{{ '{:,}'.format(listing.deposit) }}</td>{% endfor %}
+-            </tr>
+-            <tr>
+-              <th>Initial cost</th>
+-              {% for listing in selected_listings %}<td>R{{ '{:,}'.format(listing.upfront_cost) }}</td>{% endfor %}
+-            </tr>
++            <tr class="sectionRow"><th colspan="{{ selected_listings|length + 1 }}">Costs</th></tr>
++            <tr><th>Monthly rent</th>{% for listing in selected_listings %}<td><strong>R{{ '{:,}'.format(listing.monthly_rent) }}</strong></td>{% endfor %}</tr>
++            <tr><th>Deposit</th>{% for listing in selected_listings %}<td>R{{ '{:,}'.format(listing.deposit) }}</td>{% endfor %}</tr>
++            <tr><th>Application fee</th>{% for listing in selected_listings %}<td>R{{ '{:,}'.format(listing.application_fee) }}</td>{% endfor %}</tr>
++            <tr><th>Estimated upfront</th>{% for listing in selected_listings %}<td><strong>R{{ '{:,}'.format(listing.upfront_cost) }}</strong></td>{% endfor %}</tr>
++
++            <tr class="sectionRow"><th colspan="{{ selected_listings|length + 1 }}">Listing fit</th></tr>
+             <tr>
+               <th>Amenities</th>
+-              {% for listing in selected_listings %}
+-                <td>{{ listing.amenities|join(', ') if listing.amenities else 'Not recorded' }}</td>
+-              {% endfor %}
++              {% for listing in selected_listings %}<td>{{ listing.amenities|join(', ') if listing.amenities else 'Not recorded' }}</td>{% endfor %}
+             </tr>
+             <tr>
+               <th>Pros</th>
+               {% for listing in selected_listings %}
+-                <td>{% if listing.pros %}<ul class="compactList">{% for item in listing.pros %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}Not recorded{% endif %}</td>
++                <td>{% if listing.pros %}<ul class="compactList">{% for item in listing.pros %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<span class="muted">Not recorded</span>{% endif %}</td>
+               {% endfor %}
+             </tr>
+             <tr>
+               <th>Potential downsides</th>
+               {% for listing in selected_listings %}
+-                <td>{% if listing.cons %}<ul class="compactList">{% for item in listing.cons %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}Not recorded{% endif %}</td>
++                <td>{% if listing.cons %}<ul class="compactList">{% for item in listing.cons %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<span class="muted">Not recorded</span>{% endif %}</td>
+               {% endfor %}
+             </tr>
+ 
++            <tr class="sectionRow"><th colspan="{{ selected_listings|length + 1 }}">Location and travel</th></tr>
+             {% if commute_results %}
+               {% for mode in ['drive', 'walk', 'bicycle'] %}
+                 <tr class="commuteComparisonRow">
+-                  <th>{{ travel_mode_labels[mode] }} to destination</th>
++                  <th>{{ travel_mode_labels[mode] }}</th>
+                   {% for listing in selected_listings %}
+                     {% set result = commute_results.get(listing.id) %}
+                     <td>
+                       {% if result and result.routes.get(mode) %}
+                         <strong>{{ result.routes[mode].duration_label }}</strong>
+-                        <small>{{ result.routes[mode].distance_km }} km</small>
++                        <small>{{ result.routes[mode].distance_km }} km to {{ destination }}</small>
+                       {% elif result and result.error %}
+-                        <span class="muted">Unavailable</span>
++                        <span class="statusBadge mutedStatus">Unavailable</span>
+                         <small>{{ result.error }}</small>
+                       {% else %}
+                         <span class="muted">Not calculated</span>
+@@ -130,14 +136,10 @@
+               {% endfor %}
+             {% else %}
+               <tr>
+-                <th>Travel comparison</th>
++                <th>Travel status</th>
+                 {% for listing in selected_listings %}
+                   <td>
+-                    {% if listing.location_is_exact %}
+-                      <span class="statusBadge ready">Ready to calculate</span>
+-                    {% else %}
+-                      <span class="statusBadge mutedStatus">Exact location needed</span>
+-                    {% endif %}
++                    {% if listing.location_is_exact %}<span class="statusBadge ready">Ready to calculate</span>{% else %}<span class="statusBadge mutedStatus">Exact location needed</span>{% endif %}
+                   </td>
+                 {% endfor %}
+               </tr>
+@@ -145,8 +147,26 @@
+           </tbody>
+         </table>
+       </div>
+-      <p class="muted small">Travel times are estimates and can change with traffic, route conditions and address accuracy.</p>
++      <p class="muted small">Travel times are estimates and may change with traffic, route conditions and address accuracy.</p>
+     {% endif %}
+   {% endif %}
+ </section>
++
++<script>
++  (() => {
++    const form = document.getElementById('compareSelectionForm');
++    if (!form) return;
++    const choices = [...form.querySelectorAll('.comparisonChoice input')];
++    const update = () => choices.forEach((input) => input.closest('.comparisonChoice')?.classList.toggle('selected', input.checked));
++    choices.forEach((input) => input.addEventListener('change', update));
++    form.addEventListener('submit', (event) => {
++      const total = choices.filter((input) => input.checked).length;
++      if (total < 2 || total > 4) {
++        event.preventDefault();
++        window.alert('Choose between two and four listings.');
++      }
++    });
++    update();
++  })();
++</script>
+ {% endblock %}
+diff --git a/templates/confirm_listing_import.html b/templates/confirm_listing_import.html
+index dead5f7..e1f9a9a 100644
+--- a/templates/confirm_listing_import.html
++++ b/templates/confirm_listing_import.html
+@@ -1,113 +1,134 @@
+ {% extends "base.html" %}
+-{% block title %}Confirm imported listing · ScoreRent{% endblock %}
++{% block title %}Review imported listing · ScoreRent{% endblock %}
+ {% block content %}
+-<section class="stack" style="padding-top:26px;">
+-  <div class="stack" style="gap:10px;">
+-    <p class="eyebrow">Review required</p>
+-    <h2>Confirm imported listing</h2>
+-    <p>Correct anything the image reader misread. Blank fields were not confidently found.</p>
++<section class="stack flowPage">
++  <header class="pageHeader">
++    <div>
++      <p class="eyebrow">Review required</p>
++      <h1>Check the listing details.</h1>
++      <p>Correct anything that was misread. Blank fields were not found confidently.</p>
++    </div>
++  </header>
++
++  <div class="progressSteps" aria-label="Import progress">
++    <div class="progressStep"><span>✓</span>Upload screenshots</div>
++    <div class="progressStep active"><span>2</span>Review details</div>
++    <div class="progressStep"><span>3</span>Save or evaluate</div>
+   </div>
+ 
+   {% if extraction.warnings %}
+-    <div class="card stack">
+-      <h3>Check these fields</h3>
+-      {% for warning in extraction.warnings %}<p class="muted">{{ warning }}</p>{% endfor %}
++    <div class="alert warning">
++      <strong>Give these fields an extra check:</strong>
++      <ul>{% for warning in extraction.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+     </div>
+   {% endif %}
+ 
+-  <form method="post" action="/evaluate" class="card stack">
+-    <div class="grid-2">
+-      <div class="stack">
+-        <label for="listing_name">Listing name</label>
+-        <input id="listing_name" name="listing_name" value="{{ extraction.listing_name.value or '' }}">
+-        {% if extraction.listing_name.evidence %}<small class="muted">Read from: {{ extraction.listing_name.evidence }}</small>{% endif %}
+-      </div>
+-      <div class="stack">
+-        <label for="location">Address or building</label>
+-        <input id="location" name="location" value="{{ extraction.location.value or '' }}" placeholder="Full address, building, or area">
+-        {% if extraction.location.evidence %}<small class="muted">Read from: {{ extraction.location.evidence }}</small>{% endif %}
+-        <label class="checkbox exactLocationCheck">
+-          <input type="checkbox" name="location_is_exact" value="yes" {% if extraction.location_precision == 'exact' %}checked{% endif %}>
+-          <span>This is an exact address or uniquely identifiable building</span>
+-        </label>
+-        <small class="muted">Only confirmed exact locations can be used for travel comparison. A suburb alone is not exact.</small>
+-      </div>
+-    </div>
+-
+-    <div class="grid-2">
+-      <div class="stack">
+-        <label for="rent">Monthly rent (R)</label>
+-        <input id="rent" name="rent" type="number" min="1" required value="{{ extraction.rent.value or '' }}">
+-        {% if extraction.rent.evidence %}<small class="muted">Read from: {{ extraction.rent.evidence }}</small>{% endif %}
++  <form method="post" action="/evaluate" class="stack">
++    <section class="formSection">
++      <div class="formSectionHeader">
++        <span class="formSectionNumber">1</span>
++        <div><h2 class="sectionTitle">Property and location</h2><p class="muted small">Confirm the listing identity before comparing it.</p></div>
+       </div>
+-      <div class="stack">
+-        <label for="deposit">Deposit (R)</label>
+-        <input id="deposit" name="deposit" type="number" min="0" required value="{{ extraction.deposit.value if extraction.deposit.value is not none else '' }}">
+-        {% if extraction.deposit.evidence %}<small class="muted">Read from: {{ extraction.deposit.evidence }}</small>{% endif %}
++      <div class="reviewGrid">
++        <div class="stack" style="gap:8px;">
++          <label for="listing_name">Listing name</label>
++          <input id="listing_name" name="listing_name" value="{{ extraction.listing_name.value or '' }}" placeholder="Example: Furnished Observatory studio">
++          {% if extraction.listing_name.evidence %}<small class="muted">Read from: {{ extraction.listing_name.evidence }}</small>{% endif %}
++        </div>
++        <div class="stack" style="gap:8px;">
++          <label for="location">Address or building</label>
++          <input id="location" name="location" value="{{ extraction.location.value or '' }}" placeholder="Full address, building, or area">
++          {% if extraction.location.evidence %}<small class="muted">Read from: {{ extraction.location.evidence }}</small>{% endif %}
++          <label class="checkbox exactLocationCheck">
++            <input type="checkbox" name="location_is_exact" value="yes" {% if extraction.location_precision == 'exact' %}checked{% endif %}>
++            <span>This is an exact address or uniquely identifiable building</span>
++          </label>
++          <small class="muted">A suburb alone is not precise enough for travel comparison.</small>
++        </div>
+       </div>
+-    </div>
++    </section>
+ 
+-    <div class="grid-2">
+-      <div class="stack">
+-        <label for="application_fee">Application fee (R)</label>
+-        <input id="application_fee" name="application_fee" type="number" min="0" required value="{{ extraction.application_fee.value if extraction.application_fee.value is not none else '' }}">
+-        {% if extraction.application_fee.evidence %}<small class="muted">Read from: {{ extraction.application_fee.evidence }}</small>{% endif %}
++    <section class="formSection">
++      <div class="formSectionHeader">
++        <span class="formSectionNumber">2</span>
++        <div><h2 class="sectionTitle">Costs</h2><p class="muted small">Use zero only when the listing explicitly says there is no charge.</p></div>
+       </div>
+-      <div class="stack">
+-        <label for="area_demand">Area demand</label>
+-        <select id="area_demand" name="area_demand">
+-          {% for demand in demand_levels %}<option value="{{ demand }}" {% if demand == 'MEDIUM' %}selected{% endif %}>{{ demand }}</option>{% endfor %}
+-        </select>
++      <div class="grid-2">
++        <div class="stack" style="gap:8px;">
++          <label for="rent">Monthly rent (R)</label>
++          <input id="rent" name="rent" type="number" min="1" required value="{{ extraction.rent.value or '' }}">
++          {% if extraction.rent.evidence %}<small class="muted">Read from: {{ extraction.rent.evidence }}</small>{% endif %}
++        </div>
++        <div class="stack" style="gap:8px;">
++          <label for="deposit">Deposit (R)</label>
++          <input id="deposit" name="deposit" type="number" min="0" required value="{{ extraction.deposit.value if extraction.deposit.value is not none else '' }}">
++          {% if extraction.deposit.evidence %}<small class="muted">Read from: {{ extraction.deposit.evidence }}</small>{% endif %}
++        </div>
++        <div class="stack" style="gap:8px;">
++          <label for="application_fee">Application fee (R)</label>
++          <input id="application_fee" name="application_fee" type="number" min="0" required value="{{ extraction.application_fee.value if extraction.application_fee.value is not none else '' }}">
++          {% if extraction.application_fee.evidence %}<small class="muted">Read from: {{ extraction.application_fee.evidence }}</small>{% endif %}
++        </div>
++        <div class="stack" style="gap:8px;">
++          <label for="area_demand">Area demand</label>
++          <select id="area_demand" name="area_demand">
++            {% for demand in demand_levels %}<option value="{{ demand }}" {% if demand == 'MEDIUM' %}selected{% endif %}>{{ demand|title }}</option>{% endfor %}
++          </select>
++        </div>
+       </div>
+-    </div>
+-
+-    <div class="stack">
+-      <label><strong>Documents required by the listing</strong></label>
+-      <p class="muted small">Only select documents the listing actually requests.</p>
+-      <div class="checkbox-group">
+-        {% for document in available_documents %}
+-          <label class="checkbox">
+-            <input type="checkbox" name="required_documents" value="{{ document }}" {% if document in extraction.required_documents %}checked{% endif %}>
+-            <span>{{ document.replace('_', ' ').title() }}</span>
+-          </label>
+-        {% endfor %}
+-      </div>
+-    </div>
++    </section>
+ 
+-    <div class="grid-2">
+-      <div class="stack">
+-        <label for="amenities_text">Amenities</label>
+-        <textarea id="amenities_text" name="amenities_text" rows="7" placeholder="One amenity per line">{{ extraction.amenities | join('\n') }}</textarea>
+-        <small class="muted">Examples: Wi-Fi included, furnished, parking, laundry.</small>
++    <section class="formSection stack">
++      <div class="formSectionHeader">
++        <span class="formSectionNumber">3</span>
++        <div><h2 class="sectionTitle">Requirements and amenities</h2><p class="muted small">Keep only details that are supported by the advert.</p></div>
+       </div>
+-      <div class="stack">
+-        <label for="source_url">Listing link</label>
+-        <input id="source_url" name="source_url" type="url" placeholder="https://...">
+-        <label for="notes">Your notes</label>
+-        <textarea id="notes" name="notes" rows="4" placeholder="Questions to ask, viewing notes, commute details..."></textarea>
++      <div>
++        <label><strong>Documents required by the listing</strong></label>
++        <p class="muted small">Select only documents the listing actually requests.</p>
++        <div class="checkbox-group">
++          {% for document in available_documents %}
++            <label class="checkbox">
++              <input type="checkbox" name="required_documents" value="{{ document }}" {% if document in extraction.required_documents %}checked{% endif %}>
++              <span>{{ document.replace('_', ' ')|title }}</span>
++            </label>
++          {% endfor %}
++        </div>
+       </div>
+-    </div>
+-
+-    <div class="grid-2">
+-      <div class="stack">
+-        <label for="pros_text">Factual pros</label>
+-        <textarea id="pros_text" name="pros_text" rows="6" placeholder="One supported benefit per line">{{ extraction.pros | join('\n') }}</textarea>
++      <div class="grid-2">
++        <div class="stack" style="gap:8px;">
++          <label for="amenities_text">Amenities</label>
++          <textarea id="amenities_text" name="amenities_text" rows="7" placeholder="One amenity per line">{{ extraction.amenities | join('\n') }}</textarea>
++          <small class="muted">Examples: Wi-Fi included, furnished, parking, laundry.</small>
++        </div>
++        <div class="stack" style="gap:8px;">
++          <label for="source_url">Listing link</label>
++          <input id="source_url" name="source_url" type="url" placeholder="https://...">
++          <label for="notes">Your notes</label>
++          <textarea id="notes" name="notes" rows="4" placeholder="Questions to ask, viewing notes, practical concerns..."></textarea>
++        </div>
+       </div>
+-      <div class="stack">
+-        <label for="cons_text">Factual cons</label>
+-        <textarea id="cons_text" name="cons_text" rows="6" placeholder="One supported limitation per line">{{ extraction.cons | join('\n') }}</textarea>
++      <div class="grid-2">
++        <div class="stack" style="gap:8px;">
++          <label for="pros_text">Factual pros</label>
++          <textarea id="pros_text" name="pros_text" rows="6" placeholder="One supported benefit per line">{{ extraction.pros | join('\n') }}</textarea>
++        </div>
++        <div class="stack" style="gap:8px;">
++          <label for="cons_text">Potential downsides</label>
++          <textarea id="cons_text" name="cons_text" rows="6" placeholder="One supported limitation per line">{{ extraction.cons | join('\n') }}</textarea>
++        </div>
+       </div>
+-    </div>
++    </section>
+ 
+-    <div class="grid-2">
++    <div class="formActionBar">
+       <button type="submit" class="button primary">Evaluate now</button>
+-      <button type="submit" formaction="/listings" class="button">Save listing</button>
++      <button type="submit" formaction="/listings" class="button">Save to shortlist</button>
+     </div>
+   </form>
+ 
+-  <details class="card">
+-    <summary>View extracted listing text</summary>
+-    <pre style="white-space:pre-wrap; overflow-wrap:anywhere;">{{ extraction.raw_text }}</pre>
++  <details class="card rawTextDetails">
++    <summary>View the text read from the screenshots</summary>
++    <pre>{{ extraction.raw_text }}</pre>
+   </details>
+ </section>
+ {% endblock %}
+diff --git a/templates/dashboard.html b/templates/dashboard.html
+index 6ce460d..46dff3d 100644
+--- a/templates/dashboard.html
++++ b/templates/dashboard.html
+@@ -1,71 +1,91 @@
+ {% extends "base.html" %}
++{% block title %}Overview · ScoreRent{% endblock %}
+ {% block content %}
+-
+-<section class="page-header">
+-  <h2>Dashboard</h2>
+-  <p class="muted">Welcome back, {{ user.email }}.</p>
+-</section>
+-
+-{% if last_eval %}
+-
+-<div class="card dashboard-card">
+-
+-  <div class="card-header-row">
+-    <div>
+-      <p class="eyebrow">Latest evaluation</p>
+-      <h3>{{ last_eval.listing_name or "Unnamed listing" }}</h3>
+-    </div>
+-
+-    <div class="score-badge">
+-      {{ last_eval.score }}/100
+-    </div>
+-  </div>
+-
+-  <div class="eval-summary">
+-    <div>
+-      <span class="label">Verdict</span>
+-      <strong>{{ last_eval.verdict }}</strong>
+-    </div>
+-
++<section class="stack">
++  <header class="dashboardHero">
+     <div>
+-      <span class="label">Confidence</span>
+-      <strong>{{ last_eval.confidence }}</strong>
+-    </div>
+-
+-    <div>
+-      <span class="label">Date</span>
+-      <strong>{{ last_eval.created_at }}</strong>
++      <p class="eyebrow">Your rental workspace</p>
++      <h1>Make the next listing easier to judge.</h1>
++      <p>Import a listing, verify the details and keep every cost and trade-off in one shortlist.</p>
+     </div>
++    <a class="button" href="/import-listing">Import a listing</a>
++  </header>
++
++  <div class="dashboardStats">
++    <article class="card statCard">
++      <div><strong>{{ dashboard_stats.listing_count }}</strong><span>Saved listings</span></div>
++      <span class="statIcon">L</span>
++    </article>
++    <article class="card statCard">
++      <div><strong>{{ dashboard_stats.evaluation_count }}</strong><span>Evaluations</span></div>
++      <span class="statIcon">S</span>
++    </article>
++    <article class="card statCard">
++      <div><strong>{{ dashboard_stats.commute_ready_count }}</strong><span>Travel-ready listings</span></div>
++      <span class="statIcon">↗</span>
++    </article>
+   </div>
+ 
+-  <div class="actionsRow compact">
+-    <a class="btn" href="/results/{{ last_eval.id }}">View results</a>
+-    <a class="btn ghost" href="/evaluate">New evaluation</a>
+-    <a class="btn ghost" href="/history">History</a>
+-    <a class="btn ghost" href="/compare">Compare</a>
+-  </div>
+-
+-</div>
+-
+-{% else %}
+-
+-<div class="card dashboard-card">
+-
+-  <p class="eyebrow">Get started</p>
+-
+-  <h3>Welcome to ScoreRent</h3>
+-
+-  <p class="muted">
+-    You have not evaluated any rental listings yet. Start your first evaluation
+-    to get a score, verdict, reasons, and recommended next steps.
+-  </p>
+-
+-  <div class="actionsRow compact single">
+-    <a class="btn" href="/evaluate">Start evaluation</a>
++  <div class="dashboardGrid">
++    {% if last_eval %}
++      <article class="card latestEvaluation">
++        <div class="latestEvalHeader">
++          <div>
++            <p class="eyebrow">Latest evaluation</p>
++            <h2 class="sectionTitle">{{ last_eval.listing_name or "Unnamed listing" }}</h2>
++            <p class="muted small">{{ last_eval.created_at|string|replace('T', ' ') }}</p>
++          </div>
++          <div class="score-badge">{{ last_eval.score }}</div>
++        </div>
++        <div class="eval-summary">
++          <div><span class="label">Verdict</span><strong>{{ last_eval.verdict|replace('_',' ')|title }}</strong></div>
++          <div><span class="label">Confidence</span><strong>{{ last_eval.confidence|title }}</strong></div>
++          <div><span class="label">Next step</span><strong>Review recommendations</strong></div>
++        </div>
++        <div class="latestEvalActions">
++          <a class="button primary" href="/results/{{ last_eval.id }}">Open result</a>
++          <a class="button" href="/history">All evaluations</a>
++        </div>
++      </article>
++    {% else %}
++      <article class="card emptyState stack">
++        <span class="emptyStateIcon" aria-hidden="true">
++          <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h5m-5 4h3"/></svg>
++        </span>
++        <div><h2>No evaluations yet</h2><p>Run an evaluation to see affordability, document fit and recommended next steps.</p></div>
++        <a class="button primary" href="/evaluate">Evaluate a listing</a>
++      </article>
++    {% endif %}
++
++    <aside class="card stack">
++      <div>
++        <p class="eyebrow">Quick actions</p>
++        <h3>What would you like to do?</h3>
++      </div>
++      <div class="quickActions">
++        <a class="quickAction" href="/import-listing"><span class="quickActionIcon">↑</span><span><strong>Import screenshots</strong><small>Extract and confirm listing details</small></span><span>›</span></a>
++        <a class="quickAction" href="/listings"><span class="quickActionIcon">L</span><span><strong>Open shortlist</strong><small>Review your saved listings</small></span><span>›</span></a>
++        <a class="quickAction" href="/compare"><span class="quickActionIcon">⇄</span><span><strong>Compare listings</strong><small>See costs, amenities and travel</small></span><span>›</span></a>
++      </div>
++    </aside>
+   </div>
+ 
+-</div>
+-
+-{% endif %}
+-
++  {% if recent_listings %}
++    <section class="stack">
++      <div class="sectionHeader">
++        <div><p class="eyebrow">Recent shortlist</p><h2 class="sectionTitle">Saved listings</h2></div>
++        <a class="button" href="/listings">View all</a>
++      </div>
++      <div class="recentListingGrid">
++        {% for listing in recent_listings %}
++          <a class="card quickAction" href="/listings/{{ listing.id }}">
++            <span class="quickActionIcon">⌂</span>
++            <span><strong>{{ listing.title }}</strong><small>{{ listing.location or 'Location not added' }} · R{{ '{:,}'.format(listing.monthly_rent) }}</small></span>
++            <span>›</span>
++          </a>
++        {% endfor %}
++      </div>
++    </section>
++  {% endif %}
++</section>
+ {% endblock %}
+diff --git a/templates/evaluate.html b/templates/evaluate.html
+index 3f98122..8965e52 100644
+--- a/templates/evaluate.html
++++ b/templates/evaluate.html
+@@ -1,20 +1,24 @@
+ {% extends "base.html" %}
++{% block title %}Evaluate a listing · ScoreRent{% endblock %}
+ {% block content %}
+ 
+-<section class="stack" style="padding-top: 26px;">
+-  <div class="stack" style="gap:10px;">
+-    <h2>Evaluate listing</h2>
+-    <p>
+-      Enter listing details below. We’ll calculate your match score and
+-      recommend what to do next.
+-    </p>
+-  </div>
++<section class="stack flowPage">
++  <header class="pageHeader">
++    <div>
++      <p class="eyebrow">Manual evaluation</p>
++      <h1>Check your application fit.</h1>
++      <p>Enter the listing costs and requirements. ScoreRent will explain the result and suggest practical next steps.</p>
++    </div>
++  </header>
+ 
+   {% if user %}
+-    <div class="card">
+-      <strong>Have listing screenshots?</strong>
+-      <p class="muted">Let ScoreRent read them, then confirm the extracted details before evaluation.</p>
+-      <a class="button" href="/import-listing">Import screenshots</a>
++    <div class="card noticeCard sectionHeader">
++      <div>
++        <p class="eyebrow">Faster option</p>
++        <h3>Have listing screenshots?</h3>
++        <p class="muted small">Import them first, then review the extracted details before evaluating.</p>
++      </div>
++      <a class="button primary" href="/import-listing">Import screenshots</a>
+     </div>
+   {% endif %}
+ 
+diff --git a/templates/guest_results.html b/templates/guest_results.html
+index 6c2827e..62abe28 100644
+--- a/templates/guest_results.html
++++ b/templates/guest_results.html
+@@ -1,259 +1,92 @@
+ {% extends "base.html" %}
++{% block title %}Evaluation result · ScoreRent{% endblock %}
+ {% block content %}
+-
+ {% set learn_links = {
+-  "Affordability risk": {
+-    "text": "Learn how rent affordability works",
+-    "url": "/learn/rent-affordability"
+-  },
+-  "Missing income information": {
+-    "text": "Learn how to improve a weak application",
+-    "url": "/learn/improve-application"
+-  },
+-  "Missing renter profile documents": {
+-    "text": "Learn what documents landlords ask for",
+-    "url": "/learn/documents-landlords-ask-for"
+-  },
+-  "Missing required documents": {
+-    "text": "Learn what documents landlords ask for",
+-    "url": "/learn/documents-landlords-ask-for"
+-  },
+-  "Qualified guarantor support": {
+-    "text": "Learn how to strengthen an application",
+-    "url": "/learn/improve-application"
+-  },
+-  "Missing guarantor support": {
+-    "text": "Learn how to strengthen an application",
+-    "url": "/learn/improve-application"
+-  },
+-  "Bursary funding shortfall": {
+-    "text": "Learn how to improve a weak application",
+-    "url": "/learn/improve-application"
+-  },
+-  "Missing bursary confirmation": {
+-    "text": "Learn what student applicants need",
+-    "url": "/learn/documents-landlords-ask-for"
+-  },
+-  "High-demand rental area": {
+-    "text": "Learn what weakens an application",
+-    "url": "/learn/improve-application"
+-  },
+-  "Lower competition rental area": {
+-    "text": "Learn how ScoreRent calculates your result",
+-    "url": "/learn/how-scoring-works"
+-  }
++  "Affordability risk": {"text": "Learn how rent affordability works", "url": "/learn/rent-affordability"},
++  "Missing income information": {"text": "Learn how to improve a weak application", "url": "/learn/improve-application"},
++  "Missing renter profile documents": {"text": "Learn what documents landlords ask for", "url": "/learn/documents-landlords-ask-for"},
++  "Missing required documents": {"text": "Learn what documents landlords ask for", "url": "/learn/documents-landlords-ask-for"},
++  "Qualified guarantor support": {"text": "Learn how to strengthen an application", "url": "/learn/improve-application"},
++  "Missing guarantor support": {"text": "Learn how to strengthen an application", "url": "/learn/improve-application"},
++  "Bursary funding shortfall": {"text": "Learn how to improve a weak application", "url": "/learn/improve-application"},
++  "Missing bursary confirmation": {"text": "Learn what student applicants need", "url": "/learn/documents-landlords-ask-for"},
++  "High-demand rental area": {"text": "Learn what weakens an application", "url": "/learn/improve-application"},
++  "Lower competition rental area": {"text": "Learn how ScoreRent calculates your result", "url": "/learn/how-scoring-works"}
+ } %}
+-
+-<section class="stack">
+-
+-  <header>
+-    <h2>Evaluation result</h2>
+-
+-    <p class="muted">
+-      This shows how strong your rental application looks based on affordability,
+-      documents, demand, and upfront costs.
+-    </p>
++{% set ring_class = "" %}
++{% set verdict_label = "Borderline" %}
++{% set verdict_badge = "warn" %}
++{% if result.verdict == "STRONG_MATCH" or result.verdict == "WORTH_APPLYING" %}
++  {% set ring_class = "good" %}{% set verdict_label = "Strong match" %}{% set verdict_badge = "good" %}
++{% elif result.verdict == "HIGH_RISK" or result.verdict == "NOT_WORTH_IT" %}
++  {% set ring_class = "bad" %}{% set verdict_label = "High risk" %}{% set verdict_badge = "bad" %}
++{% endif %}
++
++<section class="stack result">
++  <header class="pageHeader">
++    <div><p class="eyebrow">Guest evaluation</p><h1>{{ listing.listing_name or "Unnamed listing" }}</h1><p>Review the result, then create an account to build a shortlist and compare listings.</p></div>
+   </header>
+ 
+-  {# Default presentation for a borderline result #}
+-  {% set verdict_class = "warn" %}
+-  {% set hero_class = "hero-borderline" %}
+-  {% set verdict_label = "Borderline" %}
+-
+-  {% if result.verdict == "STRONG_MATCH"
+-        or result.verdict == "WORTH_APPLYING" %}
+-
+-    {% set verdict_class = "good" %}
+-    {% set hero_class = "hero-good" %}
+-    {% set verdict_label = "Strong match" %}
+-
+-  {% elif result.verdict == "HIGH_RISK"
+-          or result.verdict == "NOT_WORTH_IT" %}
+-
+-    {% set verdict_class = "bad" %}
+-    {% set hero_class = "hero-bad" %}
+-    {% set verdict_label = "High risk" %}
+-
+-  {% endif %}
+-
+-  <div class="scoreBox {{ hero_class }}">
+-    <div class="scoreHeader">
+-
+-      <div>
+-        <div class="scoreTitle">Match score</div>
+-
+-        <div class="score">
+-          {{ result.score }}
+-        </div>
+-
+-        <div class="verdict {{ verdict_class }}">
+-          {{ verdict_label }}
+-        </div>
+-
+-        {% if result.confidence == "LOW" %}
+-          <div class="resultWarning">
+-            Some important information is missing, so treat this result as an estimate.
+-          </div>
+-        {% endif %}
+-      </div>
+-
+-      <div class="tipBubble">
+-        <span class="tip">What is this?</span>
+-
+-        <div class="tipContent">
+-          <p>
+-            This score is a practical guide, not a guarantee. It estimates how
+-            strong your application looks for this listing.
+-          </p>
+-        </div>
+-      </div>
+-
++  <section class="resultHero">
++    <div class="scoreRing {{ ring_class }}" style="--score: {{ result.score }};" aria-label="Application score {{ result.score }} out of 100">
++      <div class="scoreRingInner"><strong>{{ result.score }}</strong><small>out of 100</small></div>
+     </div>
+-  </div>
+-
+-  {% if result.actions %}
+-    <div class="card">
+-      <h3>Recommended actions</h3>
+-
+-      <div class="actionList">
+-        {% for action in result.actions %}
+-          <div class="actionItem">
+-            <span class="actionNumber">
+-              {{ loop.index }}
+-            </span>
+-
+-            <span>
+-              {{ action }}
+-            </span>
+-          </div>
+-        {% endfor %}
+-      </div>
++    <div class="resultHeroText">
++      <p class="eyebrow">Application fit</p>
++      <h1>{{ verdict_label }}</h1>
++      <p>This score is a practical guide based on the information supplied. It is not a guarantee of rental approval.</p>
++      <div class="resultPills"><span class="badge {{ verdict_badge }}">{{ verdict_label }}</span><span class="badge">{{ result.confidence|title }} information confidence</span></div>
++      {% if result.confidence == "LOW" %}<div class="resultWarning">Some important information is missing, so treat this result as an estimate.</div>{% endif %}
+     </div>
+-  {% endif %}
+-
+-  <div class="card">
+-    <h3>Listing summary</h3>
++  </section>
+ 
++  <section class="card stack">
++    <div><p class="eyebrow">Listing summary</p><h2 class="sectionTitle">Details used</h2></div>
+     <div class="summary-grid">
+-      <div>
+-        <span class="label">Name</span>
+-        {{ listing.listing_name or "Unnamed listing" }}
+-      </div>
+-
+-      <div>
+-        <span class="label">Rent</span>
+-        R{{ listing.rent }}
+-      </div>
+-
+-      <div>
+-        <span class="label">Deposit</span>
+-        R{{ listing.deposit }}
+-      </div>
+-
+-      <div>
+-        <span class="label">Application fee</span>
+-        R{{ listing.application_fee }}
+-      </div>
+-
+-      <div>
+-        <span class="label">Demand</span>
+-        {{ listing.area_demand }}
+-      </div>
++      <div><span class="label">Monthly rent</span>R{{ listing.rent }}</div>
++      <div><span class="label">Deposit</span>R{{ listing.deposit }}</div>
++      <div><span class="label">Application fee</span>R{{ listing.application_fee }}</div>
++      <div><span class="label">Area demand</span>{{ listing.area_demand }}</div>
+     </div>
+-  </div>
++  </section>
++
++  {% if result.actions %}
++    <section class="card stack">
++      <div><p class="eyebrow">Next steps</p><h2 class="sectionTitle">Recommended actions</h2></div>
++      <div class="actionList">{% for action in result.actions %}<div class="actionItem"><span class="actionNumber">{{ loop.index }}</span><span>{{ action }}</span></div>{% endfor %}</div>
++    </section>
++  {% endif %}
+ 
+   {% if result.breakdown %}
+-    <div class="card breakdownCard">
++    <section class="card breakdownCard">
+       <details class="breakdownDetails" open>
+-
+-        <summary class="breakdownSummary">
+-          Why you got this score
+-        </summary>
+-
++        <summary class="breakdownSummary">Why you got this score</summary>
+         <div class="breakdownList">
+           {% for b in result.breakdown %}
+-
+-            {% set delta = b.delta %}
+-            {% set before = b.before %}
+-            {% set after = b.after %}
+-            {% set learn = learn_links.get(b.title) %}
+-
+             {% set badge_class = "zero" %}
+-
+-            {% if delta > 0 %}
+-              {% set badge_class = "pos" %}
+-            {% elif delta < 0 %}
+-              {% set badge_class = "neg" %}
+-            {% endif %}
+-
+-            {% set clamped = after %}
+-
+-            {% if clamped < 0 %}
+-              {% set clamped = 0 %}
+-            {% elif clamped > 100 %}
+-              {% set clamped = 100 %}
+-            {% endif %}
+-
++            {% if b.delta > 0 %}{% set badge_class = "pos" %}{% elif b.delta < 0 %}{% set badge_class = "neg" %}{% endif %}
++            {% set clamped = b.after %}{% if clamped < 0 %}{% set clamped = 0 %}{% elif clamped > 100 %}{% set clamped = 100 %}{% endif %}
++            {% set learn = learn_links.get(b.title) %}
+             <div class="breakItem">
+-
+               <div class="breakTop">
+                 <div>
+-                  <div class="breakTitle">
+-                    {{ b.title }}
+-                  </div>
+-
+-                  {% if b.details %}
+-                    <div class="breakDetailsText">
+-                      {{ b.details }}
+-                    </div>
+-                  {% endif %}
+-
+-                  {% if learn %}
+-                    <a
+-                      class="learnInlineLink"
+-                      href="{{ learn.url }}"
+-                    >
+-                      {{ learn.text }} →
+-                    </a>
+-                  {% endif %}
+-                </div>
+-
+-                <div class="breakRight">
+-                  <div class="deltaBadge {{ badge_class }}">
+-                    {% if delta > 0 %}+{% endif %}{{ delta }}
+-                  </div>
+-
+-                  <div class="arrowNums">
+-                    {{ before }} → {{ after }}
+-                  </div>
++                  <div class="breakTitle">{{ b.title }}</div>
++                  {% if b.details %}<div class="breakDetailsText">{{ b.details }}</div>{% endif %}
++                  {% if learn %}<a class="learnInlineLink" href="{{ learn.url }}">{{ learn.text }} →</a>{% endif %}
+                 </div>
++                <div class="breakRight"><div class="deltaBadge {{ badge_class }}">{% if b.delta > 0 %}+{% endif %}{{ b.delta }}</div><div class="arrowNums">{{ b.before }} → {{ b.after }}</div></div>
+               </div>
+-
+-              <div class="miniBar">
+-                <div
+-                  class="miniBarFill"
+-                  style="width: {{ clamped }}%;"
+-                ></div>
+-              </div>
+-
++              <div class="miniBar"><div class="miniBarFill" style="width: {{ clamped }}%;"></div></div>
+             </div>
+           {% endfor %}
+         </div>
+-
+       </details>
+-    </div>
++    </section>
+   {% endif %}
+ 
+   <div class="actions">
+-    <a class="btn" href="/evaluate">
+-      Evaluate another
+-    </a>
+-
+-    <a class="btn secondary" href="/signup">
+-      Sign up to save history
+-    </a>
++    <a class="button primary" href="/signup">Create account and save listings</a>
++    <a class="button" href="/evaluate">Evaluate another</a>
+   </div>
+-
+ </section>
+-
+ {% endblock %}
+diff --git a/templates/history.html b/templates/history.html
+index 086af8f..e4f941b 100644
+--- a/templates/history.html
++++ b/templates/history.html
+@@ -1,55 +1,48 @@
+ {% extends "base.html" %}
++{% block title %}Evaluations · ScoreRent{% endblock %}
+ {% block content %}
+-
+-<section class="stack" style="padding-top: 26px;">
+-  <div class="stack" style="gap:10px;">
+-    <h2>Saved evaluations</h2>
+-    <p>
+-      Review past listings you've evaluated.
+-    </p>
+-  </div>
+-
+-  <div class="actions">
+-    <a class="btn" href="/evaluate">New evaluation</a>
+-    <a class="btn secondary" href="/profile">Update profile</a>
+-  </div>
++<section class="stack">
++  <header class="pageHeader">
++    <div>
++      <p class="eyebrow">Decision history</p>
++      <h1>Evaluations</h1>
++      <p>Return to earlier scores, reasons and recommended next steps.</p>
++    </div>
++    <div class="pageHeaderActions">
++      <a class="button" href="/profile">Renter profile</a>
++      <a class="button primary" href="/evaluate">New evaluation</a>
++    </div>
++  </header>
+ 
+   {% if evaluations and evaluations|length > 0 %}
+-    <div class="stack" style="margin-top: 18px;">
++    <div class="historyList">
+       {% for e in evaluations %}
+-        <a href="/results/{{ e['id'] }}" class="card stack" style="text-decoration:none;">
+-          <div class="grid-2" style="align-items:center;">
+-            <div class="stack" style="gap:4px;">
+-              <h3 style="margin:0;">{{ e["listing_name"] or "Listing" }}</h3>
+-              <p style="margin:0; opacity:.85;">
+-                {{ e["created_at"] }}
+-              </p>
+-            </div>
+-
+-            <div class="stack" style="gap:8px; justify-self:end; text-align:right;">
+-              <div class="badge">Score: {{ e["score"] }}/100</div>
+-
+-              {% if e["confidence"] == "HIGH" %}
+-                <div class="badge good">{{ e["verdict"] }} • {{ e["confidence"] }}</div>
+-              {% elif e["confidence"] == "MEDIUM" %}
+-                <div class="badge warn">{{ e["verdict"] }} • {{ e["confidence"] }}</div>
+-              {% else %}
+-                <div class="badge bad">{{ e["verdict"] }} • {{ e["confidence"] }}</div>
+-              {% endif %}
+-            </div>
++        <a href="/results/{{ e['id'] }}" class="historyItem">
++          <div>
++            <p class="eyebrow">{{ e['created_at']|string|replace('T',' ') }}</p>
++            <h2 class="listingCardTitle">{{ e["listing_name"] or "Unnamed listing" }}</h2>
++          </div>
++          <div class="historyMeta">
++            <span class="badge">Score {{ e["score"] }}/100</span>
++            {% if e["confidence"] == "HIGH" %}
++              <span class="badge good">{{ e["verdict"]|replace('_',' ')|title }} · High confidence</span>
++            {% elif e["confidence"] == "MEDIUM" %}
++              <span class="badge warn">{{ e["verdict"]|replace('_',' ')|title }} · Medium confidence</span>
++            {% else %}
++              <span class="badge bad">{{ e["verdict"]|replace('_',' ')|title }} · Low confidence</span>
++            {% endif %}
+           </div>
+         </a>
+       {% endfor %}
+     </div>
+   {% else %}
+-    <div class="card stack" style="margin-top: 18px;">
+-      <h3>No saved evaluations yet</h3>
+-      <p>Run your first evaluation to start building history.</p>
+-      <div class="actions">
+-        <a class="btn" href="/evaluate">Start evaluation</a>
+-      </div>
+-    </div>
++    <article class="card emptyState stack">
++      <span class="emptyStateIcon" aria-hidden="true">
++        <svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9M4.5 5v4h4M12 8v4l3 2"/></svg>
++      </span>
++      <div><h2>No evaluations yet</h2><p>Run your first evaluation to start building a decision history.</p></div>
++      <a class="button primary" href="/evaluate">Evaluate a listing</a>
++    </article>
+   {% endif %}
+ </section>
+-
+ {% endblock %}
+diff --git a/templates/import_listing.html b/templates/import_listing.html
+index 8f9452b..d3ecbf3 100644
+--- a/templates/import_listing.html
++++ b/templates/import_listing.html
+@@ -1,33 +1,55 @@
+ {% extends "base.html" %}
+-{% block title %}Import listing screenshots · ScoreRent{% endblock %}
++{% block title %}Import a listing · ScoreRent{% endblock %}
+ {% block content %}
+-<section class="stack" style="padding-top:26px; max-width:760px;">
+-  <div class="stack" style="gap:10px;">
+-    <p class="eyebrow">AI-assisted import</p>
+-    <h2>Import listing screenshots</h2>
+-    <p>Upload up to four screenshots. ScoreRent will read the listing text, then ask you to confirm every field before evaluating it.</p>
++<section class="stack flowPage">
++  <header class="pageHeader">
++    <div>
++      <p class="eyebrow">Listing import</p>
++      <h1>Turn screenshots into a listing you can compare.</h1>
++      <p>Upload the advert, verify what was read and save the result to your shortlist.</p>
++    </div>
++  </header>
++
++  <div class="progressSteps" aria-label="Import progress">
++    <div class="progressStep active"><span>1</span>Upload screenshots</div>
++    <div class="progressStep"><span>2</span>Review details</div>
++    <div class="progressStep"><span>3</span>Save or evaluate</div>
+   </div>
+ 
+   {% if error %}
+-    <div class="card" role="alert"><strong>Could not read the screenshots.</strong><p>{{ error }}</p></div>
++    <div class="alert error" role="alert"><strong>We could not read those screenshots.</strong><br>{{ error }}</div>
+   {% endif %}
+ 
+   <form method="post" enctype="multipart/form-data" class="card stack">
+-    <label for="images"><strong>Listing screenshots</strong></label>
+-    <input id="images" name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple required>
+-    <p class="muted small">JPEG, PNG or WebP. Maximum four images and 5 MB each.</p>
+-    <button type="submit" class="button primary">Read screenshots</button>
+-  </form>
++    <div class="uploadDropzone">
++      <span class="uploadIcon" aria-hidden="true">
++        <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V14"/></svg>
++      </span>
++      <h2>Upload listing screenshots</h2>
++      <p>Use clear screenshots that show the price, address, costs, amenities and requirements.</p>
++      <input id="images" name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple required>
++      <p class="muted small">JPEG, PNG or WebP · up to four images · 5 MB each</p>
++    </div>
+ 
+-  <div class="card stack">
+-    <h3>Before you upload</h3>
+-    <p class="muted">Your screenshots are securely sent to an external AI service for extraction. Avoid uploading images containing names, phone numbers, email addresses or private conversations.</p>
+-    <p class="muted"><strong>Crop out names, phone numbers, email addresses, private chats and any other personal information first.</strong></p>
+-  </div>
++    <div class="privacyNote">
++      <span aria-hidden="true">ⓘ</span>
++      <div><strong>Protect personal information.</strong> Screenshots are processed by an external image-reading service. Crop out names, phone numbers, email addresses and private conversations before uploading.</div>
++    </div>
+ 
+-  <div class="card stack">
+-    <h3>What happens next</h3>
+-    <p class="muted">The import tool extracts visible listing details only. It does not calculate your score. You review the rent, deposit, fees and documents before ScoreRent’s existing rules run.</p>
+-  </div>
++    <button type="submit" class="button primary wide">Read screenshots</button>
++  </form>
++
++  <section class="grid-2">
++    <article class="card stack softCard">
++      <p class="eyebrow">What gets extracted</p>
++      <h3>Listing facts only</h3>
++      <p class="muted small">Rent, deposit, fees, address, documents, amenities and clearly stated pros or limitations.</p>
++    </article>
++    <article class="card stack softCard">
++      <p class="eyebrow">You stay in control</p>
++      <h3>Nothing is final yet</h3>
++      <p class="muted small">Every field remains editable. ScoreRent’s existing rules—not the image reader—calculate the application score.</p>
++    </article>
++  </section>
+ </section>
+ {% endblock %}
+diff --git a/templates/index.html b/templates/index.html
+index 82f874d..a4a807d 100644
+--- a/templates/index.html
++++ b/templates/index.html
+@@ -1,55 +1,69 @@
+ {% extends "base.html" %}
++{% block title %}ScoreRent · Make a smarter rental decision{% endblock %}
+ {% block content %}
+-
+-<section class="stack" style="padding-top: 30px;">
+-  <div class="stack" style="gap:10px;">
+-    <h1>Decide if a rental listing is worth applying for.</h1>
++<section class="heroSection">
++  <div class="heroCopy">
++    <p class="eyebrow">Rental decision support</p>
++    <h1>Choose the rental that works on paper and in real life.</h1>
+     <p>
+-      ScoreRent helps renters avoid wasting money on application fees by checking affordability,
+-      document fit, and demand pressure before applying.
++      Import listing screenshots, check affordability and documents, compare upfront costs,
++      amenities and travel time, then keep your shortlist in one calm workspace.
+     </p>
+-  </div>
+-
+-  <div class="actions">
+-    <a class="btn" href="/evaluate">Start evaluation</a>
+-    {% if user %}
+-      <a class="btn secondary" href="/history">View saved evaluations</a>
+-    {% else %}
+-      <a class="btn secondary" href="/login">Log in to save evaluations</a>
+-    {% endif %}
+-  </div>
+ 
+-  <div class="grid-2" style="margin-top: 12px;">
+-    <div class="card stack">
+-      <div class="badge good">Fast and simple</div>
+-      <h3>Get a clear recommendation</h3>
+-      <p>
+-        ScoreRent outputs one of three recommendations: Apply, Borderline, or Not worth it.
+-        You also get the reasons behind the result.
+-      </p>
++    <div class="heroActions">
++      {% if user %}
++        <a class="button primary" href="/import-listing">Import a listing</a>
++        <a class="button" href="/listings">Open my shortlist</a>
++      {% else %}
++        <a class="button primary" href="/signup">Start your shortlist</a>
++        <a class="button" href="/evaluate">Try an evaluation</a>
++      {% endif %}
+     </div>
+ 
+-    <div class="card stack">
+-      <div class="badge warn">Practical guidance</div>
+-      <h3>Know what to fix first</h3>
+-      <p>
+-        See missing documents, affordability risks, and next steps such as adding a guarantor
+-        or targeting a lower rent range.
+-      </p>
++    <div class="trustLine">
++      <span>Rules-based scoring</span>
++      <span>Editable imported details</span>
++      <span>Side-by-side comparisons</span>
+     </div>
+   </div>
+ 
+-  <div class="card stack" style="margin-top: 14px;">
+-    <h3>How it works</h3>
+-    <ol style="margin:0; padding-left: 18px; color: var(--muted); font-weight: 600;">
+-      <li>Create a renter profile (or use guest mode)</li>
+-      <li>Enter the listing details and required documents</li>
+-      <li>Get a confidence score with reasons and recommended actions</li>
+-    </ol>
+-    <p class="muted small" style="margin-top: 10px;">
+-      Note: The confidence score is not the probability of acceptance.
+-    </p>
++  <div class="productPreview" aria-label="ScoreRent comparison preview">
++    <div class="previewBrowser">
++      <div class="previewTop">
++        <span class="previewDot"></span><span class="previewDot"></span><span class="previewDot"></span>
++      </div>
++      <div class="previewBody">
++        <p class="eyebrow">Shortlist preview</p>
++        <div class="previewListing">
++          <small>Observatory, Cape Town</small>
++          <h3>Furnished studio near transport</h3>
++          <div class="previewPrice">R7,200 <small>/ month</small></div>
++        </div>
++        <div class="previewMetrics">
++          <div class="previewMetric"><small>Upfront</small><strong>R14,400</strong></div>
++          <div class="previewMetric"><small>Application fit</small><strong>Strong</strong></div>
++          <div class="previewMetric"><small>Commute</small><strong>18 min</strong></div>
++        </div>
++      </div>
++    </div>
+   </div>
+ </section>
+ 
++<section class="featureStrip" aria-label="ScoreRent features">
++  <article class="featureCard">
++    <span class="featureIcon">01</span>
++    <h3>Import and verify</h3>
++    <p>Read visible listing details from screenshots, then correct every field before saving.</p>
++  </article>
++  <article class="featureCard">
++    <span class="featureIcon">02</span>
++    <h3>Understand the trade-offs</h3>
++    <p>See affordability, document fit, upfront costs, amenities, pros and potential downsides.</p>
++  </article>
++  <article class="featureCard">
++    <span class="featureIcon">03</span>
++    <h3>Compare what matters</h3>
++    <p>Put two to four listings side by side and calculate travel time when exact locations are available.</p>
++  </article>
++</section>
+ {% endblock %}
+diff --git a/templates/learn.html b/templates/learn.html
+index 3deed01..2accc42 100644
+--- a/templates/learn.html
++++ b/templates/learn.html
+@@ -1,40 +1,30 @@
+ {% extends "base.html" %}
+-
+-{% block title %}Learn | ScoreRent{% endblock %}
+-
++{% block title %}Rental guides · ScoreRent{% endblock %}
+ {% block content %}
+-<section class="learnHero">
+-  <span class="badge bad">Learn</span>
+-  <h1>Rental application guide</h1>
+-  <p>
+-    Practical guides to help you understand rental applications,
+-    improve your ScoreRent result, and avoid wasting money on weak applications.
+-  </p>
+-</section>
+-
+-<section class="learnGrid">
+-  <a class="learnCard" href="/learn/rent-affordability">
+-    <div class="learnIcon">💰</div>
+-    <h3>How much rent you can realistically afford</h3>
+-    <p>Understand rent-to-income bands, deposits, and budgeting before you apply.</p>
+-  </a>
+-
+-  <a class="learnCard" href="/learn/documents-landlords-ask-for">
+-    <div class="learnIcon">📄</div>
+-    <h3>What documents landlords usually ask for</h3>
+-    <p>Worker, student, new professional, and guarantor document checklists.</p>
+-  </a>
+-
+-  <a class="learnCard" href="/learn/improve-application">
+-    <div class="learnIcon">✅</div>
+-    <h3>How to improve a weak rental application</h3>
+-    <p>What to fix first when your result is borderline or high risk.</p>
+-  </a>
++<section class="stack">
++  <header class="learnHero">
++    <p class="eyebrow">Rental knowledge</p>
++    <h1>Make sense of the application process.</h1>
++    <p>Practical guides for affordability, documents, stronger applications and common rental red flags.</p>
++  </header>
+ 
+-  <a class="learnCard" href="/learn/rental-red-flags">
+-    <div class="learnIcon">🛡</div>
+-    <h3>Rental red flags before paying an application fee</h3>
+-    <p>Warning signs to check before sending money or personal documents.</p>
+-  </a>
++  <div class="learnGrid">
++    <a class="learnCard" href="/learn/rent-affordability">
++      <span class="learnIcon">R</span>
++      <span><h3>How much rent can you realistically afford?</h3><p>Understand rent-to-income bands, deposits and budgeting before applying.</p></span>
++    </a>
++    <a class="learnCard" href="/learn/documents-landlords-ask-for">
++      <span class="learnIcon">D</span>
++      <span><h3>What documents do landlords usually ask for?</h3><p>Worker, student, new-professional and guarantor document checklists.</p></span>
++    </a>
++    <a class="learnCard" href="/learn/improve-application">
++      <span class="learnIcon">↑</span>
++      <span><h3>How can you improve a weak application?</h3><p>What to fix first when a result is borderline or high risk.</p></span>
++    </a>
++    <a class="learnCard" href="/learn/rental-red-flags">
++      <span class="learnIcon">!</span>
++      <span><h3>What should you check before paying a fee?</h3><p>Warning signs to review before sending money or personal documents.</p></span>
++    </a>
++  </div>
+ </section>
+ {% endblock %}
+diff --git a/templates/listing_detail.html b/templates/listing_detail.html
+index f56b030..9a71830 100644
+--- a/templates/listing_detail.html
++++ b/templates/listing_detail.html
+@@ -1,74 +1,116 @@
+ {% extends "base.html" %}
+ {% block title %}{{ listing.title }} · ScoreRent{% endblock %}
+ {% block content %}
+-<section class="stack" style="padding-top:26px;">
+-  <div class="pageHeader">
+-    <div>
+-      <p class="eyebrow">Saved listing</p>
+-      <h2>{{ listing.title }}</h2>
+-      <p class="muted">{{ listing.location or 'Location not added' }}</p>
+-      {% if listing.location_is_exact %}
+-        <span class="statusBadge ready">Exact location available for travel comparison</span>
+-      {% else %}
+-        <span class="statusBadge mutedStatus">Travel comparison needs an exact location</span>
+-      {% endif %}
++<section class="stack">
++  <header class="listingHero">
++    <div class="listingHeroTop">
++      <div>
++        <p class="eyebrow">Saved listing</p>
++        <h1>{{ listing.title }}</h1>
++        <p>{{ listing.location or 'Location not added' }}</p>
++        {% if listing.location_is_exact %}
++          <span class="statusBadge ready">Exact location confirmed</span>
++        {% else %}
++          <span class="statusBadge mutedStatus">Exact location needed for travel comparison</span>
++        {% endif %}
++      </div>
++      <div class="listingHeroPrice">
++        <strong>R{{ '{:,}'.format(listing.monthly_rent) }}</strong>
++        <small>per month</small>
++      </div>
+     </div>
+-    <div class="actions">
+-      <a class="button primary" href="/compare?listing_ids={{ listing.id }}">Compare listing</a>
+-      <a class="button" href="/listings">Back to listings</a>
++
++    <div class="listingHeroBottom">
++      <div class="tagList">
++        {% for item in listing.amenities[:4] %}<span class="statusBadge">{{ item }}</span>{% endfor %}
++      </div>
++      <div class="actions">
++        <a class="button primary" href="/compare?listing_ids={{ listing.id }}">Add to comparison</a>
++        <a class="button" href="/listings">Back to shortlist</a>
++      </div>
+     </div>
+-  </div>
++  </header>
+ 
+-  <div class="grid-2">
+-    <article class="card stack">
+-      <h3>Costs</h3>
+-      <div class="detailRow"><span>Monthly rent</span><strong>R{{ '{:,}'.format(listing.monthly_rent) }}</strong></div>
+-      <div class="detailRow"><span>Deposit</span><strong>R{{ '{:,}'.format(listing.deposit) }}</strong></div>
+-      <div class="detailRow"><span>Application fee</span><strong>R{{ '{:,}'.format(listing.application_fee) }}</strong></div>
+-      <div class="detailRow"><span>Initial cost</span><strong>R{{ '{:,}'.format(listing.upfront_cost) }}</strong></div>
+-      <p class="muted small">Initial cost = first month’s rent + deposit + application fee.</p>
+-    </article>
++  <div class="detailLayout">
++    <div class="detailMain">
++      <section class="card stack">
++        <div class="sectionHeader">
++          <div><p class="eyebrow">At a glance</p><h2 class="sectionTitle">Costs</h2></div>
++          <span class="statusBadge">{{ listing.area_demand|title }} demand</span>
++        </div>
++        <div class="grid-2">
++          <div>
++            <div class="detailRow"><span>Monthly rent</span><strong>R{{ '{:,}'.format(listing.monthly_rent) }}</strong></div>
++            <div class="detailRow"><span>Deposit</span><strong>R{{ '{:,}'.format(listing.deposit) }}</strong></div>
++            <div class="detailRow"><span>Application fee</span><strong>R{{ '{:,}'.format(listing.application_fee) }}</strong></div>
++          </div>
++          <div class="costHighlight">
++            <span class="label">Estimated upfront cost</span>
++            <strong>R{{ '{:,}'.format(listing.upfront_cost) }}</strong>
++            <p class="small">First month’s rent + deposit + application fee.</p>
++          </div>
++        </div>
++      </section>
+ 
+-    <article class="card stack">
+-      <h3>Amenities</h3>
+-      {% if listing.amenities %}
+-        <div class="tagList">{% for item in listing.amenities %}<span class="tag">{{ item }}</span>{% endfor %}</div>
+-      {% else %}<p class="muted">No amenities recorded.</p>{% endif %}
+-    </article>
+-  </div>
++      <section class="card stack">
++        <div><p class="eyebrow">What is included</p><h2 class="sectionTitle">Amenities</h2></div>
++        {% if listing.amenities %}
++          <div class="tagList">{% for item in listing.amenities %}<span class="tag">{{ item }}</span>{% endfor %}</div>
++        {% else %}
++          <p class="muted">No amenities were recorded from the listing.</p>
++        {% endif %}
++      </section>
+ 
+-  <div class="grid-2">
+-    <article class="card stack">
+-      <h3>Pros</h3>
+-      {% if listing.pros %}<ul>{% for item in listing.pros %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p class="muted">No pros recorded.</p>{% endif %}
+-    </article>
+-    <article class="card stack">
+-      <h3>Potential downsides</h3>
+-      {% if listing.cons %}<ul>{% for item in listing.cons %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p class="muted">No downsides recorded.</p>{% endif %}
+-    </article>
+-  </div>
++      <div class="proConGrid">
++        <section class="card stack">
++          <div><p class="eyebrow">Supported by the listing</p><h2 class="sectionTitle">Pros</h2></div>
++          {% if listing.pros %}
++            <ul class="insightList positive">{% for item in listing.pros %}<li>{{ item }}</li>{% endfor %}</ul>
++          {% else %}<p class="muted">No factual pros recorded.</p>{% endif %}
++        </section>
++        <section class="card stack">
++          <div><p class="eyebrow">Worth checking</p><h2 class="sectionTitle">Potential downsides</h2></div>
++          {% if listing.cons %}
++            <ul class="insightList caution">{% for item in listing.cons %}<li>{{ item }}</li>{% endfor %}</ul>
++          {% else %}<p class="muted">No potential downsides recorded.</p>{% endif %}
++        </section>
++      </div>
+ 
+-  <article class="card stack">
+-    <div>
+-      <h3>Listing location</h3>
+-      <p class="muted small">Confirm this only when the listing shows a full address or a uniquely identifiable building. A suburb alone is not exact.</p>
++      <section class="card stack">
++        <div><p class="eyebrow">Your context</p><h2 class="sectionTitle">Notes and source</h2></div>
++        <p>{{ listing.notes or 'No personal notes added.' }}</p>
++        {% if listing.source_url %}<a class="button" href="{{ listing.source_url }}" target="_blank" rel="noopener noreferrer">Open original listing</a>{% endif %}
++      </section>
+     </div>
+-    {% if location_saved %}<div class="alert success">Location updated.</div>{% endif %}
+-    <form method="post" action="/listings/{{ listing.id }}/location" class="stack">
+-      <label for="location">Address or building</label>
+-      <input id="location" name="location" value="{{ listing.location or '' }}" placeholder="Example: 12 Main Road, Observatory, Cape Town">
+-      <label class="checkbox exactLocationCheck">
+-        <input type="checkbox" name="location_is_exact" value="yes" {% if listing.location_is_exact %}checked{% endif %}>
+-        <span>This is an exact address or uniquely identifiable building</span>
+-      </label>
+-      <button class="button" type="submit">Save location</button>
+-    </form>
+-  </article>
+ 
+-  <article class="card stack">
+-    <h3>Notes and source</h3>
+-    <p>{{ listing.notes or 'No personal notes added.' }}</p>
+-    {% if listing.source_url %}<a href="{{ listing.source_url }}" target="_blank" rel="noopener noreferrer">Open original listing</a>{% endif %}
+-  </article>
++    <aside class="detailAside">
++      <section class="card stack">
++        <div>
++          <p class="eyebrow">Travel comparison</p>
++          <h2 class="sectionTitle">Listing location</h2>
++          <p class="muted small">Only confirm this when the listing gives a full address or a uniquely identifiable building. A suburb alone is not exact.</p>
++        </div>
++        {% if location_saved %}<div class="alert success">Location updated.</div>{% endif %}
++        <form method="post" action="/listings/{{ listing.id }}/location" class="stack">
++          <div class="stack" style="gap:8px;">
++            <label for="location">Address or building</label>
++            <input id="location" name="location" value="{{ listing.location or '' }}" placeholder="12 Main Road, Observatory">
++          </div>
++          <label class="checkbox exactLocationCheck">
++            <input type="checkbox" name="location_is_exact" value="yes" {% if listing.location_is_exact %}checked{% endif %}>
++            <span>This is an exact address or uniquely identifiable building</span>
++          </label>
++          <button class="button primary wide" type="submit">Save location</button>
++        </form>
++      </section>
++
++      <section class="card stack softCard">
++        <p class="eyebrow">Required documents</p>
++        {% if listing.required_documents %}
++          <div class="tagList">{% for item in listing.required_documents %}<span class="tag">{{ item.replace('_',' ')|title }}</span>{% endfor %}</div>
++        {% else %}<p class="muted small">No required documents recorded.</p>{% endif %}
++      </section>
++    </aside>
++  </div>
+ </section>
+ {% endblock %}
+diff --git a/templates/listings.html b/templates/listings.html
+index 80586e4..4dd3c19 100644
+--- a/templates/listings.html
++++ b/templates/listings.html
+@@ -1,66 +1,116 @@
+ {% extends "base.html" %}
+-{% block title %}Saved listings · ScoreRent{% endblock %}
++{% block title %}My listings · ScoreRent{% endblock %}
+ {% block content %}
+-<section class="stack" style="padding-top:26px;">
+-  <div class="pageHeader">
++<section class="stack">
++  <header class="pageHeader">
+     <div>
+       <p class="eyebrow">Rental shortlist</p>
+-      <h2>Saved listings</h2>
+-      <p class="muted">Keep costs, amenities and practical trade-offs together.</p>
++      <h1>My listings</h1>
++      <p>Keep prices, amenities, exact locations and practical trade-offs together.</p>
+     </div>
+-    <a class="button primary" href="/import-listing">Import listing</a>
+-  </div>
++    <div class="pageHeaderActions">
++      {% if listings|length >= 2 %}<a class="button" href="/compare">Compare listings</a>{% endif %}
++      <a class="button primary" href="/import-listing">Import listing</a>
++    </div>
++  </header>
+ 
+   {% if not listings %}
+-    <div class="card stack">
+-      <h3>No saved listings yet</h3>
+-      <p class="muted">Import a screenshot and choose “Save listing” after reviewing the details.</p>
++    <article class="card emptyState stack">
++      <span class="emptyStateIcon" aria-hidden="true">
++        <svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19.5z"/></svg>
++      </span>
++      <div>
++        <h2>Your shortlist is empty</h2>
++        <p>Import a listing screenshot, verify the extracted details and save it here.</p>
++      </div>
+       <a class="button primary" href="/import-listing">Import your first listing</a>
+-    </div>
++    </article>
+   {% else %}
+-    <form method="get" action="/compare" class="stack">
++    <form method="get" action="/compare" class="stack" id="listingComparisonForm">
+       <div class="comparisonToolbar card">
+         <div>
+-          <strong>Select 2–4 listings</strong>
+-          <p class="muted small">You will enter the workplace, campus or other destination on the next page.</p>
++          <strong>Build a comparison</strong>
++          <p class="muted small"><span id="selectedListingCount">0</span> selected · choose 2–4 listings</p>
+         </div>
+         <button class="button primary" type="submit">Compare selected</button>
+       </div>
+ 
+-      <div class="grid-2">
++      <div class="listingGrid">
+         {% for listing in listings %}
+-          <article class="card stack selectableListing">
++          <article class="card listingCard selectableListing">
+             <label class="listingSelector">
+               <input type="checkbox" name="listing_ids" value="{{ listing.id }}">
+-              <span>Select for comparison</span>
++              <span>Select</span>
+             </label>
+ 
+-            <div>
+-              <p class="eyebrow">{{ listing.location or 'Location not added' }}</p>
+-              <h3>{{ listing.title }}</h3>
+-              {% if listing.location_is_exact %}
+-                <span class="statusBadge ready">Exact location available</span>
+-              {% else %}
+-                <span class="statusBadge mutedStatus">Travel distance unavailable</span>
+-              {% endif %}
++            <div class="listingMedia">
++              <div class="listingMediaTop">
++                <span class="propertyGlyph" aria-hidden="true">
++                  <svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-5v6h-5A1.5 1.5 0 0 1 3 19.5z"/></svg>
++                </span>
++                {% if listing.location_is_exact %}
++                  <span class="statusBadge ready">Travel-ready</span>
++                {% endif %}
++              </div>
++              <div>
++                <div class="listingMediaLocation">{{ listing.location or 'Location not added' }}</div>
++                <div class="listingMediaPrice">R{{ '{:,}'.format(listing.monthly_rent) }} <small>/ month</small></div>
++              </div>
+             </div>
+ 
+-            <div class="metricGrid">
+-              <div><span class="muted small">Rent</span><strong>R{{ '{:,}'.format(listing.monthly_rent) }}</strong></div>
+-              <div><span class="muted small">Upfront</span><strong>R{{ '{:,}'.format(listing.upfront_cost) }}</strong></div>
+-            </div>
++            <div class="listingCardBody">
++              <div>
++                <h2 class="listingCardTitle">{{ listing.title }}</h2>
++                {% if not listing.location_is_exact %}
++                  <span class="statusBadge mutedStatus">Exact location needed for travel</span>
++                {% endif %}
++              </div>
+ 
+-            {% if listing.amenities %}
+-              <div class="tagList">
+-                {% for amenity in listing.amenities[:5] %}<span class="tag">{{ amenity }}</span>{% endfor %}
++              <div class="listingCardMeta">
++                <div><span class="label">Upfront cost</span><strong>R{{ '{:,}'.format(listing.upfront_cost) }}</strong></div>
++                <div><span class="label">Demand</span><strong>{{ listing.area_demand|title }}</strong></div>
+               </div>
+-            {% endif %}
+ 
+-            <a class="button" href="/listings/{{ listing.id }}">View details</a>
++              {% if listing.amenities %}
++                <div class="tagList">
++                  {% for amenity in listing.amenities[:4] %}<span class="tag">{{ amenity }}</span>{% endfor %}
++                  {% if listing.amenities|length > 4 %}<span class="tag">+{{ listing.amenities|length - 4 }}</span>{% endif %}
++                </div>
++              {% else %}
++                <p class="muted small">No amenities recorded yet.</p>
++              {% endif %}
++
++              <div class="listingCardActions">
++                <a class="button wide" href="/listings/{{ listing.id }}">View listing</a>
++              </div>
++            </div>
+           </article>
+         {% endfor %}
+       </div>
+     </form>
+   {% endif %}
+ </section>
++
++<script>
++  (() => {
++    const form = document.getElementById('listingComparisonForm');
++    if (!form) return;
++    const boxes = [...form.querySelectorAll('input[name="listing_ids"]')];
++    const count = document.getElementById('selectedListingCount');
++    const update = () => {
++      const selected = boxes.filter((box) => box.checked);
++      count.textContent = selected.length;
++      boxes.forEach((box) => box.closest('.selectableListing')?.classList.toggle('selected', box.checked));
++    };
++    boxes.forEach((box) => box.addEventListener('change', update));
++    form.addEventListener('submit', (event) => {
++      const selected = boxes.filter((box) => box.checked).length;
++      if (selected < 2 || selected > 4) {
++        event.preventDefault();
++        window.alert('Choose between two and four listings to compare.');
++      }
++    });
++    update();
++  })();
++</script>
+ {% endblock %}
+diff --git a/templates/login.html b/templates/login.html
+index 6d9d455..7bd463e 100644
+--- a/templates/login.html
++++ b/templates/login.html
+@@ -1,18 +1,25 @@
+ {% extends "base.html" %}
++{% block title %}Sign in · ScoreRent{% endblock %}
+ {% block content %}
+-<h2>Sign in</h2>
++<section class="authLayout">
++  <div class="authIntro">
++    <p class="eyebrow">Welcome back</p>
++    <h1>Pick up where your shortlist left off.</h1>
++    <p>Review saved listings, compare the trade-offs and return to earlier evaluation results.</p>
++    <div class="trustLine"><span>Private shortlist</span><span>Editable listing details</span><span>Clear decision support</span></div>
++  </div>
+ 
+-{% if error %}
+-  <p class="error">{{ error }}</p>
+-{% endif %}
+-
+-<form method="post" action="/login" class="card">
+-  <label>Email</label>
+-  <input name="email" type="email" required />
+-
+-  <label>Password</label>
+-  <input name="password" type="password" required />
+-
+-  <button class="btn" type="submit">Login</button>
+-</form>
++  <div class="authPanel">
++    <p class="eyebrow">Account access</p>
++    <h2>Sign in</h2>
++    <p class="muted">Use the email and password linked to your ScoreRent account.</p>
++    {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
++    <form method="post" action="/login" class="stack">
++      <div class="stack" style="gap:8px;"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required></div>
++      <div class="stack" style="gap:8px;"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required></div>
++      <button class="button primary" type="submit">Sign in</button>
++    </form>
++    <p class="authSwitch">New to ScoreRent? <a href="/signup">Create an account</a></p>
++  </div>
++</section>
+ {% endblock %}
+diff --git a/templates/nav.html b/templates/nav.html
+index f68ff1c..b054c26 100644
+--- a/templates/nav.html
++++ b/templates/nav.html
+@@ -1,26 +1,100 @@
+ {% set path = request.url.path %}
+ {% set logged_in = user is defined and user %}
+ 
+-<nav class="topNav">
+-  <div class="navLeft">
+-    <a class="brand" href="/">ScoreRent</a>
+-  </div>
++{% macro icon(name) -%}
++  {% if name == 'home' %}
++    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-5v-6h-5v6h-5A1.5 1.5 0 0 1 3 19.5z"/></svg>
++  {% elif name == 'listings' %}
++    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5zM8 8h8M8 12h8M8 16h5"/></svg>
++  {% elif name == 'compare' %}
++    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4 4 8l4 4M4 8h13M16 20l4-4-4-4m4 4H7"/></svg>
++  {% elif name == 'import' %}
++    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V14"/></svg>
++  {% elif name == 'evaluate' %}
++    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h5m-5 4h3"/></svg>
++  {% elif name == 'history' %}
++    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9M4.5 5v4h4M12 8v4l3 2"/></svg>
++  {% elif name == 'profile' %}
++    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 8a7 7 0 0 0-14 0"/></svg>
++  {% elif name == 'learn' %}
++    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 7 9-4 9 4-9 4zM6 9.5V15c0 1.7 2.7 3 6 3s6-1.3 6-3V9.5M21 7v7"/></svg>
++  {% elif name == 'logout' %}
++    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5m4-4 4-3-4-3m4 3H9"/></svg>
++  {% endif %}
++{%- endmacro %}
+ 
+-  <div class="navLinks">
+-    {% if logged_in %}
+-      <a class="navLink navCta {% if path == '/evaluate' %}active{% endif %}" href="/evaluate">Evaluate</a>
+-      <a class="navLink {% if path == '/import-listing' %}active{% endif %}" href="/import-listing">Import</a>
+-      <a class="navLink {% if path == '/profile' %}active{% endif %}" href="/profile">Profile</a>
+-      <a class="navLink {% if path.startswith('/listings') %}active{% endif %}" href="/listings">Listings</a>
+-      <a class="navLink {% if path == '/compare' %}active{% endif %}" href="/compare">Compare</a>
+-      <a class="navLink {% if path == '/history' %}active{% endif %}" href="/history">History</a>
+-      <a class="navLink {% if path.startswith('/learn') %}active{% endif %}" href="/learn">Learn</a>
+-      <a class="navLink dangerLink" href="/logout">Logout</a>
+-    {% else %}
+-      <a class="navLink navCta {% if path == '/evaluate' %}active{% endif %}" href="/evaluate">Evaluate</a>
+-      <a class="navLink {% if path.startswith('/learn') %}active{% endif %}" href="/learn">Learn</a>
+-      <a class="navLink {% if path == '/login' %}active{% endif %}" href="/login">Login</a>
+-      <a class="navLink {% if path == '/signup' %}active{% endif %}" href="/signup">Sign up</a>
+-    {% endif %}
+-  </div>
+-</nav>
++{% if logged_in %}
++  <aside class="appSidebar" aria-label="Primary navigation">
++    <a class="sidebarBrand" href="/dashboard" aria-label="ScoreRent dashboard">
++      <span class="brandMark">S</span>
++      <span>
++        <strong>ScoreRent</strong>
++        <small>Rental decisions</small>
++      </span>
++    </a>
++
++    <nav class="sidebarNav">
++      <p class="navSectionLabel">Workspace</p>
++      <a class="sidebarLink {% if path == '/dashboard' %}active{% endif %}" href="/dashboard" {% if path == '/dashboard' %}aria-current="page"{% endif %}>
++        {{ icon('home') }}<span>Overview</span>
++      </a>
++      <a class="sidebarLink {% if path.startswith('/listings') %}active{% endif %}" href="/listings" {% if path.startswith('/listings') %}aria-current="page"{% endif %}>
++        {{ icon('listings') }}<span>My listings</span>
++      </a>
++      <a class="sidebarLink {% if path == '/compare' %}active{% endif %}" href="/compare" {% if path == '/compare' %}aria-current="page"{% endif %}>
++        {{ icon('compare') }}<span>Compare</span>
++      </a>
++      <a class="sidebarLink {% if path == '/history' or path.startswith('/results/') %}active{% endif %}" href="/history">
++        {{ icon('history') }}<span>Evaluations</span>
++      </a>
++
++      <p class="navSectionLabel">Tools</p>
++      <a class="sidebarLink sidebarLinkPrimary {% if path == '/import-listing' %}active{% endif %}" href="/import-listing">
++        {{ icon('import') }}<span>Import listing</span>
++      </a>
++      <a class="sidebarLink {% if path == '/evaluate' %}active{% endif %}" href="/evaluate">
++        {{ icon('evaluate') }}<span>Evaluate manually</span>
++      </a>
++      <a class="sidebarLink {% if path.startswith('/learn') %}active{% endif %}" href="/learn">
++        {{ icon('learn') }}<span>Learn</span>
++      </a>
++    </nav>
++
++    <div class="sidebarAccount">
++      <a class="accountCard {% if path == '/profile' %}active{% endif %}" href="/profile">
++        <span class="accountAvatar">{{ user.email[0]|upper }}</span>
++        <span class="accountMeta">
++          <strong>Profile</strong>
++          <small>{{ user.email }}</small>
++        </span>
++        <span aria-hidden="true">›</span>
++      </a>
++      <a class="sidebarLogout" href="/logout">{{ icon('logout') }}<span>Sign out</span></a>
++    </div>
++  </aside>
++
++  <header class="mobileTopbar">
++    <a class="mobileBrand" href="/dashboard"><span class="brandMark">S</span><strong>ScoreRent</strong></a>
++    <a class="mobileAvatar" href="/profile" aria-label="Open profile">{{ user.email[0]|upper }}</a>
++  </header>
++
++  <nav class="mobileBottomNav" aria-label="Mobile navigation">
++    <a class="{% if path == '/dashboard' %}active{% endif %}" href="/dashboard">{{ icon('home') }}<span>Home</span></a>
++    <a class="{% if path.startswith('/listings') %}active{% endif %}" href="/listings">{{ icon('listings') }}<span>Listings</span></a>
++    <a class="mobileImportAction {% if path == '/import-listing' %}active{% endif %}" href="/import-listing">{{ icon('import') }}<span>Import</span></a>
++    <a class="{% if path == '/compare' %}active{% endif %}" href="/compare">{{ icon('compare') }}<span>Compare</span></a>
++    <a class="{% if path == '/profile' %}active{% endif %}" href="/profile">{{ icon('profile') }}<span>Profile</span></a>
++  </nav>
++{% else %}
++  <header class="publicNav">
++    <a class="publicBrand" href="/">
++      <span class="brandMark">S</span>
++      <span><strong>ScoreRent</strong><small>Rental decisions</small></span>
++    </a>
++    <nav class="publicLinks" aria-label="Public navigation">
++      <a class="{% if path.startswith('/learn') %}active{% endif %}" href="/learn">Learn</a>
++      <a class="{% if path == '/login' %}active{% endif %}" href="/login">Sign in</a>
++      <a class="button primary compactButton" href="/signup">Create account</a>
++    </nav>
++  </header>
++{% endif %}
+diff --git a/templates/profile.html b/templates/profile.html
+index a5b6b7c..6a946b8 100644
+--- a/templates/profile.html
++++ b/templates/profile.html
+@@ -1,81 +1,67 @@
+ {% extends "base.html" %}
++{% block title %}Renter profile · ScoreRent{% endblock %}
+ {% block content %}
+-
+-<section class="stack" style="padding-top: 26px;">
+-  <div class="stack" style="gap:10px;">
+-    <h2>Your renter profile</h2>
+-    <p>Set your details once, then evaluate listings quickly.</p>
+-  </div>
+-
+-  <form method="post" class="card stack">
+-
+-    <div class="grid-2">
+-      <div class="stack">
+-        <label>Renter type</label>
+-        <select name="renter_type" id="renter_type">
+-          <option value="worker" {% if renter_type=="worker" %}selected{% endif %}>Worker</option>
+-          <option value="new_professional" {% if renter_type=="new_professional" %}selected{% endif %}>New professional</option>
+-          <option value="student" {% if renter_type=="student" %}selected{% endif %}>Student</option>
++<section class="stack flowPage">
++  <header class="pageHeader">
++    <div>
++      <p class="eyebrow">Your application context</p>
++      <h1>Renter profile</h1>
++      <p>Save your income, renter type and available documents once so future evaluations are faster.</p>
++    </div>
++    <a class="button" href="/evaluate">Evaluate listing</a>
++  </header>
++
++  <form method="post" class="stack">
++    <section class="formSection">
++      <div class="formSectionHeader">
++        <span class="formSectionNumber">1</span>
++        <div><h2 class="sectionTitle">Renter details</h2><p class="muted small">These details choose the correct evaluation rules.</p></div>
++      </div>
++      <div class="grid-2">
++        <div class="stack" style="gap:8px;">
++          <label for="renter_type">Renter type</label>
++          <select name="renter_type" id="renter_type">
++            <option value="worker" {% if renter_type=="worker" %}selected{% endif %}>Worker</option>
++            <option value="new_professional" {% if renter_type=="new_professional" %}selected{% endif %}>New professional</option>
++            <option value="student" {% if renter_type=="student" %}selected{% endif %}>Student</option>
++          </select>
++        </div>
++        <div class="stack" style="gap:8px;">
++          <label for="monthly_income">Monthly income or support (R)</label>
++          <input id="monthly_income" name="monthly_income" type="number" min="0" required value="{{ monthly_income }}">
++        </div>
++      </div>
++      <div class="stack" id="bursary_block" style="display:none; margin-top:18px;">
++        <label for="is_bursary_student">Are you a bursary student?</label>
++        <select id="is_bursary_student" name="is_bursary_student">
++          <option value="no" {% if not is_bursary_student %}selected{% endif %}>No</option>
++          <option value="yes" {% if is_bursary_student %}selected{% endif %}>Yes</option>
+         </select>
++        <p class="fieldHint">This ensures ScoreRent applies the appropriate student rules.</p>
+       </div>
++    </section>
+ 
+-      <div class="stack">
+-        <label>Monthly income / support (R)</label>
+-        <input name="monthly_income" type="number" min="0" required value="{{ monthly_income }}" />
++    <section class="formSection stack">
++      <div class="formSectionHeader">
++        <span class="formSectionNumber">2</span>
++        <div><h2 class="sectionTitle">Documents available</h2><p class="muted small">Select what you can provide today. This is compared with each listing’s requirements.</p></div>
+       </div>
+-    </div>
+-
+-    <div class="stack" id="bursary_block" style="display:none;">
+-      <label>Are you a bursary student?</label>
+-      <select name="is_bursary_student">
+-        <option value="no" {% if not is_bursary_student %}selected{% endif %}>No</option>
+-        <option value="yes" {% if is_bursary_student %}selected{% endif %}>Yes</option>
+-      </select>
+-      <p class="muted small" style="margin-top:-6px;">
+-        This ensures ScoreRent applies the correct student rules.
+-      </p>
+-    </div>
+-
+-    <hr />
+-
+-    <div class="stack">
+-      <label>Documents you have</label>
+-      <p class="muted" style="margin-top:-6px;">
+-        Tick what you can provide. ScoreRent uses this to check document fit.
+-      </p>
+-
+       <div class="checkbox-group">
+         {% for doc in (doc_clusters["worker"] | sort) %}
+-          <label class="checkbox">
+-            <input type="checkbox" name="submitted_documents" value="{{ doc }}"
+-              {% if doc in docs_selected %}checked{% endif %}/>
+-            <span>{{ doc.replace("_", " ").title() }}</span>
+-          </label>
++          <label class="checkbox"><input type="checkbox" name="submitted_documents" value="{{ doc }}" {% if doc in docs_selected %}checked{% endif %}><span>{{ doc.replace("_", " ")|title }}</span></label>
+         {% endfor %}
+-
+         {% for doc in (doc_clusters["new_professional"] | sort) %}
+-          <label class="checkbox">
+-            <input type="checkbox" name="submitted_documents" value="{{ doc }}"
+-              {% if doc in docs_selected %}checked{% endif %}/>
+-            <span>{{ doc.replace("_", " ").title() }}</span>
+-          </label>
++          <label class="checkbox"><input type="checkbox" name="submitted_documents" value="{{ doc }}" {% if doc in docs_selected %}checked{% endif %}><span>{{ doc.replace("_", " ")|title }}</span></label>
+         {% endfor %}
+-
+         {% for doc in (doc_clusters["student"] | sort) %}
+-          <label class="checkbox">
+-            <input type="checkbox" name="submitted_documents" value="{{ doc }}"
+-              {% if doc in docs_selected %}checked{% endif %}/>
+-            <span>{{ doc.replace("_", " ").title() }}</span>
+-          </label>
++          <label class="checkbox"><input type="checkbox" name="submitted_documents" value="{{ doc }}" {% if doc in docs_selected %}checked{% endif %}><span>{{ doc.replace("_", " ")|title }}</span></label>
+         {% endfor %}
+       </div>
+-    </div>
++    </section>
+ 
+-    <hr />
+-
+-    <div class="actions">
+-      <button class="btn" type="submit">Save profile</button>
+-      <a class="btn secondary" href="/evaluate">Go evaluate</a>
++    <div class="formActionBar">
++      <button class="button primary" type="submit">Save profile</button>
++      <a class="button" href="/dashboard">Cancel</a>
+     </div>
+   </form>
+ </section>
+@@ -83,14 +69,11 @@
+ <script>
+   const renterTypeSelect = document.getElementById("renter_type");
+   const bursaryBlock = document.getElementById("bursary_block");
+-
+   function updateBursaryVisibility() {
+     if (!renterTypeSelect || !bursaryBlock) return;
+-    bursaryBlock.style.display = (renterTypeSelect.value === "student") ? "block" : "none";
++    bursaryBlock.style.display = renterTypeSelect.value === "student" ? "flex" : "none";
+   }
+-
+   renterTypeSelect.addEventListener("change", updateBursaryVisibility);
+   updateBursaryVisibility();
+ </script>
+-
+ {% endblock %}
+diff --git a/templates/results.html b/templates/results.html
+index f2130d6..4a91dd2 100644
+--- a/templates/results.html
++++ b/templates/results.html
+@@ -1,119 +1,103 @@
+ {% extends "base.html" %}
+ {% block title %}Evaluation result · ScoreRent{% endblock %}
+ {% block content %}
+-
+-{% set verdict_class = "warn" %}
+-{% set hero_class = "hero-borderline" %}
++{% set ring_class = "" %}
+ {% set verdict_label = "Borderline" %}
+-
++{% set verdict_badge = "warn" %}
+ {% if evaluation.verdict == "STRONG_MATCH" or evaluation.verdict == "WORTH_APPLYING" %}
+-  {% set verdict_class = "good" %}
+-  {% set hero_class = "hero-good" %}
++  {% set ring_class = "good" %}
+   {% set verdict_label = "Strong match" %}
++  {% set verdict_badge = "good" %}
+ {% elif evaluation.verdict == "HIGH_RISK" or evaluation.verdict == "NOT_WORTH_IT" %}
+-  {% set verdict_class = "bad" %}
+-  {% set hero_class = "hero-bad" %}
++  {% set ring_class = "bad" %}
+   {% set verdict_label = "High risk" %}
++  {% set verdict_badge = "bad" %}
+ {% endif %}
+ 
+-<section class="stack result" style="padding-top:26px;">
++<section class="stack result">
+   <header class="pageHeader">
+     <div>
+-      <p class="eyebrow">Evaluation result</p>
+-      <h2>{{ evaluation.listing_name or "Unnamed listing" }}</h2>
+-      <p class="muted">Review the score, the reasons behind it, and the next practical steps.</p>
++      <p class="eyebrow">Application evaluation</p>
++      <h1>{{ evaluation.listing_name or "Unnamed listing" }}</h1>
++      <p>See what helped, what weakened the application and what you can do next.</p>
++    </div>
++    <div class="pageHeaderActions">
++      <a class="button" href="/history">All evaluations</a>
++      <a class="button primary" href="/evaluate">Evaluate another</a>
+     </div>
+-    <a class="button" href="/history">View history</a>
+   </header>
+ 
+-  <div class="scoreBox {{ hero_class }}">
+-    <div class="scoreHeader">
+-      <div>
+-        <div class="scoreTitle">Application score</div>
+-        <div class="score">{{ evaluation.score }}</div>
+-        <div class="verdict {{ verdict_class }}">{{ verdict_label }}</div>
+-        <div class="confidenceBadge">Confidence: {{ evaluation.confidence|title }}</div>
+-        {% if evaluation.confidence|upper == "LOW" %}
+-          <div class="resultWarning">
+-            Important information was missing, so treat this result as an estimate.
+-          </div>
+-        {% endif %}
+-      </div>
+-
+-      <div class="tipBubble">
+-        <span class="tip">What is this?</span>
+-        <div class="tipContent">
+-          <p>
+-            This score estimates how strong the application looks based on affordability,
+-            document fit, demand and upfront costs. It is not a guarantee of approval.
+-          </p>
+-        </div>
+-      </div>
++  <section class="resultHero">
++    <div class="scoreRing {{ ring_class }}" style="--score: {{ evaluation.score }};" aria-label="Application score {{ evaluation.score }} out of 100">
++      <div class="scoreRingInner"><strong>{{ evaluation.score }}</strong><small>out of 100</small></div>
+     </div>
+-  </div>
+-
+-  {% if actions %}
+-    <article class="card">
+-      <h3>Recommended actions</h3>
+-      <div class="actionList">
+-        {% for action in actions %}
+-          <div class="actionItem">
+-            <span class="actionNumber">{{ loop.index }}</span>
+-            <span>{{ action }}</span>
+-          </div>
+-        {% endfor %}
++    <div class="resultHeroText">
++      <p class="eyebrow">Your application fit</p>
++      <h1>{{ verdict_label }}</h1>
++      <p>This is a practical decision guide based on affordability, document fit, demand and upfront costs. It is not a prediction or guarantee of approval.</p>
++      <div class="resultPills">
++        <span class="badge {{ verdict_badge }}">{{ verdict_label }}</span>
++        <span class="badge">{{ evaluation.confidence|title }} information confidence</span>
++        <span class="badge">Rules-based result</span>
+       </div>
+-    </article>
+-  {% endif %}
++      {% if evaluation.confidence|upper == "LOW" %}
++        <div class="resultWarning">Some important information was missing, so treat this result as an estimate and verify the listing details.</div>
++      {% endif %}
++    </div>
++  </section>
+ 
+-  <article class="card stack">
+-    <h3>Listing summary</h3>
++  <section class="card stack">
++    <div><p class="eyebrow">Listing summary</p><h2 class="sectionTitle">Costs used in this evaluation</h2></div>
+     <div class="summary-grid">
+-      <div><span class="label">Rent</span>R{{ '{:,}'.format(listing.rent or 0) }}</div>
++      <div><span class="label">Monthly rent</span>R{{ '{:,}'.format(listing.rent or 0) }}</div>
+       <div><span class="label">Deposit</span>R{{ '{:,}'.format(listing.deposit or 0) }}</div>
+       <div><span class="label">Application fee</span>R{{ '{:,}'.format(listing.application_fee or 0) }}</div>
+-      <div><span class="label">Demand</span>{{ listing.area_demand or "MEDIUM" }}</div>
++      <div><span class="label">Area demand</span>{{ listing.area_demand or "MEDIUM" }}</div>
+     </div>
+-  </article>
++  </section>
+ 
+   {% if reasons %}
+-    <article class="card stack">
+-      <h3>Why you got this result</h3>
+-      <ul class="reasonList">
+-        {% for reason in reasons %}<li>{{ reason }}</li>{% endfor %}
+-      </ul>
+-    </article>
++    <section class="card stack">
++      <div><p class="eyebrow">What shaped the result</p><h2 class="sectionTitle">Why you got this score</h2></div>
++      <ul class="reasonList">{% for reason in reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
++    </section>
++  {% endif %}
++
++  {% if actions %}
++    <section class="card stack">
++      <div><p class="eyebrow">Next steps</p><h2 class="sectionTitle">Recommended actions</h2></div>
++      <div class="actionList">
++        {% for action in actions %}
++          <div class="actionItem"><span class="actionNumber">{{ loop.index }}</span><span>{{ action }}</span></div>
++        {% endfor %}
++      </div>
++    </section>
+   {% endif %}
+ 
+   {% if listing.breakdown %}
+-    <article class="card breakdownCard">
++    <section class="card breakdownCard">
+       <details class="breakdownDetails">
+-        <summary class="breakdownSummary">View score breakdown</summary>
++        <summary class="breakdownSummary">View the detailed score breakdown</summary>
+         <div class="breakdownList">
+           {% for item in listing.breakdown %}
+             {% set badge_class = "zero" %}
+             {% if item.delta > 0 %}{% set badge_class = "pos" %}{% elif item.delta < 0 %}{% set badge_class = "neg" %}{% endif %}
+             <div class="breakItem">
+               <div class="breakTop">
+-                <div>
+-                  <div class="breakTitle">{{ item.title }}</div>
+-                  {% if item.details %}<div class="breakDetailsText">{{ item.details }}</div>{% endif %}
+-                </div>
+-                <div class="breakRight">
+-                  <div class="deltaBadge {{ badge_class }}">{% if item.delta > 0 %}+{% endif %}{{ item.delta }}</div>
+-                  <div class="arrowNums">{{ item.before }} → {{ item.after }}</div>
+-                </div>
++                <div><div class="breakTitle">{{ item.title }}</div>{% if item.details %}<div class="breakDetailsText">{{ item.details }}</div>{% endif %}</div>
++                <div class="breakRight"><div class="deltaBadge {{ badge_class }}">{% if item.delta > 0 %}+{% endif %}{{ item.delta }}</div><div class="arrowNums">{{ item.before }} → {{ item.after }}</div></div>
+               </div>
+             </div>
+           {% endfor %}
+         </div>
+       </details>
+-    </article>
++    </section>
+   {% endif %}
+ 
+   <div class="actions">
+-    <a class="button primary" href="/evaluate">Evaluate another</a>
+-    <a class="button" href="/listings">Saved listings</a>
++    <a class="button primary" href="/evaluate">Evaluate another listing</a>
++    <a class="button" href="/listings">Open saved listings</a>
++    <a class="button" href="/compare">Compare shortlist</a>
+   </div>
+ </section>
+ {% endblock %}
+diff --git a/templates/signup.html b/templates/signup.html
+index ae22d86..1710c6f 100644
+--- a/templates/signup.html
++++ b/templates/signup.html
+@@ -1,12 +1,25 @@
+ {% extends "base.html" %}
++{% block title %}Create account · ScoreRent{% endblock %}
+ {% block content %}
+-<h2>Create account</h2>
+-{% if error %}<p class="error">{{ error }}</p>{% endif %}
+-<form method="post" class="card">
+-  <label>Email</label>
+-  <input name="email" type="email" required />
+-  <label>Password</label>
+-  <input name="password" type="password" required minlength="6" />
+-  <button class="btn" type="submit">Sign up</button>
+-</form>
++<section class="authLayout">
++  <div class="authIntro">
++    <p class="eyebrow">Build your shortlist</p>
++    <h1>Make rental decisions without the spreadsheet chaos.</h1>
++    <p>Save imported listings, compare costs and commute estimates, and keep your evaluation history together.</p>
++    <div class="trustLine"><span>Import screenshots</span><span>Compare 2–4 listings</span><span>Track your reasoning</span></div>
++  </div>
++
++  <div class="authPanel">
++    <p class="eyebrow">Get started</p>
++    <h2>Create account</h2>
++    <p class="muted">It takes less than a minute.</p>
++    {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
++    <form method="post" class="stack">
++      <div class="stack" style="gap:8px;"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required></div>
++      <div class="stack" style="gap:8px;"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="new-password" required minlength="6"><p class="fieldHint">Use at least six characters.</p></div>
++      <button class="button primary" type="submit">Create account</button>
++    </form>
++    <p class="authSwitch">Already have an account? <a href="/login">Sign in</a></p>
++  </div>
++</section>
+ {% endblock %}
