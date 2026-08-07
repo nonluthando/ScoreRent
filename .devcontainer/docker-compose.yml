@@ -6,6 +6,8 @@ services:
     volumes:
       - ..:/workspaces/scorerent:cached
     command: sleep infinity
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql://scorerent:scorerent@db:5432/scorerent
       TEST_DATABASE_URL: postgresql://scorerent:scorerent@test-db:5432/scorerent_test
